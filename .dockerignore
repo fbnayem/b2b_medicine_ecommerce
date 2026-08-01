@@ -1,0 +1,26 @@
+# Keep the build context small and, more importantly, keep secrets and local
+# state out of an image that may be pushed to a registry.
+node_modules
+**/node_modules
+dist
+**/dist
+dist-scripts
+**/dist-scripts
+build
+**/build
+.git
+.github
+.turbo
+**/.turbo
+.env
+.env.*
+!.env.example
+*.log
+coverage
+**/coverage
+.expo
+**/.expo
+.vscode
+.idea
+Thumbs.db
+.DS_Store

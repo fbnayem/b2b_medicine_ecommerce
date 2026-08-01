@@ -1,0 +1,16 @@
+{
+  "name": "@medsupply/validation",
+  "version": "0.0.0",
+  "main": "dist/index.js",
+  "types": "index.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "tsc"
+  },
+  "dependencies": {
+    "@medsupply/shared-types": "workspace:^",
+    "zod": "^4.4.3"
+  }
+}

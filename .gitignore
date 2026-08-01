@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-scripts
+build
+.turbo
+.next
+.expo
+.env
+coverage
+.pnpm-store
+.phase3-dist
+.verify/
+.verify-dist/
+package-lock.json
+yarn.lock

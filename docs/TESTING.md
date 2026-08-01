@@ -1,0 +1,94 @@
+# Testing Strategy
+
+Tests must pass before a phase is marked complete.
+
+## Commands
+
+- API unit/service tests: `pnpm --filter @medsupply/api test`
+- API transaction/integration tests: `pnpm --filter @medsupply/api test:integration`
+- Web component tests: `pnpm --filter @medsupply/web test`
+- Mobile flow tests: `pnpm --filter @medsupply/mobile test`
+- Type checks: `pnpm typecheck`
+- Production builds: `pnpm build`
+- Repository lint: `pnpm lint`
+
+The API integration command uses `mongodb-memory-server` as a one-node replica set by default. If `MONGODB_TEST_URI` is supplied, it uses that dedicated external replica-set database instead. The suite drops only the selected integration database before and after execution.
+
+## Current coverage through Phase 8
+
+- Inventory validation, expired receipt, FEFO eligibility/order/shortfall, negative stock, and committed-stock adjustment rules.
+- Cart integer arithmetic, immutable price snapshots, shop submission gates, draft immutability, and cancellation eligibility.
+- Integer packed-invoice calculations, discount caps, configured tax, deterministic A4/thermal PDF structure.
+- Concurrent FEFO reservation, idempotent order submission, Shop Owner isolation, one-winner approval, and failed-approval rollback.
+- Concurrent picking start, permission denial, blocked/expired batch rejection, pause/resume, discrepancy notification/resolution, packed limits, unused stock release, unique invoice/package creation, invoice immutability, PDF endpoints, ready queue, and invoice record isolation.
+- Web fulfilment queue loading/data/filter/error/retry states.
+- Mobile barcode matching and versioned picking/packing payloads, including shortfall reasons.
+- Delivery transition-policy metadata, atomic creation, assignment/reassignment, exact handover and acknowledgement gates.
+- Assigned-person isolation, pickup/start/arrival actions, expiring OTP verification, proof storage, terminal Order coordination and duplicate completion replay.
+- Failed reasons, return custody, Storekeeper receipt and safe post-return reassignment.
+- Web delivery loading/filter/error/retry component states.
+- Mobile stable idempotency keys, duplicate queue suppression and server-confirmed versus retained offline retry behavior.
+- Full, partial and multiple Payment allocation; explicit advance handling; overpayment/unsafe-number rejection; exact integer tax/proration; balanced journals and inverse reversal.
+- Atomic credit reservations under two concurrent Order approvals, credit-limit rejection, reasoned Manager override, and Admin-only audited migration backfill with idempotent replay.
+- Manual and delivery Payment creation/posting, duplicate request/transaction prevention, attachment storage, cash handover, receipt PDF, reversal permission, Invoice due restoration and immutable Payment/Ledger enforcement.
+- Ledger-derived outstanding/overdue and date-filtered statement opening/activity/closing, plus cross-shop Payment/receipt isolation.
+- Web payment/collection/account/statement/report loading, action and money parsing; mobile money, collection validation, role navigation and online-only finance flow helpers.
+
+Production web and Android Expo exports are build-level checks, not substitutes for the service, integration, component, and flow tests above.
+
+## Phase 9 coverage
+
+- Template completeness: every catalogued event renders a non-empty title and body from an empty context, with no `undefined` interpolation and no IN_APP in optional defaults.
+- Money rendering from integer minor units, including the sub-unit, grouped, negative and non-integer rejection cases.
+- Asia/Dhaka quiet hours: UTC-to-local conversion, windows that wrap past midnight, same-day windows and the disabled case.
+- Channel resolution: in-app is never suppressed; an event override beats the account default; quiet hours mute push/SMS/WhatsApp but keep email; CRITICAL events bypass quiet hours; template defaults apply when no preference is saved.
+- Dedupe and idempotency key derivation across recipients, events, occurrences and channels.
+- Queue behaviour: exponential backoff, the attempt limit, and job-id deduplication in the in-process driver.
+- Replica-set integration: one in-app record plus one delivery row per channel; replayed occurrences create nothing new; a muted event keeps only the in-app row; inbox isolation, unread counts and cross-user mark-read returning zero; saved preferences changing the channels of a later notification; push token migration between users and dispatch to active devices only; a malformed push token being rejected before it reaches the provider; activity timeline visibility for two shop owners and an internal role; append-only activity dedupe; the sweeper recovering an orphaned PENDING delivery; and the admin test-send being closed to Managers.
+- Web components: bell badge and dropdown, a realtime push incrementing the badge, retry on load failure, signed-out rendering, notification list mark-read, category filtering, preference override saving, muted-event control disabling, and timeline populated/empty states.
+- Mobile flows: Android channel creation before the permission prompt, no re-prompt when already granted, declined permission, emulator detection, provider failure surfaced rather than thrown, sign-out unregistering exactly the session's token without blocking on failure, push link-to-route mapping including the unknown-link fallback, iOS platform handling, preference resolution and toggling, and realtime origin derivation.
+
+## Phase 10 coverage
+
+- Settings resolution: built-in defaults with nothing configured; environment values overriding per field; an untouched field in an overridden group keeping its default; unusable values (a non-numeric tax rate, an out-of-range near-expiry window, an unknown delivery proof, a whitespace-only business name) falling back instead of propagating.
+- Group source reporting: an override is reported only when an environment variable is actually set, and a whitespace-only value is not treated as a configuration decision.
+- Group schemas rejecting a tax rate above 100%, a fractional basis point, a zero or oversized near-expiry window, a zero-minute OTP lifetime, a too-short password minimum and an under-length business name.
+- Localisation: an unknown IANA zone rejected, currency code normalised to upper case, and Bangla accepted so enabling it later needs no schema migration.
+- Administrative guard rails as pure decisions: an Admin refused against a privileged target and against granting a privileged role, self role change and self deactivation refused, ordinary edits allowed.
+- Replica-set settings integration: effective values with provenance and versions; a saved group becoming effective and reported as persisted; a stale version rejected while the first save stands; invalid settings never reaching the domain; saved settings changing delivery proof requirements and OTP lifetime without a restart; a reset restoring the fallback and keeping the discarded values in the audit; settings administration closed to Managers while branding stays open and policy-free.
+- Replica-set administration: an Admin blocked from administering a Super Admin and from granting a privileged role while an ordinary promotion succeeds; the last active Super Admin protected from demotion and deactivation; a role change revoking sessions and writing a role-change audit record; a password reset forcing a change, signing out sessions and never recording the password; a temporary password refused against the configured minimum; sign-in outcomes audited with lockout following the configured policy and no password in the log; the audit log filterable by administrators and closed to Managers; the user directory searchable, escaping regular-expression metacharacters and never returning a password hash.
+- Web components: settings rendered with provenance and saved with the correct version; a concurrent change explained and reloaded; reset offered only for a group with a saved override; permission denial surfaced instead of an empty form; a role change issued through the API; own-account controls disabled; a server refusal surfaced; a Manager read-only view; audit records listed and expanded on demand; audit permission denial explained.
+- Mobile helpers: every value type rendered as an operator reads it, an unset optional field distinguished from an empty collection, quiet hours rendered as a window rather than raw JSON, unknown fields still rendered rather than disappearing, and each provenance label.
+
+## Phase 11 coverage
+
+- `returnRules.test.ts`: 17 unit tests covering the transition table's completeness, the role and state gates, the derived approve/partial/reject outcome, how open and closed returns claim invoice quantity, the disposition guards including the expired-batch restock refusal, and every money path — proportional line discounts, order-discount sharing, tax proration, the delivery charge deliberately not being refunded, and the cumulative credit ceiling.
+- `returnsIntegration.test.ts`: 14 replica-set integration tests covering the full lifecycle from request to credit note, a partial return crediting only what arrived, an expired batch being written off rather than restocked, the invoice quantity ceiling across several returns, a cancellation releasing its claim, cross-shop isolation for both reads and actions, role separation between approving and receiving, idempotent replay of both a receipt and a credit-note issue, stale-version rejection, audit coverage, the report figures, the CSV byte order mark and formula-injection defence, and a Shop Owner's report being narrowed to their own shop.
+- 6 web component tests covering the role-specific return list and detail views, the storekeeper disposition form, the stale-conflict reload, and the analytics dashboard including the accessible data table behind each chart.
+- 12 mobile helper tests covering the per-role action policy for every status and the local disposition guard that catches an over-receipt or an expired-batch restock before the round trip.
+
+## Phase 12 coverage
+
+- `securityRules.test.ts`: 19 unit tests. The sanitiser's key rules; a body losing its operators while keeping every legitimate field; a prototype-pollution attempt failing to reach `Object.prototype`; dates, buffers and scalars surviving untouched; the query parser proving `?status[$ne]=` cannot become an operator object and that repeated keys collapse to an array; a search term escaped so it matches literally and capped in length. Rate-limit windows counting, resetting and keeping tiers and callers separate. Log redaction removing every credential-shaped field while keeping the rest, with bounded depth, breadth and string length. Access tokens naming their session, tokens of one type failing verification as the other, two rotations of one session producing different tokens, a stored HMAC matching only its own token and never containing it, and a pre-existing bcrypt hash still verifying. The OpenAPI document describing every declared operation with its permissions, carrying the request schema the server enforces, and leaving the health probes unauthenticated.
+- `hardeningIntegration.test.ts`: 23 replica-set integration tests against a real HTTP server. No password hash in the sign-in response or the user directory, asserted across the whole payload rather than named fields. The refresh cookie being HTTP-only, `SameSite=Strict` and scoped to the auth routes. Replaying a rotated refresh token revoking every session for that user, writing an audit record and immediately invalidating an unrelated live access token. Revoking a session stopping its access token on the next request. One user's session identifier returning "not found" to another. An unknown account and a wrong password being indistinguishable. An operator in the query string failing to widen a filter and one in a body failing validation instead of reaching bcrypt. A wildcard search matching literally. A list endpoint capping its page size. Security headers present and the server unadvertised. A correlation identifier generated, honoured when well formed and replaced when not. An unknown route, an oversized body and malformed JSON all answering in the standard envelope. A caller over budget receiving 429 with `Retry-After`. The OpenAPI document and its self-contained reference page. The report and audit queries proving with `explain()` that an index serves them rather than a collection scan, and aggregations carrying a server-side time limit. Liveness, readiness and version reporting honestly, the runtime status being administrator-only and containing no secret, and a suspended account being unable to refresh its way past the decision.
+- 7 web component tests: each device named in words its owner can recognise, every sign-in listed with the current device marked, a confirmation before ending one, "sign out everywhere" offered only when more than one session is live, the deployment panel shown to an administrator with no secret in it, the session list still usable when that panel cannot be read, and a failure surfaced with a retry rather than an empty screen.
+- 7 mobile helper tests: device descriptions for the mobile client and each desktop browser, an honest "unknown" rather than a guess, whether a session can still be ended, list ordering that puts live sessions and the current device first without mutating its input, and the wording that distinguishes a safety revocation from an ordinary sign-out.
+
+One of these was written because the code was wrong. The correlation-identifier test failed first against the middleware refusals: a 401 raised inside `requireAuth` never reaches the error handler, so it carried no identifier and the caller had nothing to quote. Those refusals now attach it themselves.
+
+## Running the integration suites against a real MongoDB
+
+The suites default to `mongodb-memory-server`, which starts a genuine one-node replica set and needs nothing installed. To run them against the Dockerised server instead, set `MONGODB_TEST_URI`:
+
+```bash
+docker compose up -d mongodb
+cd apps/api
+for suite in integration notificationIntegration settingsIntegration returnsIntegration hardeningIntegration; do
+  MONGODB_TEST_URI="mongodb://127.0.0.1:27017/it_$suite?replicaSet=rs0" \
+    node --require ./dist/services/testEnv.js --test dist/services/$suite.test.js
+done
+```
+
+One database per suite is required, not optional. Every suite drops its database in its `before` hook, and Node's test runner runs files concurrently, so pointing them all at one database makes them drop it out from under each other. With the in-memory server the question does not arise because each file gets its own instance.
+
+Verified on a real MongoDB 6.0 replica set: 71 passed, 0 failed.

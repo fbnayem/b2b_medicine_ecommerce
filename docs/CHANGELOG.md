@@ -1,0 +1,104 @@
+# Changelog
+
+## Phase 12 - Final Security Hardening, Performance and Release Readiness
+
+- Fixed four vulnerabilities carried by earlier phases, each now covered by a test that fails if the fix is reverted: the sign-in response returned the account's bcrypt hash; shop and directory search terms were interpolated into `$regex` unescaped; query parameters were assigned straight into database filters, so `?status[$ne]=` was an injection; and replaying an already-rotated refresh token was answered with an error while the live session kept working.
+- Added the security middleware layer: Helmet headers with a self-contained content security policy, a query parser that cannot produce operator objects, recursive body and parameter sanitisation against operator and prototype keys, per-request correlation identifiers, hop-counted proxy trust and tiered request body limits.
+- Added tiered rate limiting - sign-in, writes, reports and a global backstop - keyed by user when authenticated, backed by Redis when configured and an identical in-process store otherwise, with standard `RateLimit-*` and `Retry-After` headers.
+- Hardened sessions and tokens: access tokens name their session and revocation is enforced on every request and every realtime handshake, refresh tokens are stored as an HMAC with bcrypt still accepted for existing sessions, the refresh cookie is scoped to the auth routes, sessions expire on a TTL index, and sign-in pays the same cost whatever the outcome.
+- Added self-service session management for every role: list your own sign-ins, end one, or end them all, on both web and mobile.
+- Added structured JSON logging with credential redaction and bounded depth, and an error handler that keeps actionable messages while refusing to leak exception text in production.
+- Added an OpenAPI 3.1 document generated from the Zod schemas the server validates with, plus a self-contained API reference served by the API itself.
+- Added the indexes the Phase 11 report aggregations needed, a `maxTimeMS` guard on those aggregations, lean list reads, connection pool tuning and response compression, with an integration test that asserts with `explain()` that an index rather than a collection scan serves each report query.
+- Added release readiness: split liveness and readiness probes, a version endpoint, an administrator-only runtime status, ordered graceful shutdown with a hard timer, multi-stage non-root Dockerfiles for the API and web, an nginx reference configuration, a production compose file, a GitHub Actions pipeline on Node 20 LTS, and an index verification script that fails a release when an index is missing.
+- Moved the web application's API origin out of the source and into a build argument that defaults to a same-origin path.
+- Fixed two defects found by running the containers rather than only validating their configuration: the production image did not contain the operational scripts the documented release sequence depends on, and the bootstrap script created the first Super Admin with a password hard-coded in this repository, printed it, and did not force a change.
+- Verified the whole deployment on Docker: both images build, the production stack runs with the Redis rate-limit store, the Redis Socket.IO adapter and the BullMQ queue live, and the full integration suite passes against a real MongoDB 6.0 replica set.
+- Repaired the operational scripts: every migration ran through a TypeScript loader incompatible with this repository's compiler and could not start. They are now compiled and run with plain `node`, which also surfaced and fixed two latent type errors in the Phase 9 migration.
+
+## Phase 11 - Returns, Reporting and Analytics
+
+- Added the complete customer-return lifecycle: request against an issued invoice, review with per-line approved quantities, collection, warehouse receipt with per-unit disposition, and an immutable credit note posted to the customer ledger.
+- Enforced the invoice ceiling across returns, so open requests hold their claim on a line and rejected or cancelled ones release it.
+- Added disposition-controlled restocking through the previously unused `returned` stock bucket and five new stock movement types; an expired batch can be received but never restocked.
+- Added refund arithmetic that mirrors the invoice in integer minor units — line discount, then a proportional share of the order discount, then tax — with the delivery charge deliberately not refunded.
+- Added credit notes with snapshotted identity, a printable PDF and a balanced RETURN_CREDIT ledger posting keyed on the return, so a retried issue cannot double-credit.
+- Added order transitions to RETURN_REQUESTED and RETURNED, restoring the interrupted status when a return is rejected or cancelled.
+- Added six return notification events, timeline coverage and a `return:updated` realtime event.
+- Added sales, sales-by-dimension, order funnel with cycle times, inventory valuation with expiry and dead stock, delivery performance, returns analytics, receivables ageing and a composed analytics overview.
+- Added CSV export on every report with a byte order mark and formula-injection neutralisation, downloaded through the authenticated client.
+- Added web returns and analytics screens with dependency-free SVG charts each paired with an accessible data table, and mobile returns and analytics workflows.
+- Added return-rule, replica-set integration, web component and mobile coverage.
+
+## Phase 10 - System Settings, Configuration and Administration
+
+- Added seven persisted, versioned and audited settings groups covering business identity, finance and credit, inventory, delivery proof, notification defaults, localisation and security policy.
+- Added persisted-then-environment-then-default resolution applied per field, with each group reporting where its effective values came from.
+- Migrated every business configuration read off environment variables, from invoice tax and identity to credit blocking, OTP lifetime, near-expiry thresholds and the sign-in lockout policy.
+- Added per-group optimistic concurrency, group reset to fallback, a policy-free branding endpoint and a `settings:updated` realtime event.
+- Added administrative user management with role, status, temporary password reset and session revocation, guarded so an Admin cannot reach privileged accounts, nobody can demote themselves and the last active Super Admin is protected.
+- Added sign-in auditing and a read-only, filterable audit log viewer.
+- Added web settings, user administration and audit screens, and a read-only mobile settings view for administrators.
+- Added a rerunnable migration that seeds only the groups the environment actually configures.
+
+## Phase 9 - Notifications, Real-Time Updates and Activity Timeline
+
+- Replaced ad-hoc notification writes across ordering, approval, fulfilment, delivery, payment and OTP with one templated dispatcher covering a closed catalogue of 26 events.
+- Added per-user channel preferences, per-event overrides, muted events and Asia/Dhaka quiet hours; in-app delivery stays mandatory and every suppression is recorded with a reason.
+- Added replaceable email, SMS, WhatsApp and Expo push channel adapters, per-channel delivery records, retries with exponential backoff and a sweeper that recovers lost dispatches.
+- Added a BullMQ queue that degrades to an identical in-process driver when Redis is absent, plus daily overdue-invoice and near-expiry-stock digests.
+- Added a Socket.IO server with token-authenticated handshakes and user, role and shop rooms, and an optional Redis adapter for multi-instance fan-out.
+- Added the append-only activity timeline with per-record visibility, order and shop cross-links, and a migration that projects historical audit records into it.
+- Added web notification bell, inbox, preferences, activity feed and embedded timelines; delivery views now refresh on realtime signals with polling retained as a fallback.
+- Added mobile notification inbox, preferences, Expo push registration with permission handling, deep-link routing, realtime updates and embedded timelines.
+- Added notification rule, queue, replica-set integration, web component and mobile flow coverage.
+
+## Phase 8 - Payments, Customer Due and Ledger
+
+- Added pending/posted/failed/reversed Payments, delivery collection verification, proof attachments, cash handover, receipts and exact idempotency/duplicate protection.
+- Added immutable balanced Ledger transactions, live Invoice allocation, customer advances, reversals, adjustments, statements, overdue/outstanding/collection reports and reconciliation.
+- Invoice packing now posts its charge; credit approvals atomically reserve per-Shop exposure and packing consumes the reservation.
+- Added complete internal/Shop Owner web finance workflows and role-based Shop Owner/Manager/Delivery Person mobile finance workflows.
+- Added rerunnable legacy-finance scanning/canonicalisation, authenticated request-bound credit-reservation backfill, and expanded financial, integration, web and mobile test coverage.
+
+## Phase 7 - Delivery Assignment and Delivery Application
+
+- Created transactional Delivery records with packages/invoices and human `DEL` references.
+- Added assignment/reassignment, workload, custody handover/acknowledgement, pickup, route, arrival, configurable proof, completion, failure and return state actions.
+- Added expiring hashed receiver OTP and replaceable local OTP/proof-storage adapters.
+- Added web delivery board/details/assignment/handover/failed queue/POD viewer and Shop Owner tracking.
+- Added Expo role-based delivery operations with call/map, camera, drawn signature, foreground GPS consent, payment collection capture and offline idempotent retry.
+- Added state-policy, API integration, web component and mobile offline-flow tests.
+
+## Phase 6 - Storekeeper Picking, Packing and Invoice Generation
+
+- Added approved, picking, paused, packing, discrepancy, packed, and ready queues.
+- Added transactional picking progress, pause/resume, batch confirmation, manager-visible discrepancy blocking and resolution.
+- Added packing limits, expired/blocked validation, shortfall reasons, unused-stock release, audit records and notifications.
+- Added immutable packed-quantity Invoice and Package entities with configurable supplier/tax/footer snapshots.
+- Added A4 and 80 mm thermal print/PDF layouts plus package labels.
+- Added responsive web workflows and Expo Storekeeper queue, camera barcode scanning, manual fallback, packing, discrepancy, and ready screens.
+- Added unit, replica-set integration, web component, and mobile flow coverage.
+
+## Phase 5 — Manager Review and Approval
+
+- Added manager approval queues and web/mobile review workflows.
+- Added transactional full/partial approval, FEFO reservation, picking-list creation, credit/licence gates and optimistic concurrency.
+- Added approval notifications, audit history and Docker-backed rollback/concurrency tests.
+
+## Phase 3–4 verification
+
+- Enabled and verified the local MongoDB replica set.
+- Added live inventory concurrency and order API integration tests.
+- Verified idempotent order replay and cross-shop access denial.
+
+## Phase 4 — Shop Ordering and Cart
+
+- Added stock-neutral carts and server drafts across web and mobile.
+- Added order snapshots, estimates, saved-address checkout and idempotent submission.
+- Added isolated order history/details, timelines, repeat order and cancellation requests.
+- Added in-app order notifications and audit events.
+
+## Phase 3 — Catalogue and Inventory
+
+- Added medicine catalogue, batches, stock states, movements, FEFO allocation, inventory interfaces and operational tests.

@@ -1,0 +1,18 @@
+{
+  // Operational scripts — migrations, index verification, specification export.
+  //
+  // They live outside `src` and import from it, so they need their own root and
+  // output directory. They are compiled and run with plain `node` rather than a
+  // TypeScript loader: `ts-node-dev` is pinned to a `ts-node` that predates
+  // TypeScript 7 and fails to start against the compiler this repository uses,
+  // which meant every migration script was unrunnable. Compiling them is both
+  // the fix and closer to how they run in a deployment anyway.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist-scripts",
+    "rootDir": ".",
+    "module": "Node16",
+    "moduleResolution": "Node16"
+  },
+  "include": ["scripts/**/*", "src/**/*"]
+}

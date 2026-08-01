@@ -1,0 +1,347 @@
+import type { NextFunction, Request, Response } from 'express';
+import bcrypt from 'bcrypt';
+import mongoose from 'mongoose';
+import { User } from '../models/User';
+import { Session } from '../models/Session';
+import { LoginSchema } from '@medsupply/validation';
+import { UserStatus, UserRole } from '@medsupply/shared-types';
+import type { AuthRequest } from '../middlewares/auth';
+import { AuditLog } from '../models/AuditLog';
+import { securitySettings } from '../services/settingsService';
+import { correlationId, logger } from '../services/logger';
+import {
+  clearRefreshCookie,
+  hashRefreshToken,
+  issueTokens,
+  refreshTokenMatches,
+  refreshTokenTtlMs,
+  setRefreshCookie,
+  verifyRefreshToken,
+} from '../services/tokenService';
+
+/**
+ * AGENTS requires login to be audited. A failed attempt records the account it
+ * targeted but never the submitted password, and an unknown email records no
+ * actor at all rather than inventing one.
+ */
+async function auditAuth(
+  req: Request,
+  action: string,
+  userId: mongoose.Types.ObjectId | undefined,
+  role: UserRole | undefined,
+  detail?: Record<string, unknown>,
+) {
+  if (!userId) return;
+  await AuditLog.create({
+    actorId: userId,
+    actorRole: role ?? UserRole.SHOP_OWNER,
+    action,
+    entityType: 'User',
+    entityId: userId,
+    after: detail,
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent'),
+    correlationId: correlationId(),
+  });
+}
+
+/**
+ * A bcrypt comparison against a throwaway hash.
+ *
+ * Sign-in used to return immediately when the email was unknown and spend
+ * roughly a tenth of a second hashing when it was not, so the response time
+ * alone told an attacker which addresses have accounts. Every attempt now pays
+ * the same cost.
+ */
+const DECOY_HASH = bcrypt.hashSync('password-that-is-never-correct', 10);
+
+export const login = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, password } = LoginSchema.parse(req.body);
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      await bcrypt.compare(password, DECOY_HASH);
+      return res
+        .status(401)
+        .json({ error: { code: 'UNAUTHORIZED', message: 'Invalid credentials' } });
+    }
+
+    if (user.status !== UserStatus.ACTIVE) {
+      await bcrypt.compare(password, DECOY_HASH);
+      return res
+        .status(403)
+        .json({ error: { code: 'FORBIDDEN', message: 'Account is not active' } });
+    }
+
+    if (user.lockoutUntil && user.lockoutUntil > new Date()) {
+      await bcrypt.compare(password, DECOY_HASH);
+      await auditAuth(req, 'LOGIN_BLOCKED', user._id, user.role as UserRole, {
+        reason: 'Account locked',
+        lockoutUntil: user.lockoutUntil,
+      });
+      return res.status(403).json({
+        error: { code: 'FORBIDDEN', message: 'Account locked due to too many failed attempts' },
+      });
+    }
+
+    // Lockout thresholds come from System Settings so they can be tightened
+    // without a redeploy; the environment remains the fallback.
+    const policy = await securitySettings();
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) {
+      user.loginAttempts += 1;
+      const locked = user.loginAttempts >= policy.maxLoginAttempts;
+      if (locked) {
+        user.lockoutUntil = new Date(Date.now() + policy.lockoutMinutes * 60 * 1000);
+      }
+      await user.save();
+      await auditAuth(
+        req,
+        locked ? 'LOGIN_LOCKED' : 'LOGIN_FAILED',
+        user._id,
+        user.role as UserRole,
+        {
+          attempts: user.loginAttempts,
+          maxAttempts: policy.maxLoginAttempts,
+        },
+      );
+      return res
+        .status(401)
+        .json({ error: { code: 'UNAUTHORIZED', message: 'Invalid credentials' } });
+    }
+
+    user.loginAttempts = 0;
+    user.lockoutUntil = undefined;
+    user.lastLogin = new Date();
+    await user.save();
+
+    // The session identifier is needed to sign the tokens and the token hash is
+    // needed to store the session, so the record is created first and completed
+    // immediately. The placeholder can never authenticate: it is not a valid
+    // HMAC and no token hashes to it.
+    const session = await Session.create({
+      userId: user._id,
+      refreshTokenHash: 'pending',
+      userAgent: req.get('user-agent'),
+      ipAddress: req.ip,
+      expiresAt: new Date(Date.now() + refreshTokenTtlMs),
+      lastUsedAt: new Date(),
+    });
+
+    const { accessToken, refreshToken } = issueTokens(user.id, session.id);
+    session.refreshTokenHash = hashRefreshToken(refreshToken);
+    await session.save();
+
+    setRefreshCookie(res, refreshToken);
+
+    await auditAuth(req, 'LOGIN_SUCCEEDED', user._id, user.role as UserRole, {
+      sessionId: session.id,
+      forcePasswordChange: user.forcePasswordChange,
+    });
+
+    // `user` serialises through the model transform, which removes the password
+    // hash and the lockout counters.
+    res.json({ data: { user, accessToken, refreshToken } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const refresh = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+    if (!refreshToken) {
+      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'No refresh token' } });
+    }
+
+    let claims;
+    try {
+      claims = verifyRefreshToken(refreshToken);
+    } catch {
+      return res
+        .status(401)
+        .json({ error: { code: 'UNAUTHORIZED', message: 'Invalid refresh token' } });
+    }
+
+    const session = await Session.findById(claims.sessionId);
+    if (!session) {
+      clearRefreshCookie(res);
+      return res
+        .status(401)
+        .json({ error: { code: 'UNAUTHORIZED', message: 'Session not found' } });
+    }
+
+    const matches = await refreshTokenMatches(refreshToken, session.refreshTokenHash);
+
+    /**
+     * Reuse detection.
+     *
+     * A token that carries this session's valid signature but does not match
+     * the hash currently stored is a token that was already rotated away. There
+     * are only two explanations: the legitimate holder lost the response that
+     * carried the replacement, or somebody else is replaying a copy they should
+     * not have. Both are handled the same way, because the system cannot tell
+     * them apart and the cost of being wrong in one direction is a stolen
+     * account while in the other it is a sign-in.
+     *
+     * Previously only an already-revoked session triggered this; a replayed
+     * predecessor was answered with an error and left the live session running,
+     * which is precisely the case reuse detection exists to catch.
+     */
+    if (session.revokedAt || !matches) {
+      const reason = session.revokedAt ? 'revoked session' : 'rotated token replayed';
+      await Session.updateMany(
+        { userId: session.userId, revokedAt: null },
+        { revokedAt: new Date(), revokedReason: 'TOKEN_REUSE' },
+      );
+      const user = await User.findById(session.userId).select('role');
+      await auditAuth(req, 'REFRESH_TOKEN_REUSE_DETECTED', session.userId, user?.role as UserRole, {
+        sessionId: String(session._id),
+        reason,
+      });
+      logger.warn('Refresh token reuse detected; every session for the user was revoked', {
+        reason,
+      });
+      clearRefreshCookie(res);
+      return res.status(401).json({
+        error: {
+          code: 'TOKEN_REUSE_DETECTED',
+          message: 'This sign-in was ended for safety. Sign in again.',
+        },
+      });
+    }
+
+    if (session.expiresAt <= new Date()) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Session expired' } });
+    }
+
+    // An account disabled since the session began must not be able to keep
+    // renewing its way past that decision.
+    const user = await User.findById(session.userId).select('status role');
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      session.revokedAt = new Date();
+      session.revokedReason = 'REVOKED_BY_ADMIN';
+      await session.save();
+      clearRefreshCookie(res);
+      return res
+        .status(403)
+        .json({ error: { code: 'FORBIDDEN', message: 'Account is not active' } });
+    }
+
+    const rotated = issueTokens(String(session.userId), session.id);
+    session.refreshTokenHash = hashRefreshToken(rotated.refreshToken);
+    session.lastUsedAt = new Date();
+    await session.save();
+
+    setRefreshCookie(res, rotated.refreshToken);
+    res.json({ data: { accessToken: rotated.accessToken, refreshToken: rotated.refreshToken } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+    if (refreshToken) {
+      try {
+        const claims = verifyRefreshToken(refreshToken);
+        await Session.findByIdAndUpdate(claims.sessionId, {
+          revokedAt: new Date(),
+          revokedReason: 'SIGNED_OUT',
+        });
+      } catch {
+        // A token that no longer verifies cannot identify a session; the
+        // cookie is still cleared below so the browser stops presenting it.
+      }
+    } else if (req.sessionId) {
+      // Mobile signs out with its access token and no cookie.
+      await Session.findByIdAndUpdate(req.sessionId, {
+        revokedAt: new Date(),
+        revokedReason: 'SIGNED_OUT',
+      });
+    }
+    clearRefreshCookie(res);
+    res.json({ data: { success: true } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logoutAll = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await Session.updateMany(
+      { userId: req.user!._id, revokedAt: null },
+      { revokedAt: new Date(), revokedReason: 'SIGNED_OUT_EVERYWHERE' },
+    );
+    await auditAuth(req, 'SESSIONS_REVOKED_BY_OWNER', req.user!._id, req.user!.role as UserRole, {
+      revoked: result.modifiedCount,
+    });
+    clearRefreshCookie(res);
+    res.json({ data: { success: true, revoked: result.modifiedCount } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * The signed-in user's own sessions.
+ *
+ * Session revocation existed for administrators from Phase 10, but a user could
+ * neither see where their account was signed in nor end a session themselves —
+ * so the answer to a lost phone was to ask an administrator. No token or hash
+ * is returned; a session is identified by where and when it started.
+ */
+export const listOwnSessions = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const sessions = await Session.find({ userId: req.user!._id })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .select('userAgent ipAddress createdAt lastUsedAt expiresAt revokedAt revokedReason')
+      .lean();
+
+    res.json({
+      data: sessions.map((session) => ({
+        _id: String(session._id),
+        userAgent: session.userAgent ?? null,
+        ipAddress: session.ipAddress ?? null,
+        createdAt: session.createdAt,
+        lastUsedAt: session.lastUsedAt ?? null,
+        expiresAt: session.expiresAt,
+        revokedAt: session.revokedAt ?? null,
+        revokedReason: session.revokedReason ?? null,
+        current: req.sessionId ? String(session._id) === req.sessionId : false,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const revokeOwnSession = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: { code: 'INVALID_ID', message: 'Unknown session' } });
+    }
+    // Scoped to the owner, so the identifier of somebody else's session is
+    // simply not found rather than usable.
+    const session = await Session.findOne({ _id: req.params.id, userId: req.user!._id });
+    if (!session) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Unknown session' } });
+    }
+    if (!session.revokedAt) {
+      session.revokedAt = new Date();
+      session.revokedReason = 'SIGNED_OUT';
+      await session.save();
+      await auditAuth(req, 'SESSION_REVOKED_BY_OWNER', req.user!._id, req.user!.role as UserRole, {
+        sessionId: String(session._id),
+      });
+    }
+    if (req.sessionId && String(session._id) === req.sessionId) clearRefreshCookie(res);
+    res.json({ data: { success: true } });
+  } catch (error) {
+    next(error);
+  }
+};

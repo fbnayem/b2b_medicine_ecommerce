@@ -1,0 +1,15 @@
+# Generated or vendored files. Reformatting a lockfile makes CI's
+# `pnpm install --frozen-lockfile` fail, and the OpenAPI document is written by
+# `pnpm --filter @medsupply/api openapi`, so a hand-formatted copy would only
+# drift from what the generator emits.
+pnpm-lock.yaml
+docs/openapi.json
+
+node_modules
+dist
+dist-scripts
+build
+coverage
+.turbo
+.expo
+.pnpm-store

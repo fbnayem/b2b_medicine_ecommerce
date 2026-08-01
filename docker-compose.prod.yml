@@ -1,0 +1,98 @@
+# Production-shaped deployment.
+#
+# `docker-compose.yml` runs the development backing services with open ports and
+# default credentials. This file builds and runs the applications themselves,
+# publishes nothing but the web tier, and takes every secret from the
+# environment so none of them lives in the repository.
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# MongoDB runs as a replica set because the transactional guarantees this system
+# relies on — a payment and its ledger entry, a packing run and its invoice —
+# require multi-document transactions, which a standalone server cannot provide.
+
+services:
+  mongodb:
+    image: mongo:6.0
+    command: ['--replSet', 'rs0', '--bind_ip_all']
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--quiet',
+          '--eval',
+          "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb:27017'}]}).ok }",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    # Not published: only the API needs to reach it.
+    expose:
+      - '27017'
+
+  redis:
+    image: redis:7.0-alpine
+    command:
+      [
+        'redis-server',
+        '--requirepass',
+        '${REDIS_PASSWORD:?set REDIS_PASSWORD}',
+        '--appendonly',
+        'yes',
+      ]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    expose:
+      - '6379'
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: '5000'
+      MONGODB_URI: mongodb://mongodb:27017/medsupply_b2b?replicaSet=rs0
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET to at least 32 characters}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?set REFRESH_TOKEN_SECRET to at least 32 characters}
+      # One proxy in front: the nginx container below.
+      TRUST_PROXY_HOPS: '1'
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      APP_VERSION: ${APP_VERSION:-1.0.0}
+      GIT_COMMIT: ${GIT_COMMIT:-unknown}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    expose:
+      - '5000'
+    # The graceful shutdown in server.ts needs longer than Docker's ten-second
+    # default to drain in-flight transactions.
+    stop_grace_period: 30s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Same origin as the site, so the browser makes no cross-site request
+        # and the SameSite=Strict refresh cookie is delivered.
+        VITE_API_URL: /api/v1
+    ports:
+      - '${WEB_PORT:-8080}:8080'
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+  redis_data:
