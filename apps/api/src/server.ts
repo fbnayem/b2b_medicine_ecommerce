@@ -1,3 +1,9 @@
+// First, and before anything that reads configuration. `./env` validates the
+// environment the moment it is imported and exits when it is incomplete, so a
+// `.env` loaded any later would arrive after the process had already given up.
+// In a container there is no such file and dotenv is a silent no-op; this is
+// what makes the local workflow in docs/SETUP.md work without one.
+import 'dotenv/config';
 import { createServer } from 'http';
 import { connectDB, disconnectDB } from './db';
 import { env } from './env';

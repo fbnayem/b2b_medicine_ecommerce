@@ -98,8 +98,22 @@ const envSchema = z
 
 export type Env = z.infer<typeof envSchema>;
 
+/**
+ * An empty assignment means "not configured", not "configured as nothing".
+ *
+ * `.env.example` lists every optional variable with an empty value so an
+ * operator can see it exists — `REFRESH_TOKEN_SECRET=`, `REDIS_URL=` and so on.
+ * dotenv turns those into empty strings rather than leaving them absent, so
+ * without this an optional field is present-but-invalid and the process refuses
+ * to start on a file the documentation told you to copy verbatim. Nothing in
+ * the schema treats an empty string as meaningful, so dropping them here lets
+ * `.optional()` and `.default()` behave the way the file reads.
+ */
+const withoutBlanks = (source: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
+  Object.fromEntries(Object.entries(source).filter(([, value]) => value?.trim() !== ''));
+
 export const validateEnv = (): Env => {
-  const parsed = envSchema.safeParse(process.env);
+  const parsed = envSchema.safeParse(withoutBlanks(process.env));
 
   if (!parsed.success) {
     // Field names and reasons are printed; values never are, because a bad
