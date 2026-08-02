@@ -293,3 +293,33 @@ test('nobody can change or disable their own account', async () => {
     }),
   );
 });
+
+test('creating an account is not treated as changing your own role', async () => {
+  // A creation has no target. `createUser` used to satisfy the required
+  // parameter by passing the actor as their own target, which made every
+  // creation look like a self-demotion: a Super Admin could only create Super
+  // Admins, and no Manager, Storekeeper, Delivery Person or Shop Owner could be
+  // created at all. Each role is asserted individually so a future regression
+  // names the role it broke.
+  const superAdmin = { _id: objectId(), role: UserRole.SUPER_ADMIN };
+
+  for (const role of Object.values(UserRole)) {
+    await assert.doesNotReject(
+      assertAdministrable({ actor: superAdmin, nextRole: role }),
+      `a Super Admin must be able to create a ${role}`,
+    );
+  }
+
+  // The privilege rules still apply to a creation, which is the reason the
+  // guard is called from `createUser` at all.
+  const admin = { _id: objectId(), role: UserRole.ADMIN };
+
+  await assert.doesNotReject(assertAdministrable({ actor: admin, nextRole: UserRole.MANAGER }));
+
+  for (const privileged of [UserRole.ADMIN, UserRole.SUPER_ADMIN]) {
+    await expectRejection(
+      assertAdministrable({ actor: admin, nextRole: privileged }),
+      'PRIVILEGED_ROLE',
+    );
+  }
+});

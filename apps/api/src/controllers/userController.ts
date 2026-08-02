@@ -40,10 +40,11 @@ export const createUser = async (req: AuthRequest, res: Response, next: NextFunc
     }
 
     // The same privilege rules that govern edits govern creation, so an Admin
-    // cannot create a Super Admin account as a way around them.
+    // cannot create a Super Admin account as a way around them. There is no
+    // target account yet, so none is passed — supplying the actor as their own
+    // target made every creation look like a self-demotion.
     await assertAdministrable({
       actor: { _id: req.user!._id, role: req.user!.role as UserRole },
-      target: { _id: req.user!._id, role: req.user!.role as UserRole, status: req.user!.status },
       nextRole: data.role as UserRole,
     });
 

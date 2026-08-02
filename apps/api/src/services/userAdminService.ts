@@ -31,15 +31,26 @@ const isPrivileged = (role: UserRole) => PRIVILEGED_ROLES.includes(role);
  */
 export async function assertAdministrable(input: {
   actor: AdminActor;
-  target: { _id: Types.ObjectId; role: UserRole; status: UserStatus };
+  /**
+   * The account being changed, or absent when one is being created. A creation
+   * has no existing account to protect, so only the privilege rules apply — the
+   * self-demotion and last-Super-Admin rules have nothing to act on.
+   *
+   * This was previously required, and `createUser` satisfied it by passing the
+   * actor as their own target. That made `sameUser` true for every creation, so
+   * any role other than the creator's own was rejected as an attempt to change
+   * their own role: a Super Admin could only create Super Admins, and no
+   * Manager, Storekeeper, Delivery Person or Shop Owner could be created at all.
+   */
+  target?: { _id: Types.ObjectId; role: UserRole; status: UserStatus };
   nextRole?: UserRole;
   nextStatus?: UserStatus;
 }) {
   const { actor, target, nextRole, nextStatus } = input;
-  const sameUser = String(actor._id) === String(target._id);
+  const sameUser = target ? String(actor._id) === String(target._id) : false;
 
   if (actor.role !== UserRole.SUPER_ADMIN) {
-    if (isPrivileged(target.role)) {
+    if (target && isPrivileged(target.role)) {
       throw adminError(
         'Only a Super Admin may administer Admin and Super Admin accounts',
         'PRIVILEGED_TARGET',
@@ -57,7 +68,7 @@ export async function assertAdministrable(input: {
 
   // Self-service demotion or deactivation is how an administrator accidentally
   // locks themselves out mid-session; it must go through another administrator.
-  if (sameUser && nextRole && nextRole !== target.role) {
+  if (sameUser && target && nextRole && nextRole !== target.role) {
     throw adminError('You cannot change your own role', 'SELF_ROLE_CHANGE', 403);
   }
   if (sameUser && nextStatus && nextStatus !== UserStatus.ACTIVE) {
@@ -69,11 +80,11 @@ export async function assertAdministrable(input: {
   }
 
   const losesSuperAdmin =
-    target.role === UserRole.SUPER_ADMIN &&
+    target?.role === UserRole.SUPER_ADMIN &&
     ((nextRole && nextRole !== UserRole.SUPER_ADMIN) ||
       (nextStatus && nextStatus !== UserStatus.ACTIVE));
 
-  if (losesSuperAdmin) {
+  if (target && losesSuperAdmin) {
     const remaining = await User.countDocuments({
       _id: { $ne: target._id },
       role: UserRole.SUPER_ADMIN,
