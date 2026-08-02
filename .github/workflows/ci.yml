@@ -45,17 +45,22 @@ jobs:
           pnpm --filter @medsupply/shared-types build
           pnpm --filter @medsupply/validation build
 
+      # `pnpm --filter X <script>` exits 0 when the script does not exist, so a
+      # missing script reads as a passing step. That is how the mobile app —
+      # 67 files — went unchecked here for twelve phases. `run` errors instead,
+      # so deleting or renaming a script fails the build rather than silently
+      # removing a gate.
       - name: Typecheck
         run: |
-          pnpm --filter @medsupply/api typecheck
-          pnpm --filter @medsupply/web exec tsc -b --noEmit
-          pnpm --filter @medsupply/mobile typecheck
+          pnpm --filter @medsupply/api run typecheck
+          pnpm --filter @medsupply/web run typecheck
+          pnpm --filter @medsupply/mobile run typecheck
 
       - name: Lint
         run: |
-          pnpm --filter @medsupply/api lint
-          pnpm --filter @medsupply/web lint
-          pnpm --filter @medsupply/mobile lint
+          pnpm --filter @medsupply/api run lint
+          pnpm --filter @medsupply/web run lint
+          pnpm --filter @medsupply/mobile run lint
 
       - name: API unit tests
         run: pnpm --filter @medsupply/api test

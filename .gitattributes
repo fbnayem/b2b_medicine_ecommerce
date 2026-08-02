@@ -1,0 +1,37 @@
+# Line endings are policy, not luck.
+#
+# This repository is authored on Windows with core.autocrlf=true, which has so
+# far normalised everything to LF on the way into the index. That is a property
+# of one contributor's git configuration, not of the repository: anyone with
+# core.autocrlf=false — the default on Linux and macOS — who edits a shell
+# script commits CRLF, and `sh` then reads the carriage return as part of the
+# command. `.husky/pre-commit` fails as `lint-staged\r: not found`, a Dockerfile
+# RUN line breaks the image build, and nginx rejects its own configuration.
+# Each of those reports a problem that looks nothing like a line ending.
+
+* text=auto eol=lf
+
+# Files an interpreter reads directly, where a stray \r is a syntax error
+# rather than a cosmetic difference.
+.husky/*        text eol=lf
+*.sh            text eol=lf
+*.mjs           text eol=lf
+*.cjs           text eol=lf
+Dockerfile      text eol=lf
+Dockerfile.*    text eol=lf
+*.conf          text eol=lf
+
+# Generated: reformatting a lockfile makes `pnpm install --frozen-lockfile`
+# fail, so it is committed exactly as pnpm writes it.
+pnpm-lock.yaml  text eol=lf -diff
+
+# Binary — never translate, never diff.
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.ico           binary
+*.ttf           binary
+*.otf           binary
+*.woff          binary
+*.woff2         binary
+*.pdf           binary
