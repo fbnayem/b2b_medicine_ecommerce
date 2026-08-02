@@ -4,7 +4,9 @@
   "description": "MedSupply B2B Backend API",
   "main": "dist/server.js",
   "scripts": {
+    "predev": "pnpm --filter @medsupply/shared-types build && pnpm --filter @medsupply/validation build",
     "dev": "node scripts/dev.mjs",
+    "prebuild": "pnpm --filter @medsupply/shared-types build && pnpm --filter @medsupply/validation build",
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",

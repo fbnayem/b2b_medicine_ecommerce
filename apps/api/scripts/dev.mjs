@@ -22,9 +22,13 @@ import { once } from 'node:events';
 
 const children = [];
 
-const run = (command, args) => {
-  // `shell` on Windows, where `tsc` and `node` resolve through .cmd shims.
-  const child = spawn(command, args, { stdio: 'inherit', shell: process.platform === 'win32' });
+// Each command is a single fixed string rather than a command plus an argument
+// array: `shell: true` with separate arguments concatenates them unescaped,
+// which Node warns about (DEP0190) on every start. Nothing here is derived from
+// input, so a literal is both safe and quiet. The shell is needed on Windows,
+// where `tsc` resolves through a .cmd shim.
+const run = (commandLine) => {
+  const child = spawn(commandLine, { stdio: 'inherit', shell: true });
   children.push(child);
   return child;
 };
@@ -32,15 +36,15 @@ const run = (command, args) => {
 // Compile once before the server starts, so `node --watch` has something to run
 // and the first failure a developer sees is a type error rather than
 // `Cannot find module './dist/server.js'`.
-const build = run('tsc', []);
+const build = run('tsc');
 const [code] = await once(build, 'exit');
 if (code !== 0) {
   console.error('\nInitial compile failed. Fix the errors above and run `pnpm dev` again.');
   process.exit(code ?? 1);
 }
 
-run('tsc', ['--watch', '--preserveWatchOutput']);
-run('node', ['--watch', 'dist/server.js']);
+run('tsc --watch --preserveWatchOutput');
+run('node --watch dist/server.js');
 
 // One Ctrl+C should stop both, and neither should outlive the other: a stale
 // compiler writing into dist while the next `pnpm dev` runs is a confusing way
