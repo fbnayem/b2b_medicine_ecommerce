@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/useAuth';
 import { UserRole } from '@medsupply/shared-types';
 import { NotificationBell } from './NotificationBell';
 import { connectRealtime, disconnectRealtime } from '../realtime/socket';
+import { signOut } from '../api/client';
 
 interface ProtectedRouteProps {
   allowedRoles?: UserRole[];
@@ -36,6 +37,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) 
         <div className="app-utility-actions">
           <Link to="/activity">Activity</Link>
           <NotificationBell />
+          {/* Until now the only way out was "Sign out everywhere" in the
+              security centre, and that button only rendered for a user with
+              more than one session — so a warehouse terminal signed in once
+              could not be signed out at all. */}
+          <button type="button" className="link-button" onClick={() => void signOut()}>
+            Sign out
+          </button>
         </div>
       </div>
       <Outlet />

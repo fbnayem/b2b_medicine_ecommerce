@@ -252,7 +252,9 @@ export function DeliveryDetail() {
                   onChange={(event) => setPriority(event.target.value as DeliveryPriority)}
                 >
                   {Object.values(DeliveryPriority).map((value) => (
-                    <option key={value}>{value}</option>
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
                   ))}
                 </select>
               </label>

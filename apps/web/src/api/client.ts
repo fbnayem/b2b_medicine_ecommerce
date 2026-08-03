@@ -37,14 +37,56 @@ async function refreshAccessToken(): Promise<string> {
     .post(`${apiBaseUrl}/auth/refresh`, {}, { withCredentials: true })
     .then((response) => {
       const token = response.data.data.accessToken as string;
-      const user = useAuthStore.getState().user;
-      if (user) useAuthStore.getState().setAuth(user, token);
+      // The token is stored whether or not a user is loaded yet, because
+      // `restoreSession` below needs it *before* it can fetch the user. The
+      // previous version only stored it when a user was already present, which
+      // meant a fresh page load could mint a token and then throw it away.
+      useAuthStore.getState().setAccessToken(token);
       return token;
     })
     .finally(() => {
       refreshInFlight = null;
     });
   return refreshInFlight;
+}
+
+/**
+ * Re-establishes the session from the refresh cookie on start-up.
+ *
+ * The cookie is HTTP-only, so the app cannot read it and has to ask: if the
+ * refresh succeeds there is a live session, and the user is fetched fresh
+ * rather than restored from web storage. Fetching is the point — a cached user
+ * would let a suspended account or a revoked role keep rendering the screens
+ * it no longer has, until something happened to 401.
+ */
+export async function restoreSession(): Promise<void> {
+  try {
+    await refreshAccessToken();
+    const response = await apiClient.get('/users/me');
+    useAuthStore.getState().setAuth(response.data.data, useAuthStore.getState().accessToken!);
+  } catch {
+    // No session, or one the server no longer honours. Either way: anonymous.
+    useAuthStore.getState().logout();
+  } finally {
+    useAuthStore.getState().markReady();
+  }
+}
+
+/**
+ * Ends the session on the server as well as in this tab.
+ *
+ * Clearing local state alone left the refresh cookie live, so the next visitor
+ * to a shared warehouse terminal could simply reload the page and be signed in
+ * as whoever used it last.
+ */
+export async function signOut(): Promise<void> {
+  try {
+    await apiClient.post('/auth/logout');
+  } catch {
+    // The server session may already be gone. Never leave the user stuck on a
+    // screen they asked to leave because the sign-out call failed.
+  }
+  useAuthStore.getState().logout();
 }
 
 interface RetriableConfig extends InternalAxiosRequestConfig {
@@ -70,6 +112,10 @@ apiClient.interceptors.response.use(
         originalRequest.headers = headers;
         return apiClient(originalRequest);
       } catch (refreshError) {
+        // Local clear only, deliberately. Reaching here means the refresh token
+        // was rejected, so the server session is already gone and `signOut`'s
+        // POST would need the very credential that just failed. A user-initiated
+        // sign-out is the case that must reach the server; this one cannot.
         useAuthStore.getState().logout();
         return Promise.reject(refreshError);
       }

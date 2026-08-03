@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../store/useAuth';
 import { apiClient } from '../api/client';
-import { useNavigate } from 'react-router-dom';
-import { UserRole } from '@medsupply/shared-types';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { landingRouteFor } from '../app/landing';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -10,7 +10,7 @@ export const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { setAuth } = useAuthStore();
+  const { setAuth, isAuthenticated, user } = useAuthStore();
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -22,18 +22,20 @@ export const Login: React.FC = () => {
       const response = await apiClient.post('/auth/login', { email, password });
       const { user, accessToken } = response.data.data;
       setAuth(user, accessToken);
-
-      if (user.role === UserRole.SHOP_OWNER) {
-        navigate('/shop');
-      } else {
-        navigate('/dashboard');
-      }
+      navigate(landingRouteFor(user.role));
     } catch (err: any) {
       setError(err.response?.data?.error?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
+
+  // Now that a session survives a reload, someone who is already signed in can
+  // land here from a bookmark. Showing them the form would invite them to
+  // re-authenticate for no reason.
+  if (isAuthenticated && user) {
+    return <Navigate to={landingRouteFor(user.role)} replace />;
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">

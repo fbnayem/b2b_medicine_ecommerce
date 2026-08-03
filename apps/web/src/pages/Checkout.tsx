@@ -103,8 +103,14 @@ export function Checkout() {
             value={payment}
             onChange={(event) => setPayment(event.target.value as typeof payment)}
           >
+            {/* `value` is not optional here. Without it an option submits its
+                own text, so choosing mobile money sent the literal string
+                "MOBILE FINANCIAL SERVICE" instead of MOBILE_FINANCIAL_SERVICE.
+                Only the four single-word methods round-tripped correctly. */}
             {Object.values(PaymentMethod).map((value) => (
-              <option key={value}>{value.replaceAll('_', ' ')}</option>
+              <option key={value} value={value}>
+                {value.replaceAll('_', ' ')}
+              </option>
             ))}
           </select>
         </label>

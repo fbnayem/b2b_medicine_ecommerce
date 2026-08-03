@@ -110,7 +110,9 @@ export function MedicineForm() {
               onChange={(event) => field('classification', event.target.value)}
             >
               {Object.values(MedicineClassification).map((value) => (
-                <option key={value}>{value}</option>
+                <option key={value} value={value}>
+                  {value}
+                </option>
               ))}
             </select>
           </label>
