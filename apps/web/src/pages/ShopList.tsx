@@ -59,14 +59,22 @@ export const ShopList: React.FC = () => {
 
       {/* Filters */}
       <div className="flex gap-4 mb-6">
+        {/*
+          Named for assistive technology. A placeholder is not a label — it
+          disappears the moment anyone types — and the status filter had no
+          name at all, so it was announced as "combo box" with no indication of
+          what it filtered.
+        */}
         <input
           type="text"
+          aria-label="Search shops"
           placeholder="Search by name, phone or reference..."
           className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <select
+          aria-label="Filter by status"
           className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}

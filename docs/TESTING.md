@@ -8,9 +8,114 @@ Tests must pass before a phase is marked complete.
 - API transaction/integration tests: `pnpm --filter @medsupply/api test:integration`
 - Web component tests: `pnpm --filter @medsupply/web test`
 - Mobile flow tests: `pnpm --filter @medsupply/mobile test`
+- Browser end-to-end: `pnpm e2e` (smoke only: `pnpm e2e:smoke`)
 - Type checks: `pnpm typecheck`
 - Production builds: `pnpm build`
 - Repository lint: `pnpm lint`
+
+## The end-to-end harness
+
+`pnpm e2e` brings up MongoDB and Redis, runs `apps/api/scripts/seed.ts`, boots the
+API from **built output** and the web app from **both** `vite preview` and the
+Vite **dev server**, then drives Chrome.
+
+Both web targets are deliberate. The blank-page defect existed only in dev; a
+suite that ran against the build alone would have missed it, and a suite that
+ran against dev alone would not be testing what deploys.
+
+```bash
+docker compose up -d mongodb redis
+pnpm e2e                                  # everything
+pnpm exec playwright test --project=smoke-preview   # built bundle
+pnpm exec playwright test --project=smoke-dev       # dev server
+pnpm exec playwright test --project=journey         # tier 1 workflows
+```
+
+### Tiers
+
+| Tier                     | Files                   | Contract                                                                                                             |
+| ------------------------ | ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 1 — domain workflows     | `journey.spec.ts`       | **Must survive the redesign untouched.** Navigates by URL and asserts on text a person reads, never on a class name. |
+| 2 — page-level state     | `smoke.spec.ts`         | Signs in as each role and asserts the page mounted. Stable across restyling.                                         |
+| 3 — navigation and shell | (phase 3)               | **Expected to be rewritten** when the app shell lands. Budgeted, not pretended away.                                 |
+| — accessibility          | `accessibility.spec.ts` | Axe at strict zero across fifteen screens.                                                                           |
+
+### The test-id contract
+
+Frozen here **before** the primitives that emit these ids exist, so the redesign
+is written against a contract rather than the specs being rewritten around it.
+`testIdAttribute` is `data-test`, and the attribute is retained in production
+builds.
+
+| Id                                    | Emitted by   | Meaning                                                                           |
+| ------------------------------------- | ------------ | --------------------------------------------------------------------------------- |
+| `app-shell`                           | `AppShell`   | The authenticated chrome mounted.                                                 |
+| `app-sidebar`                         | `AppShell`   | Role-filtered navigation.                                                         |
+| `app-search`                          | `AppShell`   | Global navigation search.                                                         |
+| `app-account-menu`                    | `AppShell`   | Account menu, which owns sign-out.                                                |
+| `page-<routeId>`                      | `PageHeader` | One per page, **emitted from the route manifest** so it cannot drift.             |
+| `toast` / `dialog` / `dialog-confirm` | primitives   | Exactly one implementation each.                                                  |
+| `empty-state` / `error-state`         | primitives   | Distinguishes "nothing here" from "this broke".                                   |
+| `row-<reference>`                     | list rows    | The **server-generated domain reference** (`ORD-2026-000001`), never an ObjectId. |
+
+Banned in specs: `inventory.css` class names (they are being deleted),
+`nth-child`, and `getByText` for anything translatable (phase 5 adds Bangla).
+
+### Confirming destructive actions
+
+Every confirmation goes through `confirmAction()` in `e2e/fixtures.ts`, and this
+is a trap rather than a convenience. Playwright **auto-dismisses native
+dialogs**, so a spec written against the 22 `window.confirm` sites still in the
+codebase would pass while silently _cancelling_ the action it claims to test —
+and would start _performing_ that action the day those become real dialogs.
+One helper makes that swap a one-file change instead of a silent change of
+meaning in twenty-two specs.
+
+### What the harness was proven to catch
+
+A harness that has not been shown to fail on the bug it was built for is not yet
+evidence of anything. Each of these was reintroduced on purpose and the suite
+went red:
+
+| Defect reintroduced                                                | Caught by                                |
+| ------------------------------------------------------------------ | ---------------------------------------- |
+| `SHOP_OWNER` landing on `/shop`, a route that does not exist       | `smoke.spec.ts` — Shop owner signs in    |
+| A route added with no integration test                             | `routeCoverage.test.ts`                  |
+| A route added and left out of the OpenAPI document                 | `routeCoverage.test.ts`                  |
+| `COMPLETE` reachable from `ASSIGNED` in the delivery state machine | `deliveryRules.test.ts`                  |
+| An implicit `any` in the web app                                   | `pnpm --filter @medsupply/web typecheck` |
+| A duplicate OpenAPI operation                                      | `securityRules.test.ts`                  |
+| A package with a script CI does not run                            | `pipelineWiring.test.ts`                 |
+| A test file registered with no script                              | `testWiring.test.ts`                     |
+
+### What it found on its first run
+
+Three defects, none of which any of the 280 existing tests could see:
+
+1. **A wrong password told the user "No refresh token."** A 401 from
+   `POST /auth/login` was treated as an expired access token, so the refresh
+   interceptor ran, failed, and its message replaced "Invalid credentials" —
+   while signing the user out of a session they had never established.
+2. **The login form's fields had no programmatic label.** `<label>` sat beside
+   `<input>` with nothing joining them, so the first field of the application
+   was announced as "edit text, blank".
+3. **Two muted greys failed WCAG AA** at 2.47:1 and 3.62:1 on white — the
+   activity timeline's metadata and every disabled link button.
+
+### Coverage reconciliation
+
+`routeCoverage.test.ts` reconciles three descriptions of the API that should
+agree: the routes served, the routes documented, and the routes an integration
+test reaches. Route hits are **recorded live** by a middleware under
+`NODE_ENV=test`, so a test that merely mentions a path in a string does not
+count as covering it.
+
+At the time of writing: **150 routes, 69 covered, 91 undocumented.** Both gaps
+are written out endpoint by endpoint in `routeCoverage.waivers.ts` rather than
+summarised as a percentage — the endpoint that mattered was `POST /users`,
+whose role bug survived twelve phases because nothing called it, and a
+percentage would have read "88%" and named nothing. A waiver that goes stale
+fails the build, so the lists can only shrink.
 
 The API integration command uses `mongodb-memory-server` as a one-node replica set by default. If `MONGODB_TEST_URI` is supplied, it uses that dedicated external replica-set database instead. The suite drops only the selected integration database before and after execution.
 

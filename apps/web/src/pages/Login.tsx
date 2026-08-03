@@ -45,28 +45,58 @@ export const Login: React.FC = () => {
         </h1>
         <h2 className="text-xl text-center text-gray-600">Sign in to your account</h2>
 
+        {/*
+          `role="alert"` because a refusal that is only visible is a refusal a
+          screen-reader user does not receive — and on this screen the
+          alternative reading is "my password was accepted and nothing
+          happened", which is exactly how the shop-owner routing defect
+          presented.
+        */}
         {error && (
-          <div className="p-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200">
+          <div
+            id="login-error"
+            role="alert"
+            className="p-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200"
+          >
             {error}
           </div>
         )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Email Address</label>
+            {/*
+              `htmlFor`/`id` rather than proximity. These labels sat next to
+              their inputs with nothing joining them, so assistive technology
+              announced the first field of the application as "edit text,
+              blank" — and no test noticed, because no test had ever looked for
+              a label.
+            */}
+            <label htmlFor="login-email" className="block text-sm font-medium text-gray-700">
+              Email Address
+            </label>
             <input
+              id="login-email"
+              name="email"
               type="email"
+              autoComplete="username"
               required
+              aria-describedby={error ? 'login-error' : undefined}
               className="w-full px-4 py-2 mt-1 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-colors"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
+            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
+              Password
+            </label>
             <input
+              id="login-password"
+              name="password"
               type="password"
+              autoComplete="current-password"
               required
+              aria-describedby={error ? 'login-error' : undefined}
               className="w-full px-4 py-2 mt-1 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-colors"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

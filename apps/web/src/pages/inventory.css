@@ -172,7 +172,7 @@ td select {
 }
 .muted,
 small {
-  color: #718077;
+  color: #5d6b62;
 }
 .state {
   padding: 24px;
@@ -208,7 +208,7 @@ small {
   margin: 0 0 20px;
 }
 .panel dt {
-  color: #718077;
+  color: #5d6b62;
 }
 .panel dd {
   margin: 0;
@@ -272,7 +272,7 @@ td small {
 .metric-grid span {
   display: block;
   text-transform: capitalize;
-  color: #718077;
+  color: #5d6b62;
 }
 .metric-grid strong {
   display: block;
@@ -610,7 +610,7 @@ td .secondary-button {
   font-size: 0.9rem;
 }
 .bell-item-meta {
-  color: #7b8a82;
+  color: #5d6b62;
   font-size: 0.78rem;
   text-transform: capitalize;
 }
@@ -624,7 +624,7 @@ td .secondary-button {
   cursor: pointer;
 }
 .link-button:disabled {
-  color: #9aa8a1;
+  color: #5d6b62;
   cursor: not-allowed;
 }
 
@@ -657,7 +657,7 @@ td .secondary-button {
   margin: 0 0 4px;
 }
 .notification-meta {
-  color: #7b8a82;
+  color: #5d6b62;
   font-size: 0.82rem;
   margin-top: 6px;
 }
@@ -718,7 +718,7 @@ td .secondary-button {
 }
 .preference-table tbody th small {
   font-weight: 500;
-  color: #7b8a82;
+  color: #5d6b62;
 }
 .preference-table tr.muted {
   opacity: 0.55;
@@ -788,7 +788,7 @@ td .secondary-button {
 }
 .timeline-meta {
   margin: 4px 0 0;
-  color: #7b8a82;
+  color: #5d6b62;
   font-size: 0.82rem;
 }
 

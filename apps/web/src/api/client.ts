@@ -99,11 +99,22 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config as RetriableConfig | undefined;
     const status = error.response?.status;
 
-    // A failed refresh must not be retried through this path, or one expired
-    // session becomes an endless loop of refresh attempts.
-    const isRefreshCall = originalRequest?.url?.includes('/auth/refresh');
+    /**
+     * The endpoints where 401 means "these credentials are wrong", not "this
+     * access token expired".
+     *
+     * A failed refresh must not be retried through this path, or one expired
+     * session becomes an endless loop of refresh attempts. Sign-in must not
+     * either, and that omission was user-visible: mistyping a password made
+     * this interceptor attempt a refresh, the refresh failed with "No refresh
+     * token", and *that* was the sentence shown to the person at the keyboard.
+     * A shop owner who fat-fingered their password was told the application had
+     * no refresh token — while being signed out of a session they had never
+     * established.
+     */
+    const isCredentialCall = /\/auth\/(refresh|login)/.test(originalRequest?.url ?? '');
 
-    if (status === 401 && originalRequest && !originalRequest._retry && !isRefreshCall) {
+    if (status === 401 && originalRequest && !originalRequest._retry && !isCredentialCall) {
       originalRequest._retry = true;
       try {
         const token = await refreshAccessToken();
@@ -111,13 +122,16 @@ apiClient.interceptors.response.use(
         headers.set('Authorization', `Bearer ${token}`);
         originalRequest.headers = headers;
         return apiClient(originalRequest);
-      } catch (refreshError) {
+      } catch {
         // Local clear only, deliberately. Reaching here means the refresh token
         // was rejected, so the server session is already gone and `signOut`'s
         // POST would need the very credential that just failed. A user-initiated
         // sign-out is the case that must reach the server; this one cannot.
         useAuthStore.getState().logout();
-        return Promise.reject(refreshError);
+        // The caller asked about *their* request, so they get their own error.
+        // Substituting the refresh failure replaces a sentence about the thing
+        // the user was doing with one about a mechanism they have never heard of.
+        return Promise.reject(error);
       }
     }
 

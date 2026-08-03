@@ -108,6 +108,99 @@ jobs:
           REFRESH_TOKEN_SECRET: ci-placeholder-refresh-at-least-32-characters
           REDIS_PASSWORD: ci-placeholder
 
+      # Everything above stops at the module boundary. These two steps are the
+      # gap the blank page and the unstartable dev server lived in: nothing had
+      # ever booted either application and asked whether it worked.
+      - name: The dev server starts
+        run: |
+          set -euo pipefail
+          pnpm --filter @medsupply/web dev --port 5199 --host 127.0.0.1 --strictPort > /tmp/web-dev.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:5199/ > /tmp/web-dev.html; then break; fi
+            sleep 1
+          done
+          grep -q '<div id="root"' /tmp/web-dev.html || { echo 'The dev server never served the app shell:'; cat /tmp/web-dev.log; exit 1; }
+
+      - name: The built bundle serves the app shell
+        run: |
+          set -euo pipefail
+          pnpm --filter @medsupply/web preview --port 4199 --host 127.0.0.1 --strictPort > /tmp/web-preview.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4199/ > /tmp/web-preview.html; then break; fi
+            sleep 1
+          done
+          grep -q '<div id="root"' /tmp/web-preview.html || { echo 'The built bundle never served the app shell:'; cat /tmp/web-preview.log; exit 1; }
+
+  # Boots both applications in a browser against a real database and drives
+  # them as a person would. This is the suite that catches a page that renders
+  # nothing, a role that cannot sign in, and a dialog that silently cancels the
+  # action it claims to confirm.
+  browser:
+    name: End-to-end in a browser
+    runs-on: ubuntu-latest
+    needs: verify
+    timeout-minutes: 30
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: |
+          pnpm --filter @medsupply/shared-types build
+          pnpm --filter @medsupply/utilities build
+          pnpm --filter @medsupply/validation build
+          pnpm --filter @medsupply/design-tokens build
+          pnpm --filter @medsupply/api-client build
+          pnpm --filter @medsupply/config build
+          pnpm --filter @medsupply/constants build
+
+      # The transactions the seed drives need a replica set, so a single-node
+      # `mongo` service container is not enough.
+      - name: Start MongoDB as a replica set
+        run: |
+          docker run -d --name mongo -p 27017:27017 mongo:6.0 --replSet rs0 --bind_ip_all
+          for attempt in $(seq 1 60); do
+            if docker exec mongo mongosh --quiet --eval 'db.adminCommand("ping")' >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          docker exec mongo mongosh --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"127.0.0.1:27017"}]})'
+          for attempt in $(seq 1 60); do
+            if docker exec mongo mongosh --quiet --eval 'rs.status().ok' | grep -q 1; then break; fi
+            sleep 2
+          done
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run the browser suites
+        run: pnpm exec playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   images:
     name: Build container images
     runs-on: ubuntu-latest

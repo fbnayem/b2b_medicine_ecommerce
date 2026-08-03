@@ -16,3 +16,9 @@ yarn.lock
 
 # Route-coverage recording, written by the integration suites.
 apps/api/.route-coverage.log
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+.playwright/

@@ -9,7 +9,10 @@
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "prepare": "husky"
+    "prepare": "husky",
+    "e2e": "docker compose up -d mongodb redis && playwright test",
+    "e2e:smoke": "docker compose up -d mongodb redis && playwright test --project=smoke-preview --project=smoke-dev",
+    "e2e:ui": "playwright test --ui"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
