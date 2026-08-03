@@ -14,17 +14,55 @@
 services:
   mongodb:
     image: mongo:6.0
-    command: ['--replSet', 'rs0', '--bind_ip_all']
+    environment:
+      # Creates the root account on the first start, while the data directory is
+      # still empty. It exists to administer the server; the API does not use it.
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: medsupply_b2b
+      # Read by init-app-user.js below to create the least-privilege account the
+      # application actually connects with.
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME:?set MONGO_APP_USERNAME}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?set MONGO_APP_PASSWORD}
+      MONGO_KEYFILE: ${MONGO_KEYFILE:?set MONGO_KEYFILE - see docs/DEPLOYMENT.md}
+    # A replica set with authentication enabled also needs internal
+    # member-to-member authentication, which means a keyfile. The keyfile is
+    # written inside the container rather than bind-mounted, because mongod
+    # refuses to start when the keyfile is group- or world-readable and a bind
+    # mount cannot be given 0400 mongodb:mongodb from a Windows or macOS host:
+    # the file arrives owned by root with the mount's permissions and the server
+    # exits before it logs anything that names the real cause.
+    #
+    # `command` overrides CMD, not ENTRYPOINT, so this runs as
+    # `docker-entrypoint.sh bash -c ...`. The entrypoint only performs its
+    # first-run setup when its first argument is `mongod`, so it passes straight
+    # through to this shell as root -- which is what allows the chown -- and the
+    # explicit re-entry on the last line is what runs the root-user creation and
+    # the scripts in docker-entrypoint-initdb.d.
+    command:
+      - bash
+      - -c
+      - |
+        set -euo pipefail
+        printf '%s' "$$MONGO_KEYFILE" > /run/mongo-keyfile
+        chmod 400 /run/mongo-keyfile
+        chown mongodb:mongodb /run/mongo-keyfile
+        exec docker-entrypoint.sh mongod \
+          --replSet rs0 --bind_ip_all --auth --keyFile /run/mongo-keyfile
     volumes:
       - mongodb_data:/data/db
+      - ./docker/mongodb/init-app-user.js:/docker-entrypoint-initdb.d/init-app-user.js:ro
     healthcheck:
+      # Now authenticated. Without credentials this returns an auth error rather
+      # than an uninitialised replica set, the container never reports healthy,
+      # and `depends_on: service_healthy` holds the API back with a message that
+      # names nothing -- so the credentials belong here as much as in the URI.
       test:
         [
           'CMD',
-          'mongosh',
-          '--quiet',
-          '--eval',
-          "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb:27017'}]}).ok }",
+          'bash',
+          '-c',
+          'mongosh --quiet -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "try { rs.status().ok } catch (e) { rs.initiate({_id:\"rs0\",members:[{_id:0,host:\"mongodb:27017\"}]}).ok }"',
         ]
       interval: 10s
       timeout: 5s
@@ -57,7 +95,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: '5000'
-      MONGODB_URI: mongodb://mongodb:27017/medsupply_b2b?replicaSet=rs0
+      # The application connects as the least-privilege account, never as root.
+      # `authSource=admin` because that is where MongoDB stores every user
+      # record regardless of which database the account has rights over.
+      MONGODB_URI: mongodb://${MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD}@mongodb:27017/medsupply_b2b?replicaSet=rs0&authSource=admin
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET to at least 32 characters}
       REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?set REFRESH_TOKEN_SECRET to at least 32 characters}

@@ -77,9 +77,83 @@ Verify one return end to end in staging — request, approve, receive, credit no
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 ```
 
-It requires `JWT_SECRET`, `REFRESH_TOKEN_SECRET` and `REDIS_PASSWORD` and fails fast without them. Both images are multi-stage: the API ships only `dist` plus production dependencies, runs as a non-root user under `tini` so SIGTERM reaches the process and the graceful shutdown actually runs, and its healthcheck calls `/health/ready`. The web image builds the bundle and serves it from nginx, which also terminates compression and proxies `/api` and `/realtime` to the API on the same origin — which is what keeps the `SameSite=Strict` refresh cookie working.
+It requires `JWT_SECRET`, `REFRESH_TOKEN_SECRET`, `REDIS_PASSWORD`, `MONGO_ROOT_USERNAME`, `MONGO_ROOT_PASSWORD`, `MONGO_APP_USERNAME`, `MONGO_APP_PASSWORD` and `MONGO_KEYFILE`, and fails fast without them. Both images are multi-stage: the API ships only `dist` plus production dependencies, runs as a non-root user under `tini` so SIGTERM reaches the process and the graceful shutdown actually runs, and its healthcheck calls `/health/ready`. The web image builds the bundle and serves it from nginx, which also terminates compression and proxies `/api` and `/realtime` to the API on the same origin — which is what keeps the `SameSite=Strict` refresh cookie working.
 
 `stop_grace_period` is 30 seconds because the default 10 is not enough to drain a long transaction.
+
+## Database authentication
+
+MongoDB runs with `--auth`. Until this was added, the production compose file
+started the database with no authentication at all: anything that could reach
+the Docker network could read and write the entire ledger, including every
+`passwordHash`. Redis was already password-protected in the same file.
+
+Two credentials exist because they do different jobs. **Root** is created on the
+first start from `MONGO_ROOT_USERNAME` / `MONGO_ROOT_PASSWORD` and is for
+administering the server; the application never uses it. The **application**
+account, `MONGO_APP_USERNAME` / `MONGO_APP_PASSWORD`, is created by
+`docker/mongodb/init-app-user.js` with `readWrite` and `dbAdmin` on
+`medsupply_b2b` and nothing else — enough to serve traffic and to build indexes
+during a release, and not enough to read another database or administer users.
+
+`MONGO_KEYFILE` is the shared secret replica-set members use to authenticate to
+each other, which MongoDB requires as soon as `--auth` is on. Generate one and
+keep it with your other secrets:
+
+```bash
+openssl rand -base64 96 | tr -d '\n'
+```
+
+**The ordering is the part that bites.** All five variables are read _only while
+the data directory is empty_:
+
+1. The keyfile must be present before the first election, because members that
+   cannot authenticate to each other never elect a primary and the set never
+   comes up.
+2. `MONGO_INITDB_ROOT_*` creates the root account only on a fresh volume. On an
+   existing volume the entrypoint skips user creation silently.
+3. `docker-entrypoint-initdb.d` runs on that same first start, which is when the
+   application account is created.
+
+So a database that has already started once will ignore all of it. **Enabling
+authentication on an existing deployment is a migration, not a configuration
+change**: dump the data, recreate the volume so the first start happens with
+these variables set, restore, then confirm. Rotating either password later is
+done with `db.changeUserPassword()` against the running server and a matching
+update to `MONGODB_URI` — not by editing these variables and restarting.
+
+Confirm authentication is actually on before sending traffic. An anonymous
+connection must be refused:
+
+```bash
+docker compose -f docker-compose.prod.yml exec mongodb \
+  mongosh --quiet --eval 'db.getSiblingDB("medsupply_b2b").shops.countDocuments()'
+# MongoServerError: command count requires authentication
+```
+
+and the application account must be accepted, and confined:
+
+```bash
+docker compose -f docker-compose.prod.yml exec mongodb sh -c \
+  'mongosh --quiet -u "$MONGO_APP_USERNAME" -p "$MONGO_APP_PASSWORD" \
+     --authenticationDatabase admin \
+     --eval "db.getSiblingDB(\"admin\").system.users.countDocuments()"'
+# MongoServerError: not authorized on admin to execute command
+```
+
+The second check is the one worth keeping: it proves the application is not
+quietly running as root.
+
+Note that a _missing_ credential and a _wrong_ one fail differently. A wrong
+password fails during the driver handshake, so the API logs
+`Could not connect to MongoDB — Authentication failed.` and exits 1. A missing
+credential does not: the handshake itself needs no authentication, so the
+connection is established, `readyState` reaches 1, and only real queries are
+refused. `/health/ready` therefore probes with `listCollections`, which needs
+the same authorisation the application needs, rather than `ping`, which MongoDB
+answers to anyone. Without that, an unauthenticated deployment would report 200
+and every request behind it would fail. Connected-but-unauthorised is reported
+as `{"checks":{"database":"unauthorised"}}` with status 503.
 
 ## Reverse proxy
 

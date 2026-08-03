@@ -29,21 +29,34 @@ export const ready = async (_req: Request, res: Response) => {
   const state = mongoose.connection.readyState;
   const database = state === 1 ? 'up' : READY_STATES.has(state) ? 'connecting' : 'down';
 
-  let ping = false;
+  // `ping` is deliberately not the probe. MongoDB answers it without requiring
+  // authentication, and the driver's handshake does not need credentials
+  // either, so a deployment whose password is wrong or missing connects
+  // cleanly, reports readyState 1, answers ping — and then fails every single
+  // query with "requires authentication". This endpoint would return 200, the
+  // orchestrator would route traffic to it, and every request would 500.
+  //
+  // `listCollections` needs the same authorisation the application needs to do
+  // its job, so it fails exactly when the application is about to.
+  let usable = false;
   if (state === 1) {
     try {
-      await mongoose.connection.db?.admin().ping();
-      ping = true;
+      await mongoose.connection.db?.listCollections().toArray();
+      usable = true;
     } catch {
-      ping = false;
+      usable = false;
     }
   }
 
-  const ok = database === 'up' && ping;
+  const ok = database === 'up' && usable;
+  // Connected-but-unusable is its own state and needs its own word. Reporting
+  // "up" next to "not-ready" sends whoever is paged looking at the network,
+  // when the answer is almost always a credential.
+  const check = ok ? 'up' : database === 'up' ? 'unauthorised' : database;
   res.status(ok ? 200 : 503).json({
     data: {
       status: ok ? 'ready' : 'not-ready',
-      checks: { database: ok ? 'up' : database },
+      checks: { database: check },
     },
   });
 };
