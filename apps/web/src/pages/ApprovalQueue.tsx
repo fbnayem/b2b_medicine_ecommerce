@@ -4,6 +4,7 @@ import { OrderStatus } from '@medsupply/shared-types';
 import type { Order, Shop } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import './inventory.css';
+import { formatFinanceDateTime, formatMinor } from '../lib/finance';
 export function ApprovalQueue() {
   const [data, setData] = useState<Order[]>([]);
   const [status, setStatus] = useState('');
@@ -89,12 +90,8 @@ export function ApprovalQueue() {
                       </td>
                       <td>{shop.name}</td>
                       <td>{order.status.replaceAll('_', ' ')}</td>
-                      <td>৳{(order.estimatedTotalMinor / 100).toFixed(2)}</td>
-                      <td>
-                        {order.submittedAt
-                          ? new Date(order.submittedAt).toLocaleString('en-BD')
-                          : '-'}
-                      </td>
+                      <td>{formatMinor(order.estimatedTotalMinor)}</td>
+                      <td>{order.submittedAt ? formatFinanceDateTime(order.submittedAt) : '-'}</td>
                     </tr>
                   );
                 })}

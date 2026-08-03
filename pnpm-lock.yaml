@@ -114,6 +114,9 @@ importers:
       '@medsupply/shared-types':
         specifier: workspace:^
         version: link:../../packages/shared-types
+      '@medsupply/utilities':
+        specifier: workspace:^
+        version: link:../../packages/utilities
       '@medsupply/validation':
         specifier: workspace:^
         version: link:../../packages/validation
@@ -196,6 +199,9 @@ importers:
       '@medsupply/shared-types':
         specifier: workspace:^
         version: link:../../packages/shared-types
+      '@medsupply/utilities':
+        specifier: workspace:^
+        version: link:../../packages/utilities
       '@medsupply/validation':
         specifier: workspace:^
         version: link:../../packages/validation

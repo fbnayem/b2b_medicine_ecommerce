@@ -1,5 +1,12 @@
 {
   "name": "@medsupply/utilities",
   "version": "0.0.0",
-  "main": "index.ts"
+  "main": "dist/index.js",
+  "types": "index.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "tsc"
+  }
 }

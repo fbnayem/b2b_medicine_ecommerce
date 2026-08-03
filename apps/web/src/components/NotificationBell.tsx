@@ -9,17 +9,14 @@ import {
 import { useAuthStore } from '../store/useAuth';
 import { useNotificationStore } from '../store/useNotifications';
 import { useRealtimeEvent } from '../realtime/useRealtime';
+import { formatFinanceDate } from '../lib/finance';
 
 function relativeTime(value: string) {
   const seconds = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1000));
   if (seconds < 60) return 'just now';
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h ago`;
-  return new Date(value).toLocaleDateString('en-BD', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  return formatFinanceDate(value);
 }
 
 export function NotificationBell() {

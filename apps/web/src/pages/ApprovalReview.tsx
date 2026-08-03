@@ -4,6 +4,7 @@ import { OrderStatus } from '@medsupply/shared-types';
 import type { Order, Shop } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import './inventory.css';
+import { formatMinor } from '../lib/finance';
 type Stock = {
   _id: string;
   available: number;
@@ -126,15 +127,15 @@ export function ApprovalReview() {
       <section className="metric-grid">
         <article>
           <span>Credit limit</span>
-          <strong>৳{(shop.creditLimit / 100).toFixed(2)}</strong>
+          <strong>{formatMinor(shop.creditLimit)}</strong>
         </article>
         <article>
           <span>Outstanding</span>
-          <strong>৳{(shop.outstandingBalance / 100).toFixed(2)}</strong>
+          <strong>{formatMinor(shop.outstandingBalance)}</strong>
         </article>
         <article>
           <span>Available credit</span>
-          <strong>৳{(availableCredit / 100).toFixed(2)}</strong>
+          <strong>{formatMinor(availableCredit)}</strong>
         </article>
         <article>
           <span>Payment terms</span>
@@ -255,7 +256,7 @@ export function ApprovalReview() {
             Shop Owner-visible notes
             <textarea value={ownerNote} onChange={(event) => setOwnerNote(event.target.value)} />
           </label>
-          <strong>Approval total: ৳{(total / 100).toFixed(2)}</strong>
+          <strong>Approval total: {formatMinor(total)}</strong>
           <div className="actions">
             {order.status === OrderStatus.SUBMITTED && (
               <button className="secondary-button" onClick={() => void action('start')}>
@@ -278,8 +279,8 @@ export function ApprovalReview() {
           {history.length ? (
             history.map((previous) => (
               <p key={previous._id}>
-                {previous.reference} / {previous.status} / ৳
-                {(previous.estimatedTotalMinor / 100).toFixed(2)}
+                {previous.reference} / {previous.status} /{' '}
+                {formatMinor(previous.estimatedTotalMinor)}
               </p>
             ))
           ) : (

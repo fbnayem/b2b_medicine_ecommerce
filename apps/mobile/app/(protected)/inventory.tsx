@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Medicine, MedicineBatch, StockMovementType } from '@medsupply/shared-types';
 import { apiClient } from '../../src/api/client';
+import { formatFinanceDate } from '../../src/finance/date';
 
 const actions: StockMovementType[] = [
   StockMovementType.ADDITION,
@@ -146,14 +147,7 @@ export default function InventoryScreen() {
                 </View>
                 {item.isBlocked ? <Text style={styles.danger}>Blocked</Text> : null}
               </View>
-              <Text style={styles.expiry}>
-                Expires{' '}
-                {new Date(item.expiryDate).toLocaleDateString('en-GB', {
-                  day: '2-digit',
-                  month: 'short',
-                  year: 'numeric',
-                })}
-              </Text>
+              <Text style={styles.expiry}>Expires {formatFinanceDate(item.expiryDate)}</Text>
               <View style={styles.quantities}>
                 {[
                   ['On hand', item.quantities.onHand],

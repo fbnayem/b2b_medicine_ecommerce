@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AuditLogRecord, User } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import './inventory.css';
+import { formatFinanceDateTime } from '../lib/finance';
 
 const PAGE_SIZE = 25;
 
@@ -160,7 +161,7 @@ export function AuditLogViewer() {
                 </p>
                 <p className="notification-meta">
                   {actorLabel(row.actorId)} ({row.actorRole?.replaceAll('_', ' ')}) ·{' '}
-                  {new Date(row.createdAt).toLocaleString('en-BD')}
+                  {formatFinanceDateTime(row.createdAt)}
                   {row.ipAddress ? ` · ${row.ipAddress}` : ''}
                 </p>
                 <p className="notification-meta">{summarise(row)}</p>

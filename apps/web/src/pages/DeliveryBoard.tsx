@@ -5,6 +5,7 @@ import type { Delivery } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import { useLiveRefresh } from '../realtime/useRealtime';
 import './inventory.css';
+import { formatFinanceDate } from '../lib/finance';
 
 const statuses = ['', ...Object.values(DeliveryStatus)] as const;
 
@@ -107,7 +108,7 @@ export function DeliveryBoard() {
                   <strong>{delivery.status.replaceAll('_', ' ')}</strong>
                   <span>
                     {delivery.expectedDeliveryDate
-                      ? new Date(delivery.expectedDeliveryDate).toLocaleDateString('en-BD')
+                      ? formatFinanceDate(delivery.expectedDeliveryDate)
                       : 'Date pending'}
                   </span>
                 </div>

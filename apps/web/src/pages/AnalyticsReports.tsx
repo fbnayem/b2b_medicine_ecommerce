@@ -14,6 +14,7 @@ import { formatFinanceDate, formatMinor } from '../lib/finance';
 import { downloadCsv, useReportRange } from './reportRange';
 import { RangeControls } from '../components/RangeControls';
 import './inventory.css';
+import { formatQuantity } from '@medsupply/utilities';
 
 type ReportKind = 'sales' | 'inventory' | 'deliveries' | 'returns' | 'ageing';
 
@@ -227,7 +228,7 @@ function SalesReportBody({
         </article>
         <article>
           <span>Units sold</span>
-          <strong>{report.totals.unitsSold.toLocaleString('en-BD')}</strong>
+          <strong>{formatQuantity(report.totals.unitsSold)}</strong>
         </article>
         <article>
           <span>Gross</span>
@@ -336,11 +337,11 @@ function InventoryReportBody({ report }: { report: InventoryAnalyticsReport }) {
         </article>
         <article>
           <span>On hand</span>
-          <strong>{report.totals.onHand.toLocaleString('en-BD')}</strong>
+          <strong>{formatQuantity(report.totals.onHand)}</strong>
         </article>
         <article>
           <span>Available</span>
-          <strong>{report.totals.available.toLocaleString('en-BD')}</strong>
+          <strong>{formatQuantity(report.totals.available)}</strong>
         </article>
         <article>
           <span>Value at cost</span>

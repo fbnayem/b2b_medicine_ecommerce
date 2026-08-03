@@ -1,58 +1,42 @@
-const majorAmountPattern = /^(?:(?:0|[1-9]\d*)|(?:[1-9]\d{0,2}(?:,\d{3})+))(?:\.(\d{1,2}))?$/;
+import { formatDate, formatDateTime, formatMoneyMinor, parseMoney } from '@medsupply/utilities';
 
-/** Convert a user-entered BDT major-unit value to integer poisha without floats. */
-export function parseMajorToMinor(input: string): number {
-  const entered = input.trim();
-  const match = majorAmountPattern.exec(entered);
-  if (!match) {
-    throw new Error('Enter a positive amount with no more than two decimal places.');
-  }
-
-  const normalized = entered.replaceAll(',', '');
-  const [whole = '0', fraction = ''] = normalized.split('.');
-  const value = BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
-  if (value > BigInt(Number.MAX_SAFE_INTEGER)) {
-    throw new Error('The amount is too large.');
-  }
-  return Number(value);
-}
+/**
+ * Web-facing names for the shared formatters, plus the few helpers that are
+ * genuinely web-only.
+ *
+ * The formatting itself lives in `@medsupply/utilities` so that this app and
+ * the Expo app cannot drift again — they had already produced different strings
+ * for the same field. These are thin aliases rather than a rename across ~140
+ * call sites; the rename can happen when those files are touched for other
+ * reasons.
+ */
 
 export function formatMinor(value: number): string {
-  if (!Number.isSafeInteger(value)) return 'Invalid amount';
-  const negative = value < 0;
-  const absolute = Math.abs(value);
-  const whole = Math.floor(absolute / 100).toLocaleString('en-BD');
-  const fraction = String(absolute % 100).padStart(2, '0');
-  return `${negative ? '-' : ''}৳${whole}.${fraction}`;
+  return formatMoneyMinor(value);
 }
 
-const dhakaDate = new Intl.DateTimeFormat('en-GB', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'Asia/Dhaka',
-});
-
-const dhakaDateTime = new Intl.DateTimeFormat('en-GB', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: true,
-  timeZone: 'Asia/Dhaka',
-});
+/**
+ * Throws rather than returning null, because every caller here is a form
+ * submit handler that already catches and shows the message. The two failures
+ * are worded differently on purpose: three decimal places is a typo, whereas an
+ * unsafe amount means the figure itself is wrong.
+ */
+export function parseMajorToMinor(input: string): number {
+  const result = parseMoney(input);
+  if (result.ok) return result.minor;
+  throw new Error(
+    result.reason === 'too-large'
+      ? 'The amount is too large.'
+      : 'Enter a positive amount with no more than two decimal places.',
+  );
+}
 
 export function formatFinanceDate(value?: string | Date): string {
-  if (!value) return '—';
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? '—' : dhakaDate.format(parsed);
+  return formatDate(value);
 }
 
 export function formatFinanceDateTime(value?: string | Date): string {
-  if (!value) return '—';
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? '—' : dhakaDateTime.format(parsed);
+  return formatDateTime(value);
 }
 
 export function createActionKey(prefix: string): string {

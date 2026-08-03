@@ -13,6 +13,7 @@ import { useAuthStore } from '../store/useAuth';
 import { ActivityTimeline } from '../components/ActivityTimeline';
 import { useRealtimeEvent } from '../realtime/useRealtime';
 import './inventory.css';
+import { formatFinanceDateTime } from '../lib/finance';
 
 type DeliveryPerson = Pick<User, '_id' | 'firstName' | 'lastName' | 'email'> & {
   activeDeliveries: number;
@@ -307,7 +308,7 @@ export function DeliveryDetail() {
               <strong>{delivery.failure.reason.replaceAll('_', ' ')}</strong>
             </p>
             <p>{delivery.failure.notes}</p>
-            <small>{new Date(delivery.failure.reportedAt).toLocaleString('en-BD')}</small>
+            <small>{formatFinanceDateTime(delivery.failure.reportedAt)}</small>
             {canManage && delivery.status === DeliveryStatus.FAILED ? (
               <button onClick={() => void post('returning', {}, 'Return trip started.')}>
                 Start return to store
@@ -326,7 +327,7 @@ export function DeliveryDetail() {
               <dt>Packages</dt>
               <dd>{delivery.proof.deliveredPackageCount}</dd>
               <dt>Time</dt>
-              <dd>{new Date(delivery.proof.deliveredAt).toLocaleString('en-BD')}</dd>
+              <dd>{formatFinanceDateTime(delivery.proof.deliveredAt)}</dd>
               <dt>OTP</dt>
               <dd>{delivery.proof.otpVerifiedAt ? 'Verified' : 'Not required'}</dd>
               <dt>GPS</dt>
@@ -365,7 +366,7 @@ export function DeliveryDetail() {
                   <strong>{entry.to.replaceAll('_', ' ')}</strong>
                   <small>{entry.note}</small>
                 </div>
-                <small>{new Date(entry.at).toLocaleString('en-BD')}</small>
+                <small>{formatFinanceDateTime(entry.at)}</small>
               </li>
             ))}
           </ol>

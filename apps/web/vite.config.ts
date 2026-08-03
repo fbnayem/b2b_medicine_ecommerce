@@ -33,6 +33,7 @@ export default defineConfig({
      */
     alias: {
       '@medsupply/shared-types': workspacePackage('shared-types'),
+      '@medsupply/utilities': workspacePackage('utilities'),
       '@medsupply/validation': workspacePackage('validation'),
     },
   },

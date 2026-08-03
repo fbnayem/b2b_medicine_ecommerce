@@ -6,6 +6,7 @@ import {
 } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import { useRealtimeEvent } from '../realtime/useRealtime';
+import { formatFinanceDateTime } from '../lib/finance';
 
 interface Props {
   entityType: ActivityEntityType;
@@ -15,13 +16,7 @@ interface Props {
 }
 
 function formatMoment(value: string) {
-  return new Date(value).toLocaleString('en-BD', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatFinanceDateTime(value);
 }
 
 /**

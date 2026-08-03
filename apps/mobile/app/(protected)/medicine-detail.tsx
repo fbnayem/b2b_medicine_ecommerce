@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
 import { useLocalSearchParams } from 'expo-router';
 import { Medicine } from '@medsupply/shared-types';
 import { apiClient } from '../../src/api/client';
+import { formatMoneyMinor } from '../../src/finance/money';
 
 export default function MedicineDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -52,7 +53,7 @@ export default function MedicineDetailScreen() {
             <Text style={styles.value}>{value}</Text>
           </View>
         ))}
-        <Text style={styles.price}>৳{(item.defaultSellingPriceMinor / 100).toFixed(2)}</Text>
+        <Text style={styles.price}>{formatMoneyMinor(item.defaultSellingPriceMinor)}</Text>
       </View>
       {item.description ? <Text style={styles.description}>{item.description}</Text> : null}
     </ScrollView>

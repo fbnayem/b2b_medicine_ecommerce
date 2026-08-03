@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@medsupply/shared-types": "workspace:^",
+    "@medsupply/utilities": "workspace:^",
     "@medsupply/validation": "workspace:^",
     "axios": "^1.18.1",
     "lucide-react": "^1.27.0",

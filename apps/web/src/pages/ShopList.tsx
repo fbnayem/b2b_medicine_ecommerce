@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { ShopStatus } from '@medsupply/shared-types';
 import type { Shop } from '@medsupply/shared-types';
+import { formatFinanceDate, formatMinor } from '../lib/finance';
 
 const statusBadgeColor: Record<ShopStatus, string> = {
   [ShopStatus.ACTIVE]: 'bg-green-100 text-green-800',
@@ -128,7 +129,7 @@ export const ShopList: React.FC = () => {
                   <td className="px-4 py-3 text-sm text-gray-600">{shop.primaryPhone}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">{shop.territory || '—'}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    ৳{(shop.creditLimit / 100).toLocaleString()}
+                    {formatMinor(shop.creditLimit)}
                   </td>
                   <td className="px-4 py-3 text-sm">
                     {shop.drugLicenceExpiryDate ? (
@@ -139,11 +140,7 @@ export const ShopList: React.FC = () => {
                             : 'text-gray-600'
                         }
                       >
-                        {new Date(shop.drugLicenceExpiryDate).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
+                        {formatFinanceDate(shop.drugLicenceExpiryDate)}
                         {isLicenceNearExpiry(shop.drugLicenceExpiryDate) && ' ⚠️'}
                       </span>
                     ) : (

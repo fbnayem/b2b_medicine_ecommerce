@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { formatMoneyMinor, formatQuantity } from '@medsupply/utilities';
 
 export interface ChartSeries {
   key: string;
@@ -21,12 +22,7 @@ interface ChartProps {
 const PALETTE = ['#1f6feb', '#0f9d58', '#d97706', '#9333ea', '#dc2626'];
 
 function formatValue(value: number, money: boolean) {
-  if (!money) return value.toLocaleString('en-BD');
-  const negative = value < 0;
-  const absolute = Math.abs(value);
-  return `${negative ? '-' : ''}৳${Math.trunc(absolute / 100).toLocaleString('en-BD')}.${String(
-    absolute % 100,
-  ).padStart(2, '0')}`;
+  return money ? formatMoneyMinor(value) : formatQuantity(value);
 }
 
 /** Keeps a long axis readable by labelling at most eight ticks. */

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { fetchTimeline, type ActivityItem } from './api';
+import { formatFinanceDateTime } from '../finance/date';
 
 interface Props {
   entityType: string;
@@ -56,7 +57,7 @@ export function ActivityTimelineView({ entityType, entityId, title = 'Activity' 
             <Text style={styles.summary}>{item.summary}</Text>
             {item.detail ? <Text style={styles.muted}>{item.detail}</Text> : null}
             <Text style={styles.meta}>
-              {new Date(item.occurredAt).toLocaleString('en-GB')}
+              {formatFinanceDateTime(item.occurredAt)}
               {item.actorName ? ` · ${item.actorName}` : ''}
             </Text>
           </View>

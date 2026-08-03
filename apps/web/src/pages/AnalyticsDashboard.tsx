@@ -7,6 +7,7 @@ import { formatMinor } from '../lib/finance';
 import { useReportRange } from './reportRange';
 import { RangeControls } from '../components/RangeControls';
 import './inventory.css';
+import { formatQuantity } from '@medsupply/utilities';
 
 const percent = (basisPoints: number) => `${(basisPoints / 100).toFixed(1)}%`;
 const hours = (value: number | null) => (value === null ? '—' : `${value} h`);
@@ -86,7 +87,7 @@ export function AnalyticsDashboard() {
             </article>
             <article>
               <span>Invoices</span>
-              <strong>{data.sales.invoiceCount.toLocaleString('en-BD')}</strong>
+              <strong>{formatQuantity(data.sales.invoiceCount)}</strong>
             </article>
             <article>
               <span>Average invoice</span>
@@ -229,7 +230,7 @@ export function AnalyticsDashboard() {
                 </div>
                 <div>
                   <dt>Available units</dt>
-                  <dd>{data.inventory.available.toLocaleString('en-BD')}</dd>
+                  <dd>{formatQuantity(data.inventory.available)}</dd>
                 </div>
                 <div>
                   <dt>Expiring or expired</dt>

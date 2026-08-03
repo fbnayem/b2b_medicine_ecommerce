@@ -1,5 +1,6 @@
 import { formatMinor } from '../lib/finance';
 import type { AccountSummary } from '../pages/financeTypes';
+import { formatPercentFromBasisPoints } from '@medsupply/utilities';
 
 export function FinanceSummaryCards({ summary }: { summary: AccountSummary }) {
   const utilisation =
@@ -35,7 +36,7 @@ export function FinanceSummaryCards({ summary }: { summary: AccountSummary }) {
         </article>
         <article>
           <span>Credit utilisation</span>
-          <strong>{(utilisation / 100).toFixed(2)}%</strong>
+          <strong>{formatPercentFromBasisPoints(utilisation)}</strong>
         </article>
       </section>
     </>

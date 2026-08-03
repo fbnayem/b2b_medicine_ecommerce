@@ -7,6 +7,7 @@ import { useCart } from '../store/useCart';
 import { ActivityTimeline } from '../components/ActivityTimeline';
 import { ActivityEntityType } from '@medsupply/shared-types';
 import './inventory.css';
+import { formatFinanceDateTime, formatMinor } from '../lib/finance';
 
 export function OrderDetail() {
   const { id } = useParams();
@@ -116,15 +117,15 @@ export function OrderDetail() {
                   {item.medicineSnapshot.brandName} {item.medicineSnapshot.strength}
                 </strong>
                 <small>
-                  {item.requestedQuantity} × ৳{(item.estimatedUnitPriceMinor / 100).toFixed(2)}
+                  {item.requestedQuantity} × {formatMinor(item.estimatedUnitPriceMinor)}
                 </small>
               </div>
-              <strong>৳{(item.estimatedLineTotalMinor / 100).toFixed(2)}</strong>
+              <strong>{formatMinor(item.estimatedLineTotalMinor)}</strong>
             </div>
           ))}
           <div className="card-bottom">
             <strong>Estimated total</strong>
-            <strong>৳{(order.estimatedTotalMinor / 100).toFixed(2)}</strong>
+            <strong>{formatMinor(order.estimatedTotalMinor)}</strong>
           </div>
         </article>
         <article className="panel">
@@ -136,7 +137,7 @@ export function OrderDetail() {
                   <strong>{entry.to.replaceAll('_', ' ')}</strong>
                   <small>{entry.note}</small>
                 </div>
-                <small>{new Date(entry.at).toLocaleString('en-BD')}</small>
+                <small>{formatFinanceDateTime(entry.at)}</small>
               </li>
             ))}
           </ol>

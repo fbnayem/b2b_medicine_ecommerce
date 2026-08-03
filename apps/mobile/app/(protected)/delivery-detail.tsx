@@ -13,6 +13,7 @@ import { isSafeOfflineDeliveryAction, queueDeliveryAction } from '../../src/deli
 import { useAuthStore } from '../../src/store/useAuth';
 import { ActivityTimelineView } from '../../src/notifications/ActivityTimelineView';
 import { onRealtime } from '../../src/notifications/realtime';
+import { formatFinanceDateTime } from '../../src/finance/date';
 
 type ApiFailure = { response?: { status?: number; data?: { error?: { message?: string } } } };
 const reasons = Object.values(DeliveryFailureReason);
@@ -249,7 +250,7 @@ export default function DeliveryDetailScreen() {
         {delivery.history.map((entry, index) => (
           <View style={styles.timeline} key={`${entry.to}-${index}`}>
             <Text style={styles.timelineTitle}>{entry.to.replaceAll('_', ' ')}</Text>
-            <Text>{new Date(entry.at).toLocaleString('en-BD')}</Text>
+            <Text>{formatFinanceDateTime(entry.at)}</Text>
           </View>
         ))}
       </View>

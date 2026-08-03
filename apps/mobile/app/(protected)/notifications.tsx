@@ -17,6 +17,7 @@ import {
 } from '../../src/notifications/api';
 import { onRealtime } from '../../src/notifications/realtime';
 import { routeForPush } from '../../src/notifications/push';
+import { formatFinanceDateTime } from '../../src/finance/date';
 
 export default function NotificationsScreen() {
   const [items, setItems] = useState<NotificationRecord[]>([]);
@@ -143,7 +144,7 @@ export default function NotificationsScreen() {
             </View>
             <Text>{item.body}</Text>
             <Text style={styles.muted}>
-              {item.category} · {new Date(item.createdAt).toLocaleString('en-GB')}
+              {item.category} · {formatFinanceDateTime(item.createdAt)}
             </Text>
           </Pressable>
         )}

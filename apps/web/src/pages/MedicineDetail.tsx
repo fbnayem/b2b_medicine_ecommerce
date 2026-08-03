@@ -5,6 +5,7 @@ import type { Medicine, MedicineBatch } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
 import './inventory.css';
+import { formatFinanceDate, formatMinor } from '../lib/finance';
 
 export function MedicineDetail() {
   const { id } = useParams();
@@ -84,7 +85,7 @@ export function MedicineDetail() {
               {medicine.unit}
             </dd>
             <dt>Selling price</dt>
-            <dd>৳{(medicine.defaultSellingPriceMinor / 100).toFixed(2)}</dd>
+            <dd>{formatMinor(medicine.defaultSellingPriceMinor)}</dd>
             <dt>Availability</dt>
             <dd>{(medicine.totalAvailable ?? 0) > 0 ? 'Available' : 'Out of stock'}</dd>
           </dl>
@@ -114,13 +115,7 @@ export function MedicineDetail() {
                     {batches.map((batch) => (
                       <tr key={batch._id}>
                         <td>{batch.batchNumber}</td>
-                        <td>
-                          {new Date(batch.expiryDate).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </td>
+                        <td>{formatFinanceDate(batch.expiryDate)}</td>
                         <td>{batch.quantities.available}</td>
                         <td>{batch.quantities.reserved}</td>
                         <td>{batch.warehouseLocation}</td>

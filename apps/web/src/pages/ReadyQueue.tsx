@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import './inventory.css';
+import { formatMinor } from '../lib/finance';
 
 type ReadyPackage = {
   _id: string;
@@ -12,7 +13,7 @@ type ReadyPackage = {
   invoiceId: { reference: string; grandTotalMinor: number };
 };
 
-const money = (minor: number) => `৳${(minor / 100).toFixed(2)}`;
+const money = formatMinor;
 
 export function ReadyQueue() {
   const [data, setData] = useState<ReadyPackage[]>([]);

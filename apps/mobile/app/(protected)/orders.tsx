@@ -11,6 +11,8 @@ import {
 import { router } from 'expo-router';
 import type { Order } from '@medsupply/shared-types';
 import { apiClient } from '../../src/api/client';
+import { formatMoneyMinor } from '../../src/finance/money';
+import { formatFinanceDate } from '../../src/finance/date';
 export default function OrdersScreen() {
   const [data, setData] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,9 +65,9 @@ export default function OrdersScreen() {
               <Text>{item.status.replaceAll('_', ' ')}</Text>
             </View>
             <Text>
-              {item.items.length} items / ৳{(item.estimatedTotalMinor / 100).toFixed(2)}
+              {item.items.length} items / {formatMoneyMinor(item.estimatedTotalMinor)}
             </Text>
-            <Text style={styles.muted}>{new Date(item.createdAt).toLocaleDateString('en-GB')}</Text>
+            <Text style={styles.muted}>{formatFinanceDate(item.createdAt)}</Text>
           </Pressable>
         )}
       />

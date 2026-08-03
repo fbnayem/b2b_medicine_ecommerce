@@ -15,6 +15,7 @@ import type { Medicine } from '@medsupply/shared-types';
 import { apiClient } from '../../src/api/client';
 import { useCart } from '../../src/store/useCart';
 import { useAuthStore } from '../../src/store/useAuth';
+import { formatMoneyMinor } from '../../src/finance/money';
 export default function MedicinesScreen() {
   const add = useCart((state) => state.add);
   const user = useAuthStore((state) => state.user);
@@ -97,7 +98,7 @@ export default function MedicinesScreen() {
             <Text style={styles.muted}>
               {item.manufacturer} / {item.packSize}
             </Text>
-            <Text style={styles.price}>৳{(item.defaultSellingPriceMinor / 100).toFixed(2)}</Text>
+            <Text style={styles.price}>{formatMoneyMinor(item.defaultSellingPriceMinor)}</Text>
             {user?.role === UserRole.SHOP_OWNER && (
               <Pressable
                 style={styles.add}

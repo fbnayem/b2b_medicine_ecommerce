@@ -2,6 +2,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'r
 import { router } from 'expo-router';
 import { apiClient } from '../../src/api/client';
 import { useCart } from '../../src/store/useCart';
+import { formatMoneyMinor } from '../../src/finance/money';
 export default function CartScreen() {
   const { items, quantity, remove, draftId, recover } = useCart();
   async function save() {
@@ -43,7 +44,7 @@ export default function CartScreen() {
             <Text style={styles.title}>
               {item.medicine.brandName} {item.medicine.strength}
             </Text>
-            <Text>৳{(item.medicine.defaultSellingPriceMinor / 100).toFixed(2)} each</Text>
+            <Text>{formatMoneyMinor(item.medicine.defaultSellingPriceMinor)} each</Text>
             <TextInput
               accessibilityLabel={`Quantity for ${item.medicine.brandName}`}
               style={styles.input}

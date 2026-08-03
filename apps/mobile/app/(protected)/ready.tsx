@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { apiClient } from '../../src/api/client';
+import { formatMoneyMinor } from '../../src/finance/money';
 
 type ReadyPackage = {
   _id: string;
@@ -53,7 +54,7 @@ export default function ReadyScreen() {
             <Text style={styles.title}>{item.reference}</Text>
             <Text>{item.orderId.reference}</Text>
             <Text>
-              {item.invoiceId.reference} · ৳{(item.invoiceId.grandTotalMinor / 100).toFixed(2)}
+              {item.invoiceId.reference} · {formatMoneyMinor(item.invoiceId.grandTotalMinor)}
             </Text>
             <Text style={styles.barcode}>{item.barcode}</Text>
             <Text>{item.packageCount} package(s)</Text>

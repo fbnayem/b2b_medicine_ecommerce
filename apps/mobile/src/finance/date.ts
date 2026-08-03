@@ -1,3 +1,13 @@
+import { formatDate, formatDateTime, toDateInputValue } from '@medsupply/utilities';
+
+/**
+ * `formatFinanceDate` and its date-time counterpart now come from
+ * `@medsupply/utilities`, which always pins the configured time zone. The
+ * versions here did too, but the ~11 other date call sites in this app did not
+ * and silently used the device's zone.
+ */
+export { formatDateTime as formatFinanceDateTime };
+
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isDateOnly(value: string): boolean {
@@ -10,28 +20,13 @@ export function isDateOnly(value: string): boolean {
 }
 
 export function defaultStatementRange(now = new Date()): { from: string; to: string } {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Dhaka',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((value) => value.type === type)?.value ?? '';
-  const year = part('year');
-  const month = part('month');
-  const day = part('day');
-  return { from: `${year}-${month}-01`, to: `${year}-${month}-${day}` };
+  // `formatToParts` is Android-only under Hermes, so the shared helper returns
+  // an assembled en-CA string and this splits it rather than reaching for parts.
+  const today = toDateInputValue(now);
+  const [year, month] = today.split('-');
+  return { from: `${year}-${month}-01`, to: today };
 }
 
-export function formatFinanceDate(value?: string): string {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Dhaka',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
+export function formatFinanceDate(value?: string | number | Date | null): string {
+  return formatDate(value);
 }

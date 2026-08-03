@@ -3,6 +3,7 @@ import { UserRole, UserStatus, type User } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
 import './inventory.css';
+import { formatFinanceDateTime } from '../lib/finance';
 
 interface DirectoryUser extends User {
   activeSessions?: number;
@@ -215,7 +216,7 @@ export function UserAdministration() {
                     {user.role.replaceAll('_', ' ')} · {user.status}
                     {user.forcePasswordChange ? ' · password change pending' : ''}
                     {user.lastLogin
-                      ? ` · last signed in ${new Date(user.lastLogin).toLocaleString('en-BD')}`
+                      ? ` · last signed in ${formatFinanceDateTime(user.lastLogin)}`
                       : ' · never signed in'}
                   </p>
                 </div>

@@ -40,9 +40,13 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # Hand-listed rather than driven by turbo, so a new package is invisible
+      # here until it is added. Every workspace package belongs in both this
+      # step and the typecheck below.
       - name: Build shared packages
         run: |
           pnpm --filter @medsupply/shared-types build
+          pnpm --filter @medsupply/utilities build
           pnpm --filter @medsupply/validation build
 
       # `pnpm --filter X <script>` exits 0 when the script does not exist, so a
@@ -52,6 +56,9 @@ jobs:
       # removing a gate.
       - name: Typecheck
         run: |
+          pnpm --filter @medsupply/shared-types run typecheck
+          pnpm --filter @medsupply/utilities run typecheck
+          pnpm --filter @medsupply/validation run typecheck
           pnpm --filter @medsupply/api run typecheck
           pnpm --filter @medsupply/web run typecheck
           pnpm --filter @medsupply/mobile run typecheck

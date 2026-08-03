@@ -4,6 +4,8 @@ import { useLocalSearchParams } from 'expo-router';
 import type { Order } from '@medsupply/shared-types';
 import { apiClient } from '../../src/api/client';
 import { ActivityTimelineView } from '../../src/notifications/ActivityTimelineView';
+import { formatMoneyMinor } from '../../src/finance/money';
+import { formatFinanceDateTime } from '../../src/finance/date';
 export default function OrderDetailScreen() {
   const { id, submitted } = useLocalSearchParams<{ id: string; submitted?: string }>();
   const [order, setOrder] = useState<Order>();
@@ -37,22 +39,22 @@ export default function OrderDetailScreen() {
             <View>
               <Text style={styles.title}>{item.medicineSnapshot.brandName}</Text>
               <Text>
-                {item.requestedQuantity} x ৳{(item.estimatedUnitPriceMinor / 100).toFixed(2)}
+                {item.requestedQuantity} x {formatMoneyMinor(item.estimatedUnitPriceMinor)}
               </Text>
             </View>
-            <Text style={styles.title}>৳{(item.estimatedLineTotalMinor / 100).toFixed(2)}</Text>
+            <Text style={styles.title}>{formatMoneyMinor(item.estimatedLineTotalMinor)}</Text>
           </View>
         ))}
         <View style={styles.row}>
           <Text style={styles.title}>Estimated total</Text>
-          <Text style={styles.title}>৳{(order!.estimatedTotalMinor / 100).toFixed(2)}</Text>
+          <Text style={styles.title}>{formatMoneyMinor(order!.estimatedTotalMinor)}</Text>
         </View>
       </View>
       <Text style={styles.heading}>Status timeline</Text>
       {order!.statusHistory.map((entry, index) => (
         <View style={styles.timeline} key={`${entry.to}-${index}`}>
           <Text style={styles.title}>{entry.to.replaceAll('_', ' ')}</Text>
-          <Text>{new Date(entry.at).toLocaleString('en-BD')}</Text>
+          <Text>{formatFinanceDateTime(entry.at)}</Text>
         </View>
       ))}
       <ActivityTimelineView

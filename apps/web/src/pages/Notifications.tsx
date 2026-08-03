@@ -9,6 +9,7 @@ import { apiClient } from '../api/client';
 import { useNotificationStore } from '../store/useNotifications';
 import { useRealtimeEvent } from '../realtime/useRealtime';
 import './inventory.css';
+import { formatFinanceDateTime } from '../lib/finance';
 
 const categories = ['', ...Object.values(NotificationCategory)] as const;
 const PAGE_SIZE = 20;
@@ -184,7 +185,7 @@ export function Notifications() {
                 <p>{notification.body}</p>
                 <p className="notification-meta">
                   {notification.category} · {notification.priority} ·{' '}
-                  {new Date(notification.createdAt).toLocaleString('en-BD')}
+                  {formatFinanceDateTime(notification.createdAt)}
                 </p>
               </div>
               <div className="notification-row-actions">

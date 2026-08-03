@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { Order } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import './inventory.css';
+import { formatFinanceDate, formatMinor } from '../lib/finance';
 export function OrderList() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,16 +62,10 @@ export function OrderList() {
                     <td>
                       <Link to={`/orders/${order._id}`}>{order.reference}</Link>
                     </td>
-                    <td>
-                      {new Date(order.createdAt).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </td>
+                    <td>{formatFinanceDate(order.createdAt)}</td>
                     <td>{order.status.replaceAll('_', ' ')}</td>
                     <td>{order.items.length}</td>
-                    <td>৳{(order.estimatedTotalMinor / 100).toFixed(2)}</td>
+                    <td>{formatMinor(order.estimatedTotalMinor)}</td>
                   </tr>
                 ))}
               </tbody>

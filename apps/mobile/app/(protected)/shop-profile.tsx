@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { apiClient } from '../../src/api/client';
 import { Shop, ShopStatus } from '@medsupply/shared-types';
+import { formatMoneyMinor } from '../../src/finance/money';
+import { formatFinanceDate } from '../../src/finance/date';
 
 export default function ShopProfileScreen() {
   const [shop, setShop] = useState<Shop | null>(null);
@@ -80,12 +82,7 @@ export default function ShopProfileScreen() {
       {isLicenceNearExpiry(shop.drugLicenceExpiryDate) && (
         <View style={styles.warningBanner}>
           <Text style={styles.warningText}>
-            ⚠️ Drug licence expires on{' '}
-            {new Date(shop.drugLicenceExpiryDate!).toLocaleDateString('en-GB', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-            })}
+            ⚠️ Drug licence expires on {formatFinanceDate(shop.drugLicenceExpiryDate!)}
           </Text>
         </View>
       )}
@@ -107,7 +104,7 @@ export default function ShopProfileScreen() {
         <View style={styles.row}>
           <View style={styles.metricBox}>
             <Text style={styles.metricLabel}>Credit Limit</Text>
-            <Text style={styles.metricValue}>৳{(shop.creditLimit / 100).toLocaleString()}</Text>
+            <Text style={styles.metricValue}>{formatMoneyMinor(shop.creditLimit)}</Text>
           </View>
           <View style={styles.metricBox}>
             <Text style={styles.metricLabel}>Outstanding</Text>
@@ -117,7 +114,7 @@ export default function ShopProfileScreen() {
                 { color: shop.outstandingBalance > 0 ? '#dc2626' : '#16a34a' },
               ]}
             >
-              ৳{(shop.outstandingBalance / 100).toLocaleString()}
+              {formatMoneyMinor(shop.outstandingBalance)}
             </Text>
           </View>
         </View>
@@ -125,7 +122,7 @@ export default function ShopProfileScreen() {
           <View style={styles.metricBox}>
             <Text style={styles.metricLabel}>Available Credit</Text>
             <Text style={styles.metricValue}>
-              ৳{Math.max(0, (shop.creditLimit - shop.outstandingBalance) / 100).toLocaleString()}
+              {formatMoneyMinor(Math.max(0, shop.creditLimit - shop.outstandingBalance))}
             </Text>
           </View>
           <View style={styles.metricBox}>

@@ -4,6 +4,7 @@ import { UserRole } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
 import './inventory.css';
+import { formatMinor } from '../lib/finance';
 
 type PickingItem = {
   _id: string;
@@ -51,7 +52,7 @@ type IssuedResult = {
 };
 type ApiFailure = { response?: { data?: { error?: { message?: string } } } };
 
-const money = (minor: number) => `৳${(minor / 100).toFixed(2)}`;
+const money = formatMinor;
 const discrepancyTypes = [
   'MISSING_QUANTITY',
   'DAMAGED_ITEM',

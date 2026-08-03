@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useCart } from '../store/useCart';
 import './inventory.css';
-const money = (value: number) => `৳${(value / 100).toFixed(2)}`;
+import { formatMinor } from '../lib/finance';
+const money = formatMinor;
 export function Cart() {
   const { items, setQuantity, remove, draftId, setDraftId } = useCart();
   const subtotal = items.reduce(

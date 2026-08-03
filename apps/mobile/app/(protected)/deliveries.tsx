@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { DeliveryStatus } from '@medsupply/shared-types';
 import type { Delivery } from '@medsupply/shared-types';
 import { apiClient } from '../../src/api/client';
+import { formatFinanceDate } from '../../src/finance/date';
 import {
   cacheAssignedDeliveries,
   loadCachedDeliveries,
@@ -97,7 +98,7 @@ export default function DeliveriesScreen() {
               </Text>
               {item.expectedDeliveryDate ? (
                 <Text style={styles.muted}>
-                  Expected {new Date(item.expectedDeliveryDate).toLocaleDateString('en-BD')}
+                  Expected {formatFinanceDate(item.expectedDeliveryDate)}
                 </Text>
               ) : null}
             </Pressable>

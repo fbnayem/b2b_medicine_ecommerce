@@ -13,6 +13,7 @@ import {
   type FinanceShopSummary,
 } from './financeTypes';
 import './inventory.css';
+import { toMoneyInputValue } from '@medsupply/utilities';
 
 interface AttachmentPayload {
   fileName: string;
@@ -118,7 +119,7 @@ export function RecordPayment() {
     changed();
     setInvoiceId(value);
     const invoice = invoices.find((candidate) => candidate._id === value);
-    if (invoice) setAmount((invoiceDue(invoice) / 100).toFixed(2));
+    if (invoice) setAmount(toMoneyInputValue(invoiceDue(invoice)));
   }
 
   async function submit(event: FormEvent) {

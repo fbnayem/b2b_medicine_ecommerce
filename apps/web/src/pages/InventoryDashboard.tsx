@@ -4,6 +4,7 @@ import { StockMovementType } from '@medsupply/shared-types';
 import type { Medicine, MedicineBatch } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import './inventory.css';
+import { formatFinanceDate, formatFinanceDateTime } from '../lib/finance';
 
 type Movement = {
   _id: string;
@@ -198,13 +199,7 @@ export function InventoryDashboard() {
                             {batch.batchNumber} · {batch.warehouseLocation}
                           </small>
                         </td>
-                        <td>
-                          {new Date(batch.expiryDate).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </td>
+                        <td>{formatFinanceDate(batch.expiryDate)}</td>
                         <td>{batch.quantities.onHand}</td>
                         <td>{batch.quantities.available}</td>
                         <td>{batch.quantities.reserved}</td>
@@ -324,7 +319,7 @@ export function InventoryDashboard() {
                   </div>
                   <div>
                     <strong>{m.quantity}</strong>
-                    <small>{new Date(m.createdAt).toLocaleString('en-BD')}</small>
+                    <small>{formatFinanceDateTime(m.createdAt)}</small>
                   </div>
                 </li>
               ))}

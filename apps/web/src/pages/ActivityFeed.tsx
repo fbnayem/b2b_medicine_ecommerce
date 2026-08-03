@@ -7,6 +7,7 @@ import {
 import { apiClient } from '../api/client';
 import { useRealtimeEvent } from '../realtime/useRealtime';
 import './inventory.css';
+import { formatFinanceDateTime } from '../lib/finance';
 
 const categories = ['', ...Object.values(NotificationCategory)] as const;
 const PAGE_SIZE = 30;
@@ -99,7 +100,7 @@ export function ActivityFeed() {
                 <p className="timeline-summary">{item.summary}</p>
                 {item.detail ? <p className="timeline-detail">{item.detail}</p> : null}
                 <p className="timeline-meta">
-                  {new Date(item.occurredAt).toLocaleString('en-BD')}
+                  {formatFinanceDateTime(item.occurredAt)}
                   {item.actorName ? ` · ${item.actorName}` : ''} · {item.category}
                 </p>
               </li>

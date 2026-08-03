@@ -3,6 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { useLocalSearchParams, router } from 'expo-router';
 import type { Order, Shop } from '@medsupply/shared-types';
 import { apiClient } from '../../src/api/client';
+import { formatMoneyMinor } from '../../src/finance/money';
 type Line = {
   orderItemId: string;
   approvedQuantity: number;
@@ -73,7 +74,7 @@ export default function ApprovalReviewScreen() {
       <Text style={s.ref}>{order.reference}</Text>
       <Text style={s.heading}>{shop.name}</Text>
       <Text>Status: {order.status.replaceAll('_', ' ')}</Text>
-      <Text>Credit: ৳{((shop.creditLimit - shop.outstandingBalance) / 100).toFixed(2)}</Text>
+      <Text>Credit: {formatMoneyMinor(shop.creditLimit - shop.outstandingBalance)}</Text>
       {error ? <Text style={s.error}>{error}</Text> : null}
       {order.items.map((item, index) => (
         <View style={s.card} key={item.medicineId}>

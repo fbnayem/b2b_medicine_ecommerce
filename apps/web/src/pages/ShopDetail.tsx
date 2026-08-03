@@ -4,6 +4,7 @@ import { apiClient } from '../api/client';
 import { ShopStatus } from '@medsupply/shared-types';
 import type { Shop } from '@medsupply/shared-types';
 import './inventory.css';
+import { formatFinanceDate, formatMinor } from '../lib/finance';
 
 export const ShopDetail: React.FC = () => {
   const { id } = useParams();
@@ -74,12 +75,7 @@ export const ShopDetail: React.FC = () => {
       {/* Licence Warning */}
       {licenceExpirySoon && (
         <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-700">
-          ⚠️ Drug licence expires on{' '}
-          {new Date(shop.drugLicenceExpiryDate!).toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-          })}
+          ⚠️ Drug licence expires on {formatFinanceDate(shop.drugLicenceExpiryDate!)}
         </div>
       )}
 
@@ -117,17 +113,13 @@ export const ShopDetail: React.FC = () => {
             <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
               Credit Limit
             </p>
-            <p className="text-gray-900 font-semibold">
-              ৳{(shop.creditLimit / 100).toLocaleString()}
-            </p>
+            <p className="text-gray-900 font-semibold">{formatMinor(shop.creditLimit)}</p>
           </div>
           <div>
             <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
               Outstanding Balance
             </p>
-            <p className="text-gray-900 font-semibold">
-              ৳{(shop.outstandingBalance / 100).toLocaleString()}
-            </p>
+            <p className="text-gray-900 font-semibold">{formatMinor(shop.outstandingBalance)}</p>
           </div>
           <div>
             <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">

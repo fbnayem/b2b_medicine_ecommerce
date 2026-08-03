@@ -7,9 +7,9 @@ import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
 import { useCart } from '../store/useCart';
 import './inventory.css';
+import { formatMinor } from '../lib/finance';
 
-const money = (minor: number) =>
-  `৳${(minor / 100).toLocaleString('en-BD', { minimumFractionDigits: 2 })}`;
+const money = (minor: number) => formatMinor(minor);
 
 export function MedicineList() {
   const user = useAuthStore((state) => state.user);
