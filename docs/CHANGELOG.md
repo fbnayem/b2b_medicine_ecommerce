@@ -1,5 +1,60 @@
 # Changelog
 
+## Road to production, phase 1 - Production blockers and money correctness
+
+Everything here was found by running the system or auditing it against real
+load, not by the 254 tests, the typechecker or the container build, all of
+which were green throughout.
+
+- The production database ran with no authentication at all: no `--auth`, no
+  credentials, no keyfile. Anything on the Docker network could read and write
+  the entire ledger, including every `passwordHash`. It now starts with a root
+  account for administration and a separate application account holding
+  `readWrite` and `dbAdmin` on one database and nothing else. The replica-set
+  keyfile is written inside the container, because a bind-mounted keyfile
+  cannot be given `0400 mongodb:mongodb` from a Windows or macOS host and
+  mongod exits before logging anything that names the cause.
+- Enabling authentication exposed a readiness probe that could not detect its
+  absence. A missing credential does not fail at connect - the driver handshake
+  needs none - so `readyState` reached 1 and `admin().ping()`, which MongoDB
+  answers to anyone, still succeeded. `/health/ready` returned 200 while every
+  query failed. It now probes with `listCollections`, which needs the same
+  authorisation the application needs, and reports connected-but-unauthorised
+  as its own state.
+- Credit notes were invisible to the invoice balance. `getInvoiceBalance`
+  summed posted payments alone while `receivablesAgeing` also subtracted credit
+  notes, so a customer who returned goods was refused their next order by the
+  credit check while the ageing report showed them settled. Settlement is now
+  derived once, from accounts-receivable movement in the append-only ledger.
+  Payment reversals and invoices settled from advance balance are correct as a
+  consequence; neither was before.
+- The outstanding report issued roughly 17,500 database operations for 500
+  shops, and the overdue report ran the whole thing again purely to filter it.
+  Both now share one implementation issuing six aggregations regardless of shop
+  count, with the overdue filter inside the pipeline and pagination that keeps
+  totals global. The manager dashboard no longer launches eight fanned-out
+  report functions at once and caches its assembled result for a minute.
+- Shop owners could not sign in to the web application: the sign-in handler
+  sent them to a path no route declared, so the catch-all returned them to the
+  login form with no error shown. An entire role was locked out.
+- Nothing redeemed the refresh cookie at start-up, so every reload, new tab or
+  browser restart signed the user out mid-order while a live session sat unused
+  in the cookie. There was also no sign-out control anywhere in the chrome.
+- Ten money formatters became one. Eighteen call sites rendered amounts with no
+  thousands separator; others dropped the paisa. Forty-one date call sites never
+  passed a time zone and used the device's - invisible on a machine already in
+  Dhaka, wrong everywhere else and in CI. `en-BD`, used at most of those sites,
+  is not a locale at all and silently resolves to plain `en`.
+- Eight `console.*` calls bypassed the redacting logger. The worst was not an
+  error path: an unconfigured notification channel printed the whole message
+  body, so a deployment that had not yet configured SMS printed every delivery
+  OTP in plaintext on the ordinary success path.
+- New guards, each demonstrated to fail when the defect it covers is
+  reintroduced: `console.*` is permitted only in the logger and in start-up
+  validation; every sign-in destination must be a route that exists; the
+  receivables reports must stay within a database-operation ceiling; a credit
+  note must unblock the customer's next order.
+
 ## Phase 12 - Final Security Hardening, Performance and Release Readiness
 
 - Fixed four vulnerabilities carried by earlier phases, each now covered by a test that fails if the fix is reverted: the sign-in response returned the account's bcrypt hash; shop and directory search terms were interpolated into `$regex` unescaped; query parameters were assigned straight into database filters, so `?status[$ne]=` was an injection; and replaying an already-rotated refresh token was answered with an error while the live session kept working.

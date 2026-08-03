@@ -754,6 +754,63 @@ Added the Security screen, reachable from the dashboard by every role, listing e
 
 None. Phases 0-12 are complete: the system is functionally whole, hardened, indexed, documented and packaged for deployment.
 
+---
+
+## Road to production
+
+Phases 0-12 delivered the features. A subsequent audit, and a session spent
+actually running the system, found that "complete and tested" and "safe to
+operate for a real regulated distributor" are not the same claim. Every defect
+in the phases below was found by running the system or reading it against real
+load. None was found by the 254 tests, the typechecker, the container build or
+the green pipeline.
+
+The full plan, including the findings each phase answers, is held outside this
+repository with the working notes. The sequence is: secure the ground; the
+production blockers; a verification harness; the design foundation and
+application shell; close the operational dead ends; language, errors and
+accessibility; regulatory traceability.
+
+### RTP Phase 0: Secure the ground
+
+**Status:** COMPLETED
+
+Committed the pending fixes and the untracked dev-server script without which
+no clone could start the API; added `.gitattributes`; gave the mobile app the
+`typecheck` script CI had been silently skipping for twelve phases, and changed
+CI from a filtered invocation that exits zero on a missing script to one that
+errors; added a guard that fails the build when a test file is registered with
+no script that runs it. Verified by cloning fresh and starting both apps.
+
+### RTP Phase 1: Production blockers and money correctness
+
+**Status:** COMPLETED
+
+MongoDB authentication with a least-privilege application account and a
+readiness probe that can actually detect its absence; one ledger-derived
+definition of what an invoice owes, so a credit note no longer blocks the
+customer's next order; the receivables reports rewritten from roughly 17,500
+database operations to a fixed six; web session rehydration, a real sign-out
+and the sign-in redirect that locked shop owners out of the web application
+entirely; one money and date formatter shared by both clients, always in
+`Asia/Dhaka`; and the log-redaction bypasses closed, including one that printed
+delivery OTPs in plaintext on the ordinary success path.
+
+Full detail in `docs/CHANGELOG.md`. Each defect is covered by a guard that was
+demonstrated to fail when the defect is reintroduced.
+
 ### Exact next phase
 
-No further phase is defined. The remaining work is operational rather than developmental: provision production secrets, deploy behind TLS with `TRUST_PROXY_HOPS` set correctly, run `pnpm --filter @medsupply/api indexes -- --apply` against the target database, connect the real email, SMS, WhatsApp, OTP and object-storage providers behind their existing adapter interfaces, and rebuild the mobile binary for distribution.
+**RTP Phase 2: the verification harness.** Make the existing checks real - the
+web application has never been strict-typechecked, because
+`apps/web/tsconfig.app.json` carries neither `extends` nor `strict`, and CI
+hand-lists per-package commands so `packages/*` are typechecked by nothing.
+Then a deterministic seed script, a Playwright suite covering each role's
+sign-in and the money-and-stock journeys, run against the dev server as well as
+the built bundle, and a route-coverage reconciliation test that fails the build
+on an endpoint no test exercises. Roughly 53% of the route surface has no
+integration coverage today.
+
+The operational work listed above - production secrets, TLS, index application,
+real provider credentials, mobile distribution - still stands, and now depends
+on the phases above rather than only on Phase 12.
