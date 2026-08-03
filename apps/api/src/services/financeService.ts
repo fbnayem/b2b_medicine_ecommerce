@@ -15,11 +15,11 @@ import {
   dhakaDayBoundary,
   FinanceActor,
   getAvailableAdvance,
-  getInvoiceBalance,
   getLedgerBalance,
   postInvoiceCharge,
 } from './ledgerService';
 import { utilisationBasisPoints } from './financialMath';
+import { settlementForInvoices } from './invoiceLedgerQueries';
 import { getActiveReservedExposure, reserveCredit } from './creditReservationService';
 import { financeSettings } from './settingsService';
 
@@ -42,21 +42,30 @@ export async function invoiceBalanceRows(
       .lean(),
     Invoice.countDocuments(filter),
   ]);
-  const data = await Promise.all(
-    invoices.map(async (invoice) => {
-      const live = await getInvoiceBalance(invoice._id);
-      return {
-        ...invoice,
-        currentAmountPaidMinor: live.currentAmountPaidMinor,
-        currentAmountDueMinor: live.currentAmountDueMinor,
-        paidMinor: live.currentAmountPaidMinor,
-        dueMinor: live.currentAmountDueMinor,
-        amountPaidMinor: live.currentAmountPaidMinor,
-        amountDueMinor: live.currentAmountDueMinor,
-        settlementStatus: live.settlementStatus,
-      };
-    }),
+  // One aggregation for the whole page, rather than a two-query balance per
+  // invoice inside a Promise.all.
+  const settlements = await settlementForInvoices(
+    invoices.map((invoice) => invoice._id),
+    {
+      fallbackChargeMinor: new Map(
+        invoices.map((invoice) => [String(invoice._id), invoice.grandTotalMinor]),
+      ),
+    },
   );
+  const data = invoices.map((invoice) => {
+    const live = settlements.get(String(invoice._id))!;
+    return {
+      ...invoice,
+      currentAmountPaidMinor: live.paidMinor,
+      currentAmountDueMinor: live.dueMinor,
+      currentAmountCreditedMinor: live.creditedMinor,
+      paidMinor: live.paidMinor,
+      dueMinor: live.dueMinor,
+      amountPaidMinor: live.paidMinor,
+      amountDueMinor: live.dueMinor,
+      settlementStatus: live.settlementStatus,
+    };
+  });
   return { data, meta: { page, limit, total, pages: Math.ceil(total / limit) } };
 }
 
@@ -68,17 +77,29 @@ async function overdueForShop(shopId: Types.ObjectId, asOf: Date, session?: Clie
     status: 'ISSUED',
     dueDate: { $lt: cutoff },
   })
-    .select('_id dueDate')
+    .select('_id dueDate grandTotalMinor')
     .sort({ dueDate: 1 })
     .lean();
   if (session) invoiceQuery.session(session);
   const invoices = await invoiceQuery;
+  // Was a sequential loop awaiting a two-query balance per invoice, which is
+  // most of how the outstanding report reached ~17,500 database operations:
+  // this runs once per shop, and the report ran it for every shop.
+  const settlements = await settlementForInvoices(
+    invoices.map((invoice) => invoice._id),
+    {
+      session,
+      fallbackChargeMinor: new Map(
+        invoices.map((invoice) => [String(invoice._id), invoice.grandTotalMinor]),
+      ),
+    },
+  );
   let overdueMinor = 0;
   let oldestDueDate: Date | undefined;
   for (const invoice of invoices) {
-    const live = await getInvoiceBalance(invoice._id, session);
-    if (live.currentAmountDueMinor > 0) {
-      overdueMinor += live.currentAmountDueMinor;
+    const dueMinor = settlements.get(String(invoice._id))?.dueMinor ?? 0;
+    if (dueMinor > 0) {
+      overdueMinor += dueMinor;
       oldestDueDate ??= invoice.dueDate;
     }
   }
@@ -271,59 +292,287 @@ export async function getLedger(shopId: string, pageValue = 1, limitValue = 50) 
   return { data, summary, meta: { page, limit, total, pages: Math.ceil(total / limit) } };
 }
 
-export async function getOutstandingReport(asOf = new Date()) {
-  const shops = await Shop.find({ status: { $ne: ShopStatus.INACTIVE } })
-    .select('_id')
-    .lean();
-  const summaries = await Promise.all(
-    shops.map((shop) => getCreditSummary(String(shop._id), { asOf })),
-  );
-  const rows = summaries.filter((summary) => summary.outstandingMinor > 0);
-  const data = await Promise.all(
-    rows.map(async (summary) => ({
-      ...summary,
-      shopReference: summary.shop.reference,
-      shopName: summary.shop.name,
-      invoiceCount: await Invoice.countDocuments({
-        shopId: summary.shopId,
-        status: 'ISSUED',
-      }),
-    })),
-  );
+/**
+ * Every shop with money outstanding, in a fixed number of database operations.
+ *
+ * The previous shape was `Promise.all` over every active shop, each running a
+ * full credit summary, which itself looped over that shop's overdue invoices
+ * awaiting a two-query balance for each, plus a `countDocuments` per row. At
+ * 500 shops with 15 overdue invoices apiece that is roughly 17,500 round trips
+ * for one GET — and the overdue report then ran the whole thing a second time
+ * purely to filter it. Both returned unbounded, unpaginated arrays.
+ *
+ * This runs six aggregations regardless of how many shops exist, and starts
+ * from the ledger rather than from `Shop`, so a shop that has never traded is
+ * never touched.
+ *
+ * `onlyOverdue` is applied here rather than by the caller: filtering after
+ * pagination would silently make page one "the overdue subset of the first
+ * fifty outstanding shops".
+ */
+async function receivablesRows(options: {
+  asOf: Date;
+  onlyOverdue: boolean;
+  page: number;
+  limit: number;
+}) {
+  const { asOf, onlyOverdue } = options;
+  const finance = await financeSettings();
+  const graceDays = Math.max(0, finance.creditOverdueGraceDays);
+  const cutoff = new Date(asOf.getTime() - graceDays * 86_400_000);
+
+  const [balances, advances, overdues, invoiceCounts] = await Promise.all([
+    // Outstanding per shop. Deliberately unbounded in time, matching
+    // `getLedgerBalance`: the balance is what is owed now, not as of a date.
+    LedgerTransaction.aggregate<{ _id: Types.ObjectId; ledgerBalanceMinor: number }>([
+      { $group: { _id: '$shopId', ledgerBalanceMinor: { $sum: '$customerBalanceDeltaMinor' } } },
+      { $match: { ledgerBalanceMinor: { $gt: 0 } } },
+    ]),
+    LedgerTransaction.aggregate<{ _id: Types.ObjectId; advanceBalanceMinor: number }>([
+      { $unwind: '$entries' },
+      { $match: { 'entries.account': LedgerAccount.CUSTOMER_ADVANCE } },
+      {
+        $group: {
+          _id: '$shopId',
+          advanceBalanceMinor: {
+            $sum: { $subtract: ['$entries.creditMinor', '$entries.debitMinor'] },
+          },
+        },
+      },
+    ]),
+    // Overdue per shop, from the same receivable movement the credit check
+    // uses — so a credit note reduces this exactly as it reduces the invoice.
+    // The `$lookup` is one round trip whatever the number of invoices; the cost
+    // this replaces was the per-invoice `await`, not the join.
+    Invoice.aggregate<{ _id: Types.ObjectId; overdueMinor: number; oldestDueDate: Date }>([
+      { $match: { status: 'ISSUED', dueDate: { $lt: cutoff } } },
+      {
+        $lookup: {
+          from: LedgerTransaction.collection.name,
+          localField: '_id',
+          foreignField: 'invoiceId',
+          as: 'ledger',
+        },
+      },
+      // `preserveNullAndEmptyArrays` so an invoice with no ledger charge is
+      // still counted, at its own total, rather than silently dropping out of
+      // the overdue figure entirely.
+      { $unwind: { path: '$ledger', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$ledger.entries', preserveNullAndEmptyArrays: true } },
+      {
+        $match: {
+          $or: [
+            { 'ledger.entries.account': LedgerAccount.ACCOUNTS_RECEIVABLE },
+            { ledger: { $exists: false } },
+          ],
+        },
+      },
+      {
+        $group: {
+          _id: { shopId: '$shopId', invoiceId: '$_id' },
+          dueDate: { $first: '$dueDate' },
+          grandTotalMinor: { $first: '$grandTotalMinor' },
+          chargedMinor: {
+            $sum: {
+              $cond: [
+                { $eq: ['$ledger.type', 'INVOICE_CHARGE'] },
+                { $ifNull: ['$ledger.entries.debitMinor', 0] },
+                0,
+              ],
+            },
+          },
+          settledMinor: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $ne: ['$ledger.type', 'INVOICE_CHARGE'] },
+                    { $ne: [{ $type: '$ledger.type' }, 'missing'] },
+                  ],
+                },
+                {
+                  $subtract: [
+                    { $ifNull: ['$ledger.entries.creditMinor', 0] },
+                    { $ifNull: ['$ledger.entries.debitMinor', 0] },
+                  ],
+                },
+                0,
+              ],
+            },
+          },
+        },
+      },
+      {
+        $addFields: {
+          dueMinor: {
+            $max: [
+              0,
+              {
+                $subtract: [
+                  {
+                    $cond: [{ $gt: ['$chargedMinor', 0] }, '$chargedMinor', '$grandTotalMinor'],
+                  },
+                  '$settledMinor',
+                ],
+              },
+            ],
+          },
+        },
+      },
+      { $match: { dueMinor: { $gt: 0 } } },
+      {
+        $group: {
+          _id: '$_id.shopId',
+          overdueMinor: { $sum: '$dueMinor' },
+          oldestDueDate: { $min: '$dueDate' },
+        },
+      },
+    ]),
+    Invoice.aggregate<{ _id: Types.ObjectId; invoiceCount: number }>([
+      { $match: { status: 'ISSUED' } },
+      { $group: { _id: '$shopId', invoiceCount: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const advanceByShop = new Map(advances.map((row) => [String(row._id), row.advanceBalanceMinor]));
+  const overdueByShop = new Map(overdues.map((row) => [String(row._id), row]));
+  const countByShop = new Map(invoiceCounts.map((row) => [String(row._id), row.invoiceCount]));
+
+  const candidateIds = balances
+    .filter((row) => !onlyOverdue || (overdueByShop.get(String(row._id))?.overdueMinor ?? 0) > 0)
+    .map((row) => row._id);
+
+  const shops = await Shop.find({
+    _id: { $in: candidateIds },
+    status: { $ne: ShopStatus.INACTIVE },
+  }).lean();
+  const shopById = new Map(shops.map((shop) => [String(shop._id), shop]));
+
+  const overdueThreshold = Math.max(0, finance.creditBlockOverdueThresholdMinor);
+  const today = dhakaDayBoundary(dhakaDateString(asOf));
+
+  const all = balances
+    .filter((row) => shopById.has(String(row._id)))
+    .map((row) => {
+      const key = String(row._id);
+      const shop = shopById.get(key)!;
+      const overdue = overdueByShop.get(key);
+      const overdueMinor = overdue?.overdueMinor ?? 0;
+      const oldestDueDate = overdue?.oldestDueDate;
+      const outstandingMinor = Math.max(0, row.ledgerBalanceMinor);
+      const reserved = shop.reservedCreditMinor ?? 0;
+      const utilisation = utilisationBasisPoints(outstandingMinor + reserved, shop.creditLimit);
+      const daysOverdue = oldestDueDate
+        ? Math.max(0, Math.floor((today.getTime() - oldestDueDate.getTime()) / 86_400_000))
+        : 0;
+
+      const blockReasons: string[] = [];
+      if (shop.status === ShopStatus.CREDIT_BLOCKED) {
+        blockReasons.push(shop.orderBlockingReason || 'Account is manually credit blocked');
+      }
+      if (finance.creditBlockOnLimitExceeded && outstandingMinor + reserved > shop.creditLimit) {
+        blockReasons.push('Projected exposure exceeds the credit limit');
+      }
+      if (overdueMinor > overdueThreshold) {
+        blockReasons.push('Overdue balance exceeds the configured threshold');
+      }
+
+      return {
+        shop: {
+          _id: key,
+          reference: shop.reference,
+          name: shop.name,
+          status: shop.status,
+        },
+        shopId: key,
+        reference: shop.reference,
+        name: shop.name,
+        shopReference: shop.reference,
+        shopName: shop.name,
+        creditLimitMinor: shop.creditLimit,
+        ledgerBalanceMinor: row.ledgerBalanceMinor,
+        outstandingMinor,
+        outstandingBalanceMinor: outstandingMinor,
+        overdueMinor,
+        overdueBalanceMinor: overdueMinor,
+        advanceBalanceMinor: advanceByShop.get(key) ?? 0,
+        availableCreditMinor: Math.max(0, shop.creditLimit - outstandingMinor - reserved),
+        utilisationBasisPoints: utilisation,
+        creditUtilisationBps: utilisation,
+        creditUtilisationBasisPoints: utilisation,
+        paymentTermsDays: shop.paymentTermsDays,
+        reservedExposureMinor: reserved,
+        invoiceCount: countByShop.get(key) ?? 0,
+        manuallyBlocked: shop.status === ShopStatus.CREDIT_BLOCKED,
+        overdueBlocked: overdueMinor > overdueThreshold,
+        orderBlocked: blockReasons.length > 0,
+        creditBlocked: blockReasons.length > 0,
+        blockReason: blockReasons.join('; ') || undefined,
+        blockReasons,
+        oldestDueDate,
+        daysOverdue,
+        overdueDays: daysOverdue,
+        asOf: asOf.toISOString(),
+      };
+    })
+    .filter((row) => !onlyOverdue || row.overdueMinor > 0)
+    .sort((a, b) =>
+      onlyOverdue ? b.overdueMinor - a.overdueMinor : b.outstandingMinor - a.outstandingMinor,
+    );
+
+  const start = (options.page - 1) * options.limit;
+  return { rows: all.slice(start, start + options.limit), total: all.length, all };
+}
+
+export async function getOutstandingReport(asOf = new Date(), page = 1, limit = 100) {
+  const { rows, total, all } = await receivablesRows({
+    asOf,
+    onlyOverdue: false,
+    page,
+    limit,
+  });
   return {
-    data,
+    data: rows,
     summary: {
-      shopCount: data.length,
-      totalOutstandingMinor: data.reduce((sum, row) => sum + row.outstandingMinor, 0),
+      shopCount: total,
+      // Totals stay global rather than per page: a report whose total changed
+      // as you paged through it would be worse than useless to an accountant.
+      totalOutstandingMinor: all.reduce((sum, row) => sum + row.outstandingMinor, 0),
+      page,
+      limit,
+      pages: Math.max(1, Math.ceil(total / limit)),
     },
   };
 }
 
-export async function getOverdueReport(asOf = new Date()) {
-  const report = await getOutstandingReport(asOf);
-  const today = dhakaDayBoundary(dhakaDateString(asOf));
-  const data = report.data
-    .filter((row) => row.overdueMinor > 0)
-    .map((row) => ({
-      ...row,
-      shopId: row.shopId,
-      reference: row.shop.reference,
-      name: row.shop.name,
-      shopReference: row.shop.reference,
-      shopName: row.shop.name,
-      oldestDueDate: row.oldestDueDate,
-      daysOverdue: row.oldestDueDate
-        ? Math.max(0, Math.floor((today.getTime() - row.oldestDueDate.getTime()) / 86_400_000))
-        : 0,
-      overdueDays: row.oldestDueDate
-        ? Math.max(0, Math.floor((today.getTime() - row.oldestDueDate.getTime()) / 86_400_000))
-        : 0,
-    }));
+/**
+ * Every overdue shop, unpaginated, for the nightly digest.
+ *
+ * The digest must reach all of them, so it deliberately does not use the
+ * paginated report: reading `getOverdueReport().data` after pagination landed
+ * would have silently stopped notifying the hundred-and-first shop, and nothing
+ * would have reported an error.
+ */
+export async function listOverdueShops(asOf = new Date()) {
+  const { all } = await receivablesRows({
+    asOf,
+    onlyOverdue: true,
+    page: 1,
+    limit: Number.MAX_SAFE_INTEGER,
+  });
+  return all;
+}
+
+export async function getOverdueReport(asOf = new Date(), page = 1, limit = 100) {
+  const { rows, total, all } = await receivablesRows({ asOf, onlyOverdue: true, page, limit });
   return {
-    data,
+    data: rows,
     summary: {
-      overdueShopCount: data.length,
-      totalOverdueMinor: data.reduce((sum, row) => sum + row.overdueMinor, 0),
+      overdueShopCount: total,
+      totalOverdueMinor: all.reduce((sum, row) => sum + row.overdueMinor, 0),
+      page,
+      limit,
+      pages: Math.max(1, Math.ceil(total / limit)),
     },
   };
 }

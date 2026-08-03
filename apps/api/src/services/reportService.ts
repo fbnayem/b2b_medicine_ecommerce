@@ -1,6 +1,7 @@
 import { Types, type PipelineStage } from 'mongoose';
 import {
   DeliveryStatus,
+  LedgerAccount,
   OrderStatus,
   PaymentStatus,
   ReportGranularity,
@@ -11,6 +12,7 @@ import {
 import { CreditNote } from '../models/CreditNote';
 import { Delivery } from '../models/Delivery';
 import { Invoice } from '../models/Invoice';
+import { LedgerTransaction } from '../models/LedgerTransaction';
 import { MedicineBatch } from '../models/MedicineBatch';
 import { Order } from '../models/Order';
 import { Payment } from '../models/Payment';
@@ -1171,31 +1173,59 @@ export async function receivablesAgeing(input: { asOf?: string } = {}) {
     invoiceCount: number;
   }>([
     { $match: { status: 'ISSUED', invoiceDate: { $lte: asOfDate } } },
+    // One lookup against the ledger, replacing separate correlated joins to
+    // `payments` and `creditnotes`.
+    //
+    // This is the same accounts-receivable movement `settlementForInvoices`
+    // reads, which is the point: this report and the credit check that blocks
+    // orders now compute "what is owed" from one definition. They previously
+    // did not — this one subtracted credit notes and the credit check did not,
+    // so a customer who had returned goods showed settled here and was refused
+    // their next order there.
+    //
+    // The ledger also closes two gaps the old joins had: a reversed payment is
+    // debited back rather than still counted as paid, and an invoice settled
+    // from advance balance is recognised as paid.
     {
       $lookup: {
-        from: 'payments',
+        from: LedgerTransaction.collection.name,
         let: { invoiceId: '$_id' },
         pipeline: [
           {
             $match: {
               $expr: { $eq: ['$invoiceId', '$$invoiceId'] },
-              status: PaymentStatus.POSTED,
+              // Bounded by the report date. An as-of ageing report must not
+              // count a payment received after the date it claims to describe.
+              occurredAt: { $lte: asOfDate },
             },
           },
-          { $group: { _id: null, applied: { $sum: '$invoiceAppliedMinor' } } },
+          { $unwind: '$entries' },
+          { $match: { 'entries.account': LedgerAccount.ACCOUNTS_RECEIVABLE } },
+          {
+            $group: {
+              _id: null,
+              chargedMinor: {
+                $sum: {
+                  $cond: [
+                    { $eq: ['$type', 'INVOICE_CHARGE'] },
+                    { $subtract: ['$entries.debitMinor', '$entries.creditMinor'] },
+                    0,
+                  ],
+                },
+              },
+              settledMinor: {
+                $sum: {
+                  $cond: [
+                    { $ne: ['$type', 'INVOICE_CHARGE'] },
+                    { $subtract: ['$entries.creditMinor', '$entries.debitMinor'] },
+                    0,
+                  ],
+                },
+              },
+            },
+          },
         ],
         as: 'settlement',
-      },
-    },
-    {
-      $lookup: {
-        from: 'creditnotes',
-        let: { invoiceId: '$_id' },
-        pipeline: [
-          { $match: { $expr: { $eq: ['$invoiceId', '$$invoiceId'] } } },
-          { $group: { _id: null, credited: { $sum: '$totalMinor' } } },
-        ],
-        as: 'credits',
       },
     },
     {
@@ -1205,13 +1235,20 @@ export async function receivablesAgeing(input: { asOf?: string } = {}) {
             0,
             {
               $subtract: [
-                '$grandTotalMinor',
                 {
-                  $add: [
-                    { $ifNull: [{ $first: '$settlement.applied' }, 0] },
-                    { $ifNull: [{ $first: '$credits.credited' }, 0] },
-                  ],
+                  // An issued invoice with no charge in the ledger is a data
+                  // fault, not a settled account, and reading the ledger alone
+                  // would report it as owing nothing — the one direction a
+                  // receivables report must never err in. Falling back to the
+                  // invoice's own total errs the safe way.
+                  $let: {
+                    vars: { charged: { $ifNull: [{ $first: '$settlement.chargedMinor' }, 0] } },
+                    in: {
+                      $cond: [{ $gt: ['$$charged', 0] }, '$$charged', '$grandTotalMinor'],
+                    },
+                  },
                 },
+                { $ifNull: [{ $first: '$settlement.settledMinor' }, 0] },
               ],
             },
           ],
@@ -1319,18 +1356,60 @@ export async function receivablesAgeing(input: { asOf?: string } = {}) {
 
 /* --------------------------------------------------------------- overview */
 
+/**
+ * The manager dashboard, computed at most once every `OVERVIEW_CACHE_MS`.
+ *
+ * Eight report functions, each of which fans out into several aggregations of
+ * its own, used to be launched together on a single GET. Under `Promise.all`
+ * they all reach the driver at once, so one dashboard load could occupy most of
+ * the connection pool — and a dashboard is the page people leave open and
+ * refresh. Two changes: they run in small batches rather than all at once, and
+ * the assembled result is cached briefly.
+ *
+ * The cache does not make the ledger less authoritative. Reports are still
+ * recomputed from source every time they are actually computed; this only stops
+ * five managers with the same dashboard open from computing the same answer
+ * five times a second.
+ */
+const OVERVIEW_CACHE_MS = 60_000;
+const overviewCache = new Map<
+  string,
+  { at: number; value: Awaited<ReturnType<typeof buildOverview>> }
+>();
+
+export function invalidateOverviewCache() {
+  overviewCache.clear();
+}
+
 export async function analyticsOverview(input: RangeInput) {
-  const [sales, orders, delivery, returns, ageing, inventory, topMedicines, topShops] =
-    await Promise.all([
-      salesSummary(input),
-      orderFunnel(input),
-      deliveryPerformance(input),
-      returnsAnalytics(input),
-      receivablesAgeing({ asOf: input.to }),
-      inventoryAnalytics({ asOf: input.to, deadStockDays: 90 }),
-      salesByDimension({ ...input, dimension: SalesDimension.MEDICINE, limit: 5 }),
-      salesByDimension({ ...input, dimension: SalesDimension.SHOP, limit: 5 }),
-    ]);
+  const key = JSON.stringify([input.from, input.to, input.granularity, input.shopId]);
+  const cached = overviewCache.get(key);
+  if (cached && Date.now() - cached.at < OVERVIEW_CACHE_MS) return cached.value;
+
+  const value = await buildOverview(input);
+  // Bounded so a report driven by a free-text date range cannot grow without
+  // limit; the dashboard only ever uses a handful of ranges.
+  if (overviewCache.size > 32) overviewCache.clear();
+  overviewCache.set(key, { at: Date.now(), value });
+  return value;
+}
+
+async function buildOverview(input: RangeInput) {
+  // Two at a time. Enough to overlap the latency of independent aggregations,
+  // few enough that one dashboard cannot saturate the pool.
+  const [sales, orders] = await Promise.all([salesSummary(input), orderFunnel(input)]);
+  const [delivery, returns] = await Promise.all([
+    deliveryPerformance(input),
+    returnsAnalytics(input),
+  ]);
+  const [ageing, inventory] = await Promise.all([
+    receivablesAgeing({ asOf: input.to }),
+    inventoryAnalytics({ asOf: input.to, deadStockDays: 90 }),
+  ]);
+  const [topMedicines, topShops] = await Promise.all([
+    salesByDimension({ ...input, dimension: SalesDimension.MEDICINE, limit: 5 }),
+    salesByDimension({ ...input, dimension: SalesDimension.SHOP, limit: 5 }),
+  ]);
 
   const overdueMinor = ageing.buckets
     .filter((bucket) => bucket.bucket !== 'CURRENT')

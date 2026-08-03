@@ -37,6 +37,9 @@ const schema = new mongoose.Schema(
 );
 
 schema.index({ shopId: 1, occurredAt: 1, _id: 1 });
+// Settlement is derived per invoice from this collection, and the ageing report
+// bounds it by date, so the two fields are read together every time.
+schema.index({ invoiceId: 1, occurredAt: 1 });
 
 schema.pre('validate', function ensureBalancedTransaction() {
   const totals = this.entries.reduce(

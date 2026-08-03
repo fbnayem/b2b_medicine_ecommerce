@@ -169,6 +169,8 @@ export async function outstandingReport(req: AuthRequest, res: Response, next: N
   try {
     const result = await getOutstandingReport(
       req.query.asOf ? dhakaDayBoundary(String(req.query.asOf), true) : new Date(),
+      Math.max(1, Number(req.query.page) || 1),
+      Math.min(200, Math.max(1, Number(req.query.limit) || 100)),
     );
     res.json({ data: result.data, meta: result.summary });
   } catch (error) {
@@ -180,6 +182,8 @@ export async function overdueReport(req: AuthRequest, res: Response, next: NextF
   try {
     const result = await getOverdueReport(
       req.query.asOf ? dhakaDayBoundary(String(req.query.asOf), true) : new Date(),
+      Math.max(1, Number(req.query.page) || 1),
+      Math.min(200, Math.max(1, Number(req.query.limit) || 100)),
     );
     res.json({ data: result.data, meta: result.summary });
   } catch (error) {

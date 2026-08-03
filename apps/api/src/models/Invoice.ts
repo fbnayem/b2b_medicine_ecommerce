@@ -71,6 +71,10 @@ schema.pre('save', function preventIssuedInvoiceMutation() {
  * first stage of every report was a collection scan that grew with turnover.
  */
 schema.index({ status: 1, invoiceDate: 1 });
+// Drives the overdue and ageing reports, which select issued invoices past a
+// due date across every shop. Without it those are a collection scan.
+schema.index({ status: 1, dueDate: 1 });
+schema.index({ shopId: 1, status: 1, dueDate: 1 });
 schema.index({ shopId: 1, status: 1, invoiceDate: 1 });
 schema.index({ issuedAt: 1 });
 

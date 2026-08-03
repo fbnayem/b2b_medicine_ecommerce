@@ -1,6 +1,6 @@
 import { NotificationEvent, UserRole } from '@medsupply/shared-types';
 import { MedicineBatch } from '../models/MedicineBatch';
-import { getOverdueReport } from './financeService';
+import { listOverdueShops } from './financeService';
 import { notify } from './notificationService';
 import { createJobQueue, type JobQueue } from './jobQueue';
 import { shopOwnerIds, userIdsWithRoles, MANAGEMENT_ROLES } from './notificationAudience';
@@ -23,12 +23,12 @@ export async function runOverdueDigest(at = new Date()) {
   if (!(await notificationSettings()).overdueDigestEnabled) {
     return { shops: 0, day: await localDateKey(at), skipped: true };
   }
-  const report = await getOverdueReport(at);
+  const rows = await listOverdueShops(at);
   const dayKey = await localDateKey(at);
   const managers = await userIdsWithRoles(MANAGEMENT_ROLES);
   let sent = 0;
 
-  for (const row of report.data) {
+  for (const row of rows) {
     const owners = await shopOwnerIds(row.shopId);
     if (!owners.length && !managers.length) continue;
     await notify({

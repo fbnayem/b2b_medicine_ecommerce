@@ -4,9 +4,9 @@ import { AuditLog } from '../models/AuditLog';
 import { nextReference } from '../models/Counter';
 import { Invoice } from '../models/Invoice';
 import { LedgerTransaction } from '../models/LedgerTransaction';
-import { Payment } from '../models/Payment';
 import { Shop } from '../models/Shop';
 import { assertBalancedEntries, FinancialEntry, safeAdd } from './financialMath';
+import { settlementForInvoice } from './invoiceLedgerQueries';
 
 export type FinanceActor = {
   _id: Types.ObjectId;
@@ -77,29 +77,21 @@ export async function getInvoiceBalance(
   if (!invoice) {
     throw Object.assign(new Error('Invoice not found'), { statusCode: 404, code: 'NOT_FOUND' });
   }
-  const aggregate = Payment.aggregate<{ applied: number }>([
-    {
-      $match: {
-        invoiceId: invoice._id,
-        status: 'POSTED',
-      },
-    },
-    { $group: { _id: null, applied: { $sum: '$invoiceAppliedMinor' } } },
-  ]);
-  if (session) aggregate.session(session);
-  const [allocation] = await aggregate;
-  const currentAmountPaidMinor = allocation?.applied ?? 0;
-  const currentAmountDueMinor = Math.max(0, invoice.grandTotalMinor - currentAmountPaidMinor);
+  // Previously this summed posted `Payment.invoiceAppliedMinor` and nothing
+  // else, so a credit note was invisible here while the ageing report did
+  // subtract it. The customer who had returned goods still looked fully in debt
+  // to `overdueForShop`, and their next order was refused. One implementation
+  // now, and it reads the ledger, which records the credit note too.
+  const settlement = await settlementForInvoice(invoice._id, {
+    session,
+    fallbackChargeMinor: invoice.grandTotalMinor,
+  });
   return {
     invoice,
-    currentAmountPaidMinor,
-    currentAmountDueMinor,
-    settlementStatus:
-      currentAmountDueMinor === 0
-        ? 'PAID'
-        : currentAmountPaidMinor > 0
-          ? 'PARTIALLY_PAID'
-          : 'UNPAID',
+    currentAmountPaidMinor: settlement.paidMinor,
+    currentAmountDueMinor: settlement.dueMinor,
+    currentAmountCreditedMinor: settlement.creditedMinor,
+    settlementStatus: settlement.settlementStatus,
   } as const;
 }
 
