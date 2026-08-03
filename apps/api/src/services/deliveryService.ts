@@ -23,7 +23,7 @@ import { proofFileStorage, type ProofFileInput } from './proofFileService';
 import { createDeliveryCollectionPayment } from './paymentService';
 import type { PaymentAttachmentInput } from './paymentAttachmentService';
 import { Payment } from '../models/Payment';
-import { getInvoiceBalance } from './ledgerService';
+import { dhakaDateString, getInvoiceBalance } from './ledgerService';
 import { notify } from './notificationService';
 import type { TemplateContext } from './notificationCatalogue';
 import { ActivityVisibility, recordActivity } from './activityService';
@@ -302,7 +302,9 @@ export async function assignDelivery(id: string, input: AssignmentInput, actor: 
         delivery,
         event: NotificationEvent.DELIVERY_ASSIGNED,
         recipientIds: [person._id],
-        context: { date: input.expectedDeliveryDate.toISOString().slice(0, 10) },
+        // The Dhaka calendar date, not the UTC one: before 6 am they differ,
+        // and the rider would be told to expect the delivery yesterday.
+        context: { date: dhakaDateString(input.expectedDeliveryDate) },
         actor,
         summary: `Delivery ${delivery.reference} assigned to ${person.firstName} ${person.lastName}`,
         detail: input.instructions,

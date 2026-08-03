@@ -20,6 +20,14 @@ export interface JobQueue<T> {
   /** Resolves once every enqueued job has settled. Used by tests and shutdown. */
   drain(): Promise<void>;
   close(): Promise<void>;
+  /**
+   * Waiting and failed job counts, for `/metrics`.
+   *
+   * A rising failure count is how an operator learns that notifications — the
+   * delivery OTP among them — have stopped going out, which was previously
+   * visible only to somebody reading the logs.
+   */
+  counts(): Promise<{ waiting: number; failed: number }>;
 }
 
 export const JOB_ATTEMPTS = 5;
@@ -126,6 +134,13 @@ class InProcessQueue<T> implements JobQueue<T> {
     }
   }
 
+  async counts() {
+    // The in-process driver retries in memory and has no dead-letter state, so
+    // a job that exhausts its attempts is gone. Reporting 0 rather than a
+    // guess keeps the metric honest about what this driver can know.
+    return { waiting: this.pending.size, failed: 0 };
+  }
+
   async close() {
     this.closed = true;
     for (const timer of this.timers) {
@@ -198,6 +213,17 @@ class BullQueue<T> implements JobQueue<T> {
 
   async drain() {
     // BullMQ owns job state in Redis; waiting is a worker concern, not ours.
+  }
+
+  async counts() {
+    try {
+      const counts = await this.queue.getJobCounts('waiting', 'failed');
+      return { waiting: counts.waiting ?? 0, failed: counts.failed ?? 0 };
+    } catch {
+      // A scrape must not fail because Redis is briefly unreachable; the
+      // database-connected gauge already reports that class of problem.
+      return { waiting: 0, failed: 0 };
+    }
   }
 
   async close() {

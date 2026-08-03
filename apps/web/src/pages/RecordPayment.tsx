@@ -13,7 +13,7 @@ import {
   type FinanceShopSummary,
 } from './financeTypes';
 import './inventory.css';
-import { toMoneyInputValue } from '@medsupply/utilities';
+import { toDateTimeInputValue, toMoneyInputValue } from '@medsupply/utilities';
 
 interface AttachmentPayload {
   fileName: string;
@@ -22,7 +22,7 @@ interface AttachmentPayload {
 }
 
 const acceptedPaymentFiles = ['image/jpeg', 'image/png', 'application/pdf'];
-const nowInDhaka = () => new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString().slice(0, 16);
+const nowInDhaka = () => toDateTimeInputValue(new Date());
 
 async function attachmentPayload(file: File): Promise<AttachmentPayload> {
   if (!acceptedPaymentFiles.includes(file.type)) {

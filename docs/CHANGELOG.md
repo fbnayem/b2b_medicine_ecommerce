@@ -1,5 +1,89 @@
 # Changelog
 
+## Road to production, phase 7 — documents and the operational floor
+
+The audit that opened this phase was run from a customer's chair rather than an
+engineer's, and it moved the risk: nothing here crashes. What it found is that
+the artefacts the business hands to a customer were the weakest thing in the
+product, and that an operator had no way to learn something had gone wrong.
+
+### The invoice could not be handed to a customer
+
+- **It truncated in silence.** The PDF builder sliced to `(842 - 50) / 16 = 49`
+  lines and dropped the rest — no second page, no warning, no error. Measured
+  against the real implementation compiled from git history: **200 lines in,
+  49 rendered runs out, 151 lost.** An order of more than about 28 items
+  produced an invoice the customer signed that did not list what was delivered.
+- **It could not print `৳`.** Every character outside ` -~` became `?`,
+  so the currency symbol of the country this system operates in — and every
+  Bangla name — was unprintable on every document the business issues.
+- It had no columns; an invoice line was slash-separated prose.
+
+`pdfService.ts` is now a real layout: measured and wrapped text, pagination with
+a repeated table header and `Page n of m`, and an embedded Noto Sans Bengali
+subset. That font was chosen against the file rather than its name — the hinted
+static builds of the same family carry **no Latin at all**, so `Napa 500` would
+have rendered as four empty boxes.
+
+Bengali reorders when it is set: `ট্যাবলেট` lays out as `ট্যাবেলট` because the
+E-kar is stored after its consonant and drawn before it. That is the renderer
+working. It does mean text selected out of the PDF comes back in visual order,
+which is recorded in the file rather than half-fixed.
+
+### The server had never adopted the shared formatters
+
+`@medsupply/utilities` was built in phase 1 and adopted by both clients. The
+server was forgotten, so the documents the business actually issues were the
+last place in the system rendering `1250000.00 BDT` with no thousands separator
+and dating itself by the **UTC** calendar day — which in Dhaka is the previous
+one for everything before 6 am. Eight money sites and eleven date sites moved
+onto the shared functions, and `formattingDiscipline.test.ts` now fails the
+build if either pattern returns.
+
+The same UTC bug had three more homes on the client: two date defaults that
+pre-filled _yesterday_ for anyone working before 6 am — when warehouse shifts
+start — and a hand-rolled `+6h` offset three lines from a utility that does it
+properly. `toDateTimeInputValue` replaced the last of those.
+
+### Backups that have actually been restored
+
+`DEPLOYMENT.md` had asked for "monitored backup restoration" since the hardening
+phase, and there was no script behind the sentence. There are two now, and the
+drill is the one that matters: it verifies the archive digest **before**
+restoring anything, restores into a scratch database, reconciles document counts
+against the live one, and asserts every ledger transaction still balances.
+
+The first drill run passed having restored **zero documents** — naming a
+database in a `mongorestore --uri` makes it ignore `--nsFrom`/`--nsTo` and
+report success anyway. That is why the drill reconciles against the source
+rather than merely looking for damage. Corrupting one byte of the archive now
+exits 1 with nothing restored.
+
+### Something to look at when the ledger goes wrong
+
+`GET /metrics` serves Prometheus exposition beside the health probes, ahead of
+the rate limiter, guarded by a bearer token and refused outright in production
+when none is configured. It carries request, latency, error and queue figures,
+and one gauge specific to this system:
+`medsupply_ledger_unbalanced_transactions`. Every ledger transaction is written
+with equal debits and credits; a non-zero value means something wrote to the
+collection outside the service. `-1` means the check could not run, which is
+deliberately distinct from zero — an alert must not read "the books balance"
+when nothing was examined.
+
+Route labels are template paths with identifiers stripped, so a busy deployment
+cannot create one time series per order.
+
+### Corrections
+
+The audit's CSV byte-order-mark finding was **wrong**. `toCsv` already emits a
+`U+FEFF` BOM and `csvMinor` already uses integer arithmetic; the finding came
+from reading the `Content-Type` header instead of the CSV builder.
+
+### Result
+
+452 tests, up from 434.
+
 ## Road to production, phases 2-6
 
 Five phases, delivered in one run. The through-line is unchanged from phase 1:

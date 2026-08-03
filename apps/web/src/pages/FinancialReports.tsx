@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
+import { toDateInputValue } from '@medsupply/utilities';
 import { formatFinanceDate, formatFinanceDateTime, formatMinor } from '../lib/finance';
 import type { FinanceReportData, FinanceReportRow } from './financeTypes';
 import './inventory.css';
@@ -37,7 +38,9 @@ function reportAmount(kind: ReportKind, row: FinanceReportRow) {
 }
 
 function FinancialReportPage({ kind }: { kind: ReportKind }) {
-  const today = new Date().toISOString().slice(0, 10);
+  // Dhaka's today, not UTC's: before 6 am the two differ, and a clerk opening
+  // the collections report at the start of a shift got yesterday's figures.
+  const today = toDateInputValue(new Date());
   const monthStart = `${today.slice(0, 8)}01`;
   const [rows, setRows] = useState<FinanceReportRow[]>([]);
   const [summary, setSummary] = useState<ReportSummary>({});

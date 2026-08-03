@@ -18,6 +18,7 @@ import {
   backfillCreditReservation,
 } from '../services/financeService';
 import { dhakaDateString, dhakaDayBoundary, postLedgerAdjustment } from '../services/ledgerService';
+import { formatDate, formatMoneyMinor } from '@medsupply/utilities';
 import { createSimplePdf } from '../services/pdfService';
 import { businessSettings } from '../services/settingsService';
 import { correlationId } from '../services/logger';
@@ -51,17 +52,17 @@ async function sendStatement(req: AuthRequest, res: Response, shopId: string) {
   const data = await getStatement(shopId, dates.from, dates.to);
   if (req.query.format === 'pdf') {
     const business = await businessSettings();
-    const pdf = createSimplePdf([
+    const pdf = await createSimplePdf([
       business.name,
       'CUSTOMER STATEMENT',
       `Shop: ${data.shop.reference} ${data.shop.name}`,
       `Period: ${data.from} to ${data.to}`,
-      `Opening: BDT ${(data.openingBalanceMinor / 100).toFixed(2)}`,
+      `Opening: ${formatMoneyMinor(data.openingBalanceMinor)}`,
       ...data.rows.map(
         (row) =>
-          `${new Date(row.date).toISOString().slice(0, 10)} ${row.reference} Dr ${(row.debitMinor / 100).toFixed(2)} Cr ${(row.creditMinor / 100).toFixed(2)} Bal ${(row.balanceMinor / 100).toFixed(2)}`,
+          `${formatDate(row.date)}  ${row.reference}  Dr ${formatMoneyMinor(row.debitMinor)}  Cr ${formatMoneyMinor(row.creditMinor)}  Bal ${formatMoneyMinor(row.balanceMinor)}`,
       ),
-      `Closing: BDT ${(data.closingBalanceMinor / 100).toFixed(2)}`,
+      `Closing: ${formatMoneyMinor(data.closingBalanceMinor)}`,
     ]);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(

@@ -8,7 +8,8 @@ import { securityHeaders } from './middlewares/securityHeaders';
 import { requestContext, sanitiseRequest } from './middlewares/requestContext';
 import { globalRateLimit, reportRateLimit, writeMethodRateLimit } from './middlewares/rateLimit';
 import { parseQuery } from './services/requestSanitiser';
-import { live, ready, version } from './controllers/healthController';
+import { live, metrics, ready, version } from './controllers/healthController';
+import { metricsMiddleware } from './services/metrics';
 import { API_MOUNTS, type MountTier } from './routes';
 import { routeCoverageRecorder } from './services/routeTable';
 
@@ -70,11 +71,19 @@ app.use(express.json({ limit: env.JSON_BODY_LIMIT }));
 
 app.use(sanitiseRequest());
 
+// Timing wraps everything below it, so a request is measured whether it is
+// served, rejected by the rate limiter or refused by a role guard. Registered
+// after the body parsers so it does not measure its own middleware.
+app.use(metricsMiddleware());
+
 // Probes must answer while the process is degraded, so they sit ahead of the
-// rate limiter and are never counted against a caller's budget.
+// rate limiter and are never counted against a caller's budget. `/metrics` is
+// here for the same reason: a scraper needs an answer most when the process is
+// unhappy, which is exactly when a rate limit would refuse it.
 app.get('/health', live);
 app.get('/health/ready', ready);
 app.get('/health/version', version);
+app.get('/metrics', metrics);
 
 app.use(globalRateLimit());
 

@@ -75,4 +75,5 @@ export const HEALTH_ROUTES = [
   { method: 'get', path: '/health' },
   { method: 'get', path: '/health/ready' },
   { method: 'get', path: '/health/version' },
+  { method: 'get', path: '/metrics' },
 ] as const;

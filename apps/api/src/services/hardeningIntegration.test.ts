@@ -556,6 +556,32 @@ test('health and readiness report the database honestly', async () => {
   assert.ok((version.body as { data: { version: string } }).data.version);
 });
 
+test('metrics expose the ledger gauge without leaking an identifier into a label', async () => {
+  // Cause one request with an ObjectId in the path, so the scrape below has
+  // something to have got wrong.
+  await call('/api/v1/orders/507f1f77bcf86cd799439011');
+
+  const response = await fetch(`${base}/metrics`);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type') ?? '', /text\/plain/);
+  const body = await response.text();
+
+  /*
+   * The gauge an operator alerts on. It must be present on every scrape, and it
+   * must be able to say "I could not check" (-1) rather than reporting zero
+   * unbalanced transactions when nothing was examined.
+   */
+  assert.match(body, /^medsupply_ledger_unbalanced_transactions -?\d+$/m);
+  assert.match(body, /^medsupply_database_connected 1$/m);
+
+  // A label built from the URL rather than the route template would create one
+  // time series per order and eventually take the scraper down.
+  assert.ok(
+    !body.includes('507f1f77bcf86cd799439011'),
+    'an ObjectId reached a metric label, which makes cardinality unbounded',
+  );
+});
+
 test('the runtime status is administrator-only and reveals no secret', async () => {
   const ownerSession = await signIn('owner@hardening.local');
   const refused = await call('/api/v1/admin/runtime', { token: ownerSession.accessToken });

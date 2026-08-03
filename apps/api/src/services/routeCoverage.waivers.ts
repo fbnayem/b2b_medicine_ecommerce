@@ -169,9 +169,19 @@ export const UNTESTED_ROUTES: readonly string[] = [
   'get /api/v1/returns/credit-notes/:id',
   'get /api/v1/shops/:id',
   'get /api/v1/shops/my',
+  /*
+   * These four are mounted directly on the application, ahead of the coverage
+   * recorder, so that a degraded process can still answer a probe and a scraper
+   * can still be served while the rate limiter is refusing everything else.
+   * That position is also why the recorder never sees them — not an absence of
+   * tests. All four are exercised in `hardeningIntegration.test.ts`:
+   * "health and readiness report the database honestly" and "metrics expose the
+   * ledger gauge without leaking an identifier into a label".
+   */
   'get /health',
   'get /health/ready',
   'get /health/version',
+  'get /metrics',
   'patch /api/v1/inventory/batches/:id/block',
   'patch /api/v1/inventory/medicines/:id',
   'patch /api/v1/orders/drafts/:id',

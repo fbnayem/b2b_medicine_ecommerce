@@ -1,5 +1,6 @@
 import { ClientSession, Types } from 'mongoose';
 import { LedgerAccount, LedgerTransactionType, UserRole } from '@medsupply/shared-types';
+import { toDateInputValue } from '@medsupply/utilities';
 import { AuditLog } from '../models/AuditLog';
 import { nextReference } from '../models/Counter';
 import { Invoice } from '../models/Invoice';
@@ -298,6 +299,15 @@ export function dhakaDayBoundary(value: string, end = false) {
   return date;
 }
 
+/**
+ * The calendar date in Dhaka, as `YYYY-MM-DD`.
+ *
+ * This used to add six hours to the clock and slice the ISO string, which is
+ * right for Bangladesh only for as long as the offset never changes and only
+ * because Dhaka has no daylight saving. `toDateInputValue` asks `Intl` for the
+ * date in the configured zone instead, so the answer stays correct if the
+ * deployment is ever configured for a different one.
+ */
 export function dhakaDateString(value = new Date()) {
-  return new Date(value.getTime() + 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return toDateInputValue(value);
 }

@@ -26,6 +26,7 @@ import {
   startReturnReview,
   type ReturnActor,
 } from '../services/returnService';
+import { formatDate, formatMoneyMinor, formatQuantity } from '@medsupply/utilities';
 import { createSimplePdf } from '../services/pdfService';
 import { correlationId } from '../services/logger';
 
@@ -164,8 +165,6 @@ export async function issueCredit(req: AuthRequest, res: Response, next: NextFun
   }
 }
 
-const major = (value: number) => (value / 100).toFixed(2);
-
 export async function creditNote(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const note = await getCreditNote(actor(req), String(req.params.id));
@@ -175,23 +174,23 @@ export async function creditNote(req: AuthRequest, res: Response, next: NextFunc
     }
     const supplier = note.supplierSnapshot as Record<string, string>;
     const shop = note.shopSnapshot as Record<string, string>;
-    const pdf = createSimplePdf([
+    const pdf = await createSimplePdf([
       supplier.name ?? 'Credit note',
       'CREDIT NOTE',
       `Reference: ${note.reference}`,
       `Against invoice: ${note.invoiceReference}`,
       `Return: ${note.returnReference}`,
-      `Issued: ${new Date(note.issuedAt).toISOString().slice(0, 10)}`,
+      `Issued: ${formatDate(note.issuedAt)}`,
       `Customer: ${shop.reference ?? ''} ${shop.name ?? ''}`.trim(),
       '',
       ...note.lines.map(
         (line) =>
-          `${line.quantity} x ${line.medicineSnapshot?.brandName ?? 'Item'} (batch ${line.batchNumber}) = BDT ${major(line.lineTotalMinor)}`,
+          `${formatQuantity(line.quantity)} x ${line.medicineSnapshot?.brandName ?? 'Item'} (batch ${line.batchNumber}) = ${formatMoneyMinor(line.lineTotalMinor)}`,
       ),
       '',
-      `Subtotal: BDT ${major(note.subtotalMinor)}`,
-      `Tax: BDT ${major(note.taxMinor)}`,
-      `Total credited: BDT ${major(note.totalMinor)}`,
+      `Subtotal: ${formatMoneyMinor(note.subtotalMinor)}`,
+      `Tax: ${formatMoneyMinor(note.taxMinor)}`,
+      `Total credited: ${formatMoneyMinor(note.totalMinor)}`,
     ]);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${note.reference}.pdf"`);

@@ -87,6 +87,12 @@ const OPERATIONS: Operation[] = [
   { method: 'get', path: '/health/version', summary: 'Deployed version and commit', tag: 'Health' },
   {
     method: 'get',
+    path: '/metrics',
+    summary: 'Prometheus metrics, including the ledger-imbalance gauge',
+    tag: 'Health',
+  },
+  {
+    method: 'get',
     path: '/api/v1/admin/runtime',
     summary: 'Effective security and performance configuration',
     tag: 'Health',

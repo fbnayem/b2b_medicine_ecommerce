@@ -1,4 +1,5 @@
 import { ReportGranularity } from '@medsupply/shared-types';
+import { toDateInputValue } from '@medsupply/utilities';
 
 /**
  * Reports bucket on the Asia/Dhaka calendar, the same boundary the finance
@@ -68,7 +69,7 @@ export function bucketLabels(from: string, to: string, granularity: ReportGranul
     cursor -= ((dhakaDay + 1) % 7) * DAY_MS;
   }
   for (let guard = 0; cursor <= end.getTime() && guard < 1200; guard += 1) {
-    labels.push(new Date(cursor + 6 * 3_600_000).toISOString().slice(0, 10));
+    labels.push(toDateInputValue(new Date(cursor)));
     cursor += step;
   }
   return labels;

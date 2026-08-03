@@ -881,3 +881,62 @@ pruning, and never deletes without one.
 
 The operational work listed above - production secrets, TLS, index application,
 real provider credentials, mobile distribution - still stands.
+
+## RTP Phase 7: Documents, formatting and the operational floor
+
+**Status:** COMPLETED
+
+### Scope
+
+The artefacts a customer physically receives, the formatting rules the server
+had never adopted, and the two operational controls whose absence meant nobody
+would learn that anything had gone wrong.
+
+### Completed work
+
+- **`pdfService.ts` replaced.** The fixed-offset text stamper it replaces
+  truncated silently past ~28 invoice lines — 200 lines in produced 49 rendered
+  runs out — and substituted `?` for every non-ASCII character, so `৳` and all
+  Bangla were unprintable. The new builder measures and wraps text, paginates
+  with a repeated table header and `Page n of m`, and embeds Noto Sans Bengali,
+  which covers Latin, Bengali, Bengali digits and `৳` in one file. The invoice
+  moved from slash-separated prose to a real column table.
+- **The server adopted `@medsupply/utilities`.** Every money and date on an
+  invoice, statement, receipt and credit note now uses `formatMoneyMinor` and
+  `formatDate`; `formattingDiscipline.test.ts` fails the build if
+  `(minor / 100).toFixed(...)` or `toISOString().slice(0, 10)` reappears.
+- Three UTC date defaults on web corrected to the Dhaka calendar day, and
+  `toDateTimeInputValue` added to the utilities package to replace a hand-rolled
+  `+6h` offset that had begun to be copied.
+- Mobile approval no longer tells the manager `"approve completed"` or stores
+  `"reject requested"` as the reason the shop owner is shown.
+- **`backup.ts` and `restoreDrill.ts`.** The drill verifies the archive digest
+  before restoring anything, restores into a scratch database, reconciles
+  document counts against the live one, and asserts every ledger transaction
+  still balances. It exits non-zero, so cron can alert on it.
+- **`GET /metrics`** in Prometheus format, bearer-token guarded, carrying
+  request/latency/error counters, queue depth and failures, and the
+  ledger-imbalance gauge.
+
+### Verified
+
+452 tests pass (105 API unit, 102 API integration plus 4 reconciliation, 124
+web, 60 mobile, 57 browser). A backup and restore round trip was run against the
+live database; corrupting a single byte of the archive makes the drill exit 1
+with nothing restored. `/metrics` was scraped from a booted API and confirmed to
+strip ObjectIds from route labels.
+
+### Known limitations
+
+- `ERROR_REPORTING_DSN` is validated and documented but no adapter is wired.
+- The in-process job queue reports `failed: 0` because it keeps no dead-letter
+  state; only the BullMQ driver reports a real figure.
+- Selecting Bangla text out of a PDF yields visual rather than logical order.
+  The page is correct; fixing extraction needs `/ActualText` and tagged PDF.
+- `mongodump`/`mongorestore` are not in the API image by design. Backups need
+  the MongoDB Database Tools on the host, or `--docker <container>`.
+
+### Corrections to the audit
+
+The CSV byte-order-mark finding was wrong: `toCsv` already emits `U+FEFF` and
+`csvMinor` already uses integer arithmetic.

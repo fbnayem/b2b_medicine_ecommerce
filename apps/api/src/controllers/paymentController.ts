@@ -20,6 +20,7 @@ import {
   recordPayment,
   reversePayment,
 } from '../services/paymentService';
+import { formatDateTime, formatMoneyMinor } from '@medsupply/utilities';
 import { createSimplePdf } from '../services/pdfService';
 import { businessSettings } from '../services/settingsService';
 
@@ -224,18 +225,18 @@ export async function receipt(req: AuthRequest, res: Response, next: NextFunctio
       const shop = data.shop as unknown as { reference?: string; name?: string };
       const invoice = data.invoice as unknown as { reference?: string } | undefined;
       const business = await businessSettings();
-      const pdf = createSimplePdf([
+      const pdf = await createSimplePdf([
         business.name,
         'PAYMENT RECEIPT',
         `Receipt: ${data.receiptReference ?? '-'}`,
         `Payment: ${data.paymentReference}`,
         `Shop: ${shop?.reference ?? ''} ${shop?.name ?? ''}`,
         `Invoice: ${invoice?.reference ?? 'Advance balance'}`,
-        `Amount: BDT ${(data.amountMinor / 100).toFixed(2)}`,
+        `Amount: ${formatMoneyMinor(data.amountMinor)}`,
         `Method: ${data.method.replaceAll('_', ' ')}`,
         `Transaction reference: ${data.transactionReference ?? '-'}`,
-        `Collected: ${new Date(data.collectedAt).toISOString()}`,
-        `Posted: ${data.postedAt ? new Date(data.postedAt).toISOString() : '-'}`,
+        `Collected: ${formatDateTime(data.collectedAt)}`,
+        `Posted: ${data.postedAt ? formatDateTime(data.postedAt) : '-'}`,
         data.status === 'REVERSED' ? `REVERSED: ${data.reversalReference ?? ''}` : '',
         business.invoiceFooter,
       ]);

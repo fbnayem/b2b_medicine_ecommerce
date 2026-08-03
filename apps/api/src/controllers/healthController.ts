@@ -1,9 +1,11 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { env } from '../env';
 import { rateLimitStore } from '../middlewares/rateLimit';
 import { realtimeDriver } from '../services/realtime';
 import { notificationQueue } from '../services/notificationService';
+import { renderPrometheus } from '../services/metrics';
 
 /**
  * Liveness, readiness and build identity.
@@ -120,4 +122,34 @@ export const runtimeStatus = (_req: Request, res: Response) => {
       },
     },
   });
+};
+
+/**
+ * Prometheus exposition.
+ *
+ * Mounted alongside the probes rather than under `/api/v1/admin`, because a
+ * scraper cannot sign in and giving one a service account with administrative
+ * rights would be a far larger grant than reading counters. It is guarded by a
+ * bearer token instead, and refused outright in production when no token is
+ * configured — the series include the ledger-imbalance gauge, and that is not
+ * something to serve to anyone who can reach the port.
+ */
+export const metrics = async (req: Request, res: Response) => {
+  if (!env.METRICS_TOKEN && env.NODE_ENV === 'production') {
+    return res.status(404).end();
+  }
+  if (env.METRICS_TOKEN) {
+    const presented = req.header('authorization') ?? '';
+    const expected = `Bearer ${env.METRICS_TOKEN}`;
+    // Compared at constant length so a wrong token cannot be found byte by byte.
+    const ok =
+      presented.length === expected.length &&
+      timingSafeEqual(Buffer.from(presented), Buffer.from(expected));
+    if (!ok) return res.status(401).end();
+  }
+
+  const queue = await notificationQueue().counts();
+  res
+    .type('text/plain; version=0.0.4; charset=utf-8')
+    .send(await renderPrometheus({ queueDepth: queue.waiting, queueFailed: queue.failed }));
 };

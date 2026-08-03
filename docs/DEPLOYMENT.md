@@ -207,3 +207,64 @@ Note that the refresh cookie is issued with `Secure` in production, so a browser
 ## Verified deployment
 
 The compose file, both images and the release sequence were run end to end on MongoDB 6.0 and Redis 7: the stack starts healthy, the API reports the Redis rate-limit store, the Redis Socket.IO adapter and the BullMQ queue, nginx serves the application and proxies the API on one origin with compression and security headers, and the index check reports, applies and converges from inside the API image.
+
+## Backups, and proving they restore
+
+`docs/DEPLOYMENT.md` asked for "monitored backup restoration" from the hardening
+phase onward, and there was no script behind the sentence. There are two now, and
+the second is the one that matters: **an untested backup is a belief, not a
+control.**
+
+```bash
+# Nightly. Streams the archive out of the database container, writes a SHA-256
+# digest beside it, and keeps the last 14.
+pnpm --filter @medsupply/api backup -- --out /var/backups/medsupply --keep 14
+
+# Also nightly, after the backup. Restores the newest archive into a scratch
+# database, reconciles it against the live one, and drops the scratch copy.
+pnpm --filter @medsupply/api restore:drill -- --from /var/backups/medsupply
+```
+
+`mongodump` and `mongorestore` are not in the API image, deliberately: a runtime
+container should not also hold the means to dump the whole database. Either
+install the MongoDB Database Tools on the host that runs backups, or pass
+`--docker <container>` to run them inside the database container — the archive is
+streamed over stdout, so no writable volume has to be mounted into it.
+
+The drill checks four things and **exits non-zero if any fails**, so cron can
+alert on it:
+
+| Check                                   | Why                                                                                                                                             |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Digest matches                          | A single flipped byte fails here and **nothing is restored**.                                                                                   |
+| Collections restored                    | Catches an archive that unpacked to nothing.                                                                                                    |
+| Document counts match the live database | A truncated archive restores cleanly into a perfectly self-consistent, much smaller database. Only comparison with the source reveals it.       |
+| Every ledger transaction balances       | Debits must equal credits per document. This is the invariant the whole system exists to protect, and it is not something a row count can fake. |
+
+The drill only ever writes to `<database>_restoredrill`, and it restores with a
+database-less URI plus an explicit namespace mapping. That detail is load-bearing:
+naming a database in the URI makes `mongorestore` ignore `--nsFrom`/`--nsTo` and
+**report success having restored zero documents**, which would make a green drill
+mean nothing at all.
+
+## Metrics and alerting
+
+`GET /metrics` serves Prometheus exposition alongside the health probes, ahead of
+the rate limiter — a scraper needs an answer most when the process is unhappy.
+
+Set `METRICS_TOKEN` and the endpoint requires `Authorization: Bearer <token>`,
+compared in constant time. In production, leaving it unset returns 404 rather
+than serving the series unauthenticated.
+
+| Series                                     | Alert on                                                                                                                                                                                                                                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `medsupply_ledger_unbalanced_transactions` | **Any non-zero value, immediately.** Every ledger transaction is written with equal debits and credits; a non-zero gauge means something wrote to the collection outside the service. `-1` means the check could not run — alert on that too, since it is not the same as "balanced". |
+| `medsupply_queue_failed`                   | A rising count means notifications have stopped going out, the delivery OTP among them.                                                                                                                                                                                               |
+| `medsupply_database_connected`             | `0` for more than a scrape or two.                                                                                                                                                                                                                                                    |
+| `medsupply_server_errors_total`            | Rate of increase.                                                                                                                                                                                                                                                                     |
+
+Route labels are template paths with identifiers stripped (`/api/v1/orders/:id`),
+so cardinality stays bounded no matter how much traffic the deployment takes.
+
+`ERROR_REPORTING_DSN` is reserved for an external error reporter; unset, errors
+go to the structured logger as before.

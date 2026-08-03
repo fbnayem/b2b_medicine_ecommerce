@@ -10,6 +10,27 @@ type Line = {
   unitPriceMinor: number;
   lineDiscountMinor: number;
 };
+
+type ApprovalAction = 'start' | 'approve' | 'hold' | 'reject';
+
+/** What the manager is told once the action has been recorded. */
+const ACTION_DONE: Record<ApprovalAction, string> = {
+  start: 'Review started.',
+  approve: 'Order approved.',
+  hold: 'Order put on hold.',
+  reject: 'Order rejected.',
+};
+
+/**
+ * The reason stored against the order when the manager leaves the note empty.
+ * It is shown to the shop owner, so it has to read as a sentence rather than as
+ * the name of the endpoint that produced it.
+ */
+const ACTION_REASON: Record<Exclude<ApprovalAction, 'start'>, string> = {
+  approve: 'Approved without further comment.',
+  hold: 'Put on hold pending a check.',
+  reject: 'Rejected without further comment.',
+};
 export default function ApprovalReviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [order, setOrder] = useState<Order>();
@@ -37,7 +58,14 @@ export default function ApprovalReviewScreen() {
   useEffect(() => {
     void load();
   }, [id]);
-  async function action(name: 'start' | 'approve' | 'hold' | 'reject') {
+  /*
+   * The confirmation used to interpolate the endpoint segment, so approving an
+   * order told the manager "approve completed" — the same defect the web app
+   * was corrected for, still live here. The fallback reason had it worse: it
+   * sent "reject requested" to the server, where it is stored on the order and
+   * shown to the shop owner as the reason their order was refused.
+   */
+  async function action(name: ApprovalAction) {
     if (!order) return;
     try {
       let body: Record<string, unknown> = { version: order.version };
@@ -51,9 +79,9 @@ export default function ApprovalReviewScreen() {
           creditOverride: false,
         };
       else if (name !== 'start')
-        body = { ...body, reason: note || `${name} requested`, shopOwnerNotes: note || undefined };
+        body = { ...body, reason: note || ACTION_REASON[name], shopOwnerNotes: note || undefined };
       await apiClient.post(`/approvals/${id}/${name}`, body);
-      Alert.alert('Success', `${name} completed`);
+      Alert.alert('Done', ACTION_DONE[name]);
       router.back();
     } catch (caught: unknown) {
       setError(

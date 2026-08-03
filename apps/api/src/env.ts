@@ -67,6 +67,19 @@ const envSchema = z
     APP_VERSION: z.string().default('1.0.0'),
     GIT_COMMIT: z.string().default('unknown'),
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error', 'silent']).default('info'),
+
+    /**
+     * Bearer token a Prometheus scraper must present at `/metrics`.
+     *
+     * Left empty, the endpoint is only reachable from wherever the process is
+     * reachable — acceptable on a private network, and the reason it is
+     * refused outright in production unless set. The series it exposes include
+     * the ledger-imbalance gauge, which tells anyone who can read it how
+     * healthy the books are.
+     */
+    METRICS_TOKEN: z.string().default(''),
+    /** Where uncaught server errors are reported. Empty disables reporting. */
+    ERROR_REPORTING_DSN: z.string().default(''),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== 'production') return;

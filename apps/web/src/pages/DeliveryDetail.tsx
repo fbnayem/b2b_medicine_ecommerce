@@ -13,6 +13,7 @@ import { useAuthStore } from '../store/useAuth';
 import { ActivityTimeline } from '../components/ActivityTimeline';
 import { useRealtimeEvent } from '../realtime/useRealtime';
 import './inventory.css';
+import { toDateInputValue } from '@medsupply/utilities';
 import { formatFinanceDateTime } from '../lib/finance';
 import { useAsk } from '../components/ui';
 
@@ -30,7 +31,9 @@ export function DeliveryDetail() {
   const [delivery, setDelivery] = useState<Delivery>();
   const [people, setPeople] = useState<DeliveryPerson[]>([]);
   const [personId, setPersonId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  // The Dhaka calendar date. `toISOString()` yields the UTC one, so a
+  // storekeeper assigning a delivery before 6 am was offered yesterday.
+  const [date, setDate] = useState(toDateInputValue(new Date()));
   const [priority, setPriority] = useState<DeliveryPriority>(DeliveryPriority.NORMAL);
   const [instructions, setInstructions] = useState('');
   const [error, setError] = useState('');

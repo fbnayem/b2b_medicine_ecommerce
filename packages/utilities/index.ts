@@ -229,3 +229,34 @@ export function toDateInputValue(
     timeZone: settings.timeZone,
   }).format(parsed);
 }
+
+/**
+ * The local date and time in the configured zone, as `YYYY-MM-DDTHH:mm`, for a
+ * `datetime-local` input.
+ *
+ * The call site this replaces added six hours to the clock and sliced the ISO
+ * string. That is right for Bangladesh only for as long as the offset never
+ * changes, and it is the kind of constant that gets copied to a second call
+ * site and then to a third — which is exactly what had begun to happen.
+ */
+export function toDateTimeInputValue(
+  value: string | number | Date | null | undefined,
+  settings: FormatSettings = active,
+): string {
+  const parsed = toDate(value);
+  if (!parsed) return '';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: settings.timeZone,
+  }).formatToParts(parsed);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((candidate) => candidate.type === type)?.value ?? '';
+  // `en-CA` renders midnight as `24` rather than `00` in some engines.
+  const hour = part('hour') === '24' ? '00' : part('hour');
+  return `${part('year')}-${part('month')}-${part('day')}T${hour}:${part('minute')}`;
+}

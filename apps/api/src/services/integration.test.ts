@@ -513,11 +513,18 @@ test('picking, discrepancy resolution, short packing and immutable invoice are t
     assert.equal(pdfResponse.status, 200);
     assert.match(pdfResponse.headers.get('content-type') ?? '', /application\/pdf/);
     const bytes = Buffer.from(await pdfResponse.arrayBuffer());
-    assert.equal(bytes.subarray(0, 8).toString(), '%PDF-1.4');
+    // The header version is the generator's business, not this test's; what
+    // matters is that a PDF came back at the requested paper size.
+    assert.equal(bytes.subarray(0, 5).toString(), '%PDF-');
     assert.match(
-      bytes.toString(),
-      layout === 'thermal' ? /MediaBox \[0 0 226 842\]/ : /MediaBox \[0 0 595 842\]/,
+      bytes.toString('latin1'),
+      layout === 'thermal'
+        ? /\/MediaBox \[0 0 226 841\.89\]/
+        : /\/MediaBox \[0 0 595\.28 841\.89\]/,
     );
+    // The font that carries `৳` and Bangla must actually be embedded, or the
+    // endpoint silently reverts to a document that cannot print either.
+    assert.match(bytes.toString('latin1'), /\/Subtype\s*\/CIDFontType2/);
   }
   const ownerAInvoice = await fetch(`${base}/api/v1/fulfilment/invoices/${invoice!._id}`, {
     headers: authorization(owners[0]._id),

@@ -26,7 +26,8 @@ import {
   resumePicking,
   startPicking,
 } from '../services/fulfilmentService';
-import { createSimplePdf } from '../services/pdfService';
+import { formatDate, formatMoneyMinor, formatQuantity } from '@medsupply/utilities';
+import { createDocumentPdf } from '../services/pdfService';
 import { notify } from '../services/notificationService';
 import { ActivityVisibility, recordActivity } from '../services/activityService';
 import { emitEntityUpdate } from '../services/realtime';
@@ -322,47 +323,85 @@ export async function pdf(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const value = await permittedInvoice(req);
     if (!value) return res.status(404).end();
-    const money = (minor: number | undefined) => `${((minor ?? 0) / 100).toFixed(2)} BDT`;
-    const address = (value: unknown) =>
-      value && typeof value === 'object'
-        ? Object.values(value as Record<string, unknown>)
-            .filter((part) => typeof part === 'string' && part.length > 0)
+    const address = (part: unknown) =>
+      part && typeof part === 'object'
+        ? Object.values(part as Record<string, unknown>)
+            .filter((piece) => typeof piece === 'string' && piece.length > 0)
             .join(', ')
         : '';
     const layout = req.query.layout === 'thermal' ? 'THERMAL' : 'A4';
-    const lines = [
-      String(value.supplierSnapshot?.name ?? 'MedSupply B2B'),
-      String(value.supplierSnapshot?.address ?? ''),
-      `${String(value.supplierSnapshot?.phone ?? '')} ${String(value.supplierSnapshot?.email ?? '')}`,
-      `Invoice ${value.reference}`,
-      `Order ${String(value.orderSnapshot?.reference ?? value.orderId)}`,
-      `Date ${value.invoiceDate?.toISOString().slice(0, 10)}`,
-      `Due ${value.dueDate?.toISOString().slice(0, 10)} (${value.paymentTermsDays ?? 0} days)`,
-      `Customer ${String(value.shopSnapshot?.name ?? '')} ${String(value.shopSnapshot?.phone ?? '')}`,
-      `Billing ${address(value.billingAddressSnapshot)}`,
-      `Delivery ${address(value.deliveryAddressSnapshot)}`,
-      'Medicine / batch / expiry / qty / unit / discount / total',
-      ...value.items.map(
-        (item) =>
-          `${item.medicineSnapshot?.brandName} / ${item.batchNumber} / ${item.expiryDate?.toISOString().slice(0, 10)} / ${item.quantity} / ${money(item.unitPriceMinor)} / ${money(item.discountMinor)} / ${money(item.lineTotalMinor)}`,
-      ),
-      `Subtotal ${money(value.subtotalMinor)}`,
-      `Order discount ${money(value.orderDiscountMinor)}`,
-      `Delivery charge ${money(value.deliveryChargeMinor)}`,
-      `Tax ${money(value.taxMinor)}`,
-      `Grand total ${money(value.grandTotalMinor)}`,
-      `Previous balance ${money(value.previousBalanceMinor)}`,
-      `Amount paid ${money(value.amountPaidMinor)}`,
-      `Current due ${money(value.amountDueMinor)}`,
-      `Total outstanding ${money(value.totalOutstandingMinor)}`,
-      '',
-      'Authorised signature: ____________________',
-      value.footer ?? '',
-    ];
+
+    /*
+     * Every amount and date below goes through the shared formatters. They were
+     * built in Phase 1 and adopted by both clients; the server kept its own
+     * `(minor / 100).toFixed(2)` and `toISOString().slice(0, 10)`, so the
+     * documents the business actually issues were the last place in the system
+     * printing ungrouped money and a UTC calendar date.
+     */
+    const pdfBuffer = await createDocumentPdf(
+      {
+        brand: String(value.supplierSnapshot?.name ?? 'MedSupply B2B'),
+        brandLines: [
+          String(value.supplierSnapshot?.address ?? ''),
+          [value.supplierSnapshot?.phone, value.supplierSnapshot?.email]
+            .filter((part) => typeof part === 'string' && part.length > 0)
+            .join(' · '),
+        ],
+        title: `Invoice ${value.reference}`,
+        facts: [
+          ['Order', String(value.orderSnapshot?.reference ?? value.orderId)],
+          ['Invoice date', formatDate(value.invoiceDate)],
+          ['Customer', String(value.shopSnapshot?.name ?? '')],
+          ['Due', `${formatDate(value.dueDate)} (${value.paymentTermsDays ?? 0} days)`],
+          ['Phone', String(value.shopSnapshot?.phone ?? '')],
+          ['Billing', address(value.billingAddressSnapshot)],
+          ['Delivery', address(value.deliveryAddressSnapshot)],
+        ],
+        table: {
+          columns: [
+            { header: 'Medicine', width: 30 },
+            { header: 'Batch', width: 14 },
+            { header: 'Expiry', width: 13 },
+            { header: 'Qty', width: 8, align: 'right' },
+            { header: 'Unit', width: 12, align: 'right' },
+            { header: 'Discount', width: 11, align: 'right' },
+            { header: 'Total', width: 12, align: 'right' },
+          ],
+          rows: value.items.map((item) => [
+            String(item.medicineSnapshot?.brandName ?? ''),
+            item.batchNumber,
+            formatDate(item.expiryDate),
+            formatQuantity(item.quantity),
+            formatMoneyMinor(item.unitPriceMinor),
+            formatMoneyMinor(item.discountMinor),
+            formatMoneyMinor(item.lineTotalMinor),
+          ]),
+        },
+        totals: [
+          { label: 'Subtotal', value: formatMoneyMinor(value.subtotalMinor) },
+          { label: 'Order discount', value: formatMoneyMinor(value.orderDiscountMinor) },
+          { label: 'Delivery charge', value: formatMoneyMinor(value.deliveryChargeMinor) },
+          { label: 'Tax', value: formatMoneyMinor(value.taxMinor) },
+          { label: 'Grand total', value: formatMoneyMinor(value.grandTotalMinor), strong: true },
+          { label: 'Previous balance', value: formatMoneyMinor(value.previousBalanceMinor) },
+          { label: 'Amount paid', value: formatMoneyMinor(value.amountPaidMinor) },
+          { label: 'Current due', value: formatMoneyMinor(value.amountDueMinor) },
+          {
+            label: 'Total outstanding',
+            value: formatMoneyMinor(value.totalOutstandingMinor),
+            strong: true,
+          },
+        ],
+        footer: ['', 'Authorised signature: ____________________', value.footer ?? ''],
+        pageNote: `Invoice ${value.reference}`,
+      },
+      layout,
+    );
+
     res
       .type('application/pdf')
       .setHeader('Content-Disposition', `inline; filename="${value.reference}.pdf"`)
-      .send(createSimplePdf(lines, layout));
+      .send(pdfBuffer);
   } catch (error) {
     next(error);
   }

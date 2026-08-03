@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { calculatePackedInvoice, prorateMinor } from './invoiceMath';
-import { createSimplePdf } from './pdfService';
 
 test('packed invoice uses integer minor units and configured tax', () => {
   const invoice = calculatePackedInvoice(
@@ -35,17 +34,9 @@ test('discounts cannot reduce an invoice below zero', () => {
   assert.equal(invoice.grandTotalMinor, 0);
 });
 
-test('A4 and thermal PDF generation is deterministic and produces valid page sizes', () => {
-  const lines = ['MedSupply B2B', 'Invoice INV-2026-000001', 'Authorised signature'];
-  const a4 = createSimplePdf(lines, 'A4');
-  const repeated = createSimplePdf(lines, 'A4');
-  const thermal = createSimplePdf(lines, 'THERMAL');
-  assert.equal(a4.subarray(0, 8).toString(), '%PDF-1.4');
-  assert.match(a4.toString(), /MediaBox \[0 0 595 842\]/);
-  assert.match(thermal.toString(), /MediaBox \[0 0 226 842\]/);
-  assert.match(a4.toString(), /%%EOF$/);
-  assert.deepEqual(a4, repeated);
-});
+// Document rendering moved to `pdfDocument.test.ts` when the fixed-offset text
+// stamper was replaced. The assertions there are about pagination and character
+// coverage; this file is about the money arithmetic and stays that way.
 
 test('financial ratios use exact integer rounding and reject unsafe totals', () => {
   assert.equal(prorateMinor(100, 1, 3), 33);

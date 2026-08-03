@@ -8,6 +8,7 @@ import {
   formatQuantity,
   parseMoney,
   toDateInputValue,
+  toDateTimeInputValue,
   toMoneyInputValue,
 } from '@medsupply/utilities';
 import { formatFinanceDate, formatMinor, parseMajorToMinor } from './finance';
@@ -116,5 +117,22 @@ describe('date formatting is anchored to the business time zone', () => {
     expect(formatDate('not a date')).toBe('—');
     expect(formatDateTime(null)).toBe('—');
     expect(toDateInputValue(undefined)).toBe('');
+  });
+
+  it('fills a datetime-local input with Dhaka wall-clock time', () => {
+    // `RecordPayment` hand-rolled this as `Date.now() + 6h` sliced to 16
+    // characters. Correct for Bangladesh today, and a constant that had already
+    // started being copied to other screens.
+    expect(toDateTimeInputValue(instant)).toBe('2026-08-03T02:30');
+    expect(toDateTimeInputValue(instant, { ...DEFAULT_FORMAT_SETTINGS, timeZone: 'UTC' })).toBe(
+      '2026-08-02T20:30',
+    );
+    expect(toDateTimeInputValue(undefined)).toBe('');
+  });
+
+  it('renders midnight as 00 rather than 24', () => {
+    // 18:00 UTC is exactly midnight in Dhaka, and `en-CA` reports hour 24 for
+    // it in some engines, which a datetime-local input rejects outright.
+    expect(toDateTimeInputValue('2026-08-02T18:00:00.000Z')).toBe('2026-08-03T00:00');
   });
 });

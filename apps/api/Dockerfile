@@ -58,6 +58,13 @@ COPY --from=build --chown=medsupply:medsupply /repo/apps/api/dist ./dist
 # on the release machine, which is most of what shipping an image avoids.
 COPY --from=build --chown=medsupply:medsupply /repo/apps/api/dist-scripts ./dist-scripts
 
+# The embedded document font. `pdfService.ts` resolves it as `../../assets` from
+# its own directory, which is `/app/dist/services` here and `apps/api/src/services`
+# in development — the same two hops in both. Without this the invoice endpoint
+# throws ENOENT at request time rather than at boot, so it would pass every
+# health check and fail the first time a customer asked for an invoice.
+COPY --from=build --chown=medsupply:medsupply /repo/apps/api/assets ./assets
+
 # Never root: a process that is compromised should not also own the filesystem.
 USER medsupply
 
