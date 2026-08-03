@@ -5,9 +5,7 @@
   "types": "index.ts",
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit",
-    "test": "tsc"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@medsupply/shared-types": "workspace:^",

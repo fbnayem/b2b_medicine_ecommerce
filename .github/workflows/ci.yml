@@ -41,13 +41,19 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Hand-listed rather than driven by turbo, so a new package is invisible
-      # here until it is added. Every workspace package belongs in both this
-      # step and the typecheck below.
+      # here until it is added. `pipelineWiring.test.ts` reconciles this file
+      # against the workspace and fails the build when a package defines a
+      # gated script that no step below runs — which is how all five
+      # `packages/*` went unchecked here for twelve phases.
       - name: Build shared packages
         run: |
           pnpm --filter @medsupply/shared-types build
           pnpm --filter @medsupply/utilities build
           pnpm --filter @medsupply/validation build
+          pnpm --filter @medsupply/design-tokens build
+          pnpm --filter @medsupply/api-client build
+          pnpm --filter @medsupply/config build
+          pnpm --filter @medsupply/constants build
 
       # `pnpm --filter X <script>` exits 0 when the script does not exist, so a
       # missing script reads as a passing step. That is how the mobile app —
@@ -59,6 +65,10 @@ jobs:
           pnpm --filter @medsupply/shared-types run typecheck
           pnpm --filter @medsupply/utilities run typecheck
           pnpm --filter @medsupply/validation run typecheck
+          pnpm --filter @medsupply/design-tokens run typecheck
+          pnpm --filter @medsupply/api-client run typecheck
+          pnpm --filter @medsupply/config run typecheck
+          pnpm --filter @medsupply/constants run typecheck
           pnpm --filter @medsupply/api run typecheck
           pnpm --filter @medsupply/web run typecheck
           pnpm --filter @medsupply/mobile run typecheck

@@ -9,23 +9,8 @@ import { requestContext, sanitiseRequest } from './middlewares/requestContext';
 import { globalRateLimit, reportRateLimit, writeMethodRateLimit } from './middlewares/rateLimit';
 import { parseQuery } from './services/requestSanitiser';
 import { live, ready, version } from './controllers/healthController';
-import authRoutes from './routes/authRoutes';
-import userRoutes from './routes/userRoutes';
-import shopRoutes from './routes/shopRoutes';
-import inventoryRoutes from './routes/inventoryRoutes';
-import orderRoutes from './routes/orderRoutes';
-import approvalRoutes from './routes/approvalRoutes';
-import fulfilmentRoutes from './routes/fulfilmentRoutes';
-import deliveryRoutes from './routes/deliveryRoutes';
-import paymentRoutes from './routes/paymentRoutes';
-import financeRoutes from './routes/financeRoutes';
-import notificationRoutes from './routes/notificationRoutes';
-import activityRoutes from './routes/activityRoutes';
-import settingsRoutes from './routes/settingsRoutes';
-import adminRoutes from './routes/adminRoutes';
-import returnRoutes from './routes/returnRoutes';
-import reportRoutes from './routes/reportRoutes';
-import docsRoutes from './routes/docsRoutes';
+import { API_MOUNTS, type MountTier } from './routes';
+import { routeCoverageRecorder } from './services/routeTable';
 
 /** Shared with the Socket.IO handshake so both transports honour one allow-list. */
 export const corsOrigins = (
@@ -93,25 +78,24 @@ app.get('/health/version', version);
 
 app.use(globalRateLimit());
 
-app.use('/api/v1/docs', docsRoutes);
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/users', writeMethodRateLimit(), userRoutes);
-app.use('/api/v1/shops', writeMethodRateLimit(), shopRoutes);
-app.use('/api/v1/inventory', writeMethodRateLimit(), inventoryRoutes);
-app.use('/api/v1/orders', writeMethodRateLimit(), orderRoutes);
-app.use('/api/v1/approvals', writeMethodRateLimit(), approvalRoutes);
-app.use('/api/v1/fulfilment', writeMethodRateLimit(), fulfilmentRoutes);
-app.use('/api/v1/deliveries', writeMethodRateLimit(), deliveryRoutes);
-app.use('/api/v1/payments', writeMethodRateLimit(), paymentRoutes);
-app.use('/api/v1/finance', financeRoutes);
-app.use('/api/v1/notifications', notificationRoutes);
-app.use('/api/v1/activity', activityRoutes);
-app.use('/api/v1/settings', writeMethodRateLimit(), settingsRoutes);
-app.use('/api/v1/admin', writeMethodRateLimit(), adminRoutes);
-app.use('/api/v1/returns', writeMethodRateLimit(), returnRoutes);
-// Every report recomputes from source records, so these are the most expensive
-// reads in the system and carry their own budget.
-app.use('/api/v1/reports', reportRateLimit(), reportRoutes);
+// Under test only: records which route served each request so the coverage
+// reconciliation can name the endpoints no test reaches. Registered only when
+// there is something to register — Express 5 throws on `app.use([])`, so
+// passing the empty production case straight through would stop the server
+// booting anywhere except under test.
+const coverageRecorder = routeCoverageRecorder();
+if (coverageRecorder.length > 0) app.use(...coverageRecorder);
+
+/** One limiter instance per tier, shared by every mount on that tier. */
+const tierMiddleware: Record<MountTier, ReturnType<typeof writeMethodRateLimit>[]> = {
+  none: [],
+  write: [writeMethodRateLimit()],
+  report: [reportRateLimit()],
+};
+
+for (const mount of API_MOUNTS) {
+  app.use(mount.prefix, ...tierMiddleware[mount.tier], mount.router);
+}
 
 app.use(notFoundHandler);
 app.use(errorHandler);

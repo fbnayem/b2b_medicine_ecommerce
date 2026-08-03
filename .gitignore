@@ -13,3 +13,6 @@ coverage
 .verify-dist/
 package-lock.json
 yarn.lock
+
+# Route-coverage recording, written by the integration suites.
+apps/api/.route-coverage.log

@@ -184,7 +184,7 @@ const OPERATIONS: Operation[] = [
   },
   {
     method: 'post',
-    path: '/api/v1/inventory/batches',
+    path: '/api/v1/inventory/batches/receive',
     summary: 'Receive stock into a batch',
     tag: 'Inventory',
     roles: [...MANAGEMENT, UserRole.STOREKEEPER],
@@ -252,7 +252,7 @@ const OPERATIONS: Operation[] = [
   },
   {
     method: 'post',
-    path: '/api/v1/fulfilment/{id}/pack',
+    path: '/api/v1/fulfilment/picking/{id}/pack',
     summary: 'Pack actual quantities and generate the final invoice',
     tag: 'Fulfilment',
     roles: [...MANAGEMENT, UserRole.STOREKEEPER],
@@ -336,11 +336,11 @@ const OPERATIONS: Operation[] = [
   },
   {
     method: 'get',
-    path: '/api/v1/finance/statement',
+    path: '/api/v1/finance/shops/{shopId}/statement',
     summary: 'Customer statement for a period',
     tag: 'Finance',
-    roles: ALL_ROLES,
-    query: ['shopId', 'from', 'to', 'format'],
+    roles: MANAGEMENT,
+    query: ['from', 'to', 'format'],
   },
   {
     method: 'post',
@@ -362,7 +362,7 @@ const OPERATIONS: Operation[] = [
   },
   {
     method: 'get',
-    path: '/api/v1/activity/feed',
+    path: '/api/v1/activity',
     summary: 'Organisation activity feed, filtered by permission',
     tag: 'Activity',
     roles: ALL_ROLES,
@@ -410,7 +410,7 @@ const OPERATIONS: Operation[] = [
   },
   {
     method: 'post',
-    path: '/api/v1/admin/users/{id}/password',
+    path: '/api/v1/admin/users/{id}/reset-password',
     summary: 'Issue a temporary password',
     tag: 'Administration',
     roles: ADMINS,
