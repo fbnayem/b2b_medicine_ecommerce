@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "oxlint src",
     "pretest": "pnpm --filter @medsupply/shared-types build && pnpm --filter @medsupply/validation build",
-    "test": "tsc && node --require ./dist/services/testEnv.js --test dist/services/inventoryRules.test.js dist/services/orderRules.test.js dist/services/invoiceMath.test.js dist/services/deliveryRules.test.js dist/services/financialMath.test.js dist/services/creditReservationRules.test.js dist/services/notificationRules.test.js dist/services/settingsRules.test.js dist/services/returnRules.test.js dist/services/securityRules.test.js dist/services/testWiring.test.js",
+    "test": "tsc && node --require ./dist/services/testEnv.js --test dist/services/inventoryRules.test.js dist/services/orderRules.test.js dist/services/invoiceMath.test.js dist/services/deliveryRules.test.js dist/services/financialMath.test.js dist/services/creditReservationRules.test.js dist/services/notificationRules.test.js dist/services/settingsRules.test.js dist/services/returnRules.test.js dist/services/securityRules.test.js dist/services/testWiring.test.js dist/services/loggingDiscipline.test.js",
     "pretest:integration": "pnpm --filter @medsupply/shared-types build && pnpm --filter @medsupply/validation build",
     "test:integration": "tsc && node --require ./dist/services/testEnv.js --test dist/services/integration.test.js dist/services/notificationIntegration.test.js dist/services/settingsIntegration.test.js dist/services/returnsIntegration.test.js dist/services/hardeningIntegration.test.js",
     "scripts:build": "tsc -p tsconfig.scripts.json",

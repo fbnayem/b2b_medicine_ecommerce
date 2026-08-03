@@ -12,6 +12,7 @@ import { NotificationPreference } from '../models/NotificationPreference';
 import { Shop } from '../models/Shop';
 import { User } from '../models/User';
 import { channelAdapter, type OutboundMessage } from './notificationChannels';
+import { logger } from './logger';
 import { templateFor, type TemplateContext } from './notificationCatalogue';
 import {
   deliveryIdempotencyKey,
@@ -397,7 +398,7 @@ export function startNotificationSweeper() {
   if (sweeper) return;
   sweeper = setInterval(() => {
     void sweepPendingDeliveries().catch((error) =>
-      console.error('[notifications] sweep failed', error),
+      logger.error('notification sweep failed', { error }),
     );
   }, SWEEP_INTERVAL_MS);
   sweeper.unref?.();

@@ -1,4 +1,5 @@
 import type { Queue, Worker } from 'bullmq';
+import { logger } from './logger';
 
 export type JobHandler<T> = (payload: T) => Promise<void>;
 
@@ -100,7 +101,7 @@ class InProcessQueue<T> implements JobQueue<T> {
       await this.handler(payload);
     } catch (error) {
       if (attempt >= JOB_ATTEMPTS) {
-        console.error(`[queue:${this.name}] job failed after ${attempt} attempts`, error);
+        logger.error('queue job exhausted its attempts', { queue: this.name, attempt, error });
         return;
       }
       this.schedule(payload, backoffDelayMs(attempt, this.baseBackoffMs), attempt + 1);
@@ -159,7 +160,7 @@ class BullQueue<T> implements JobQueue<T> {
       },
     });
     this.queue.on('error', (error) => {
-      console.error(`[queue:${name}] connection error`, error);
+      logger.error('queue connection error', { queue: name, error });
     });
   }
 
@@ -173,7 +174,10 @@ class BullQueue<T> implements JobQueue<T> {
       { connection: { url: this.connectionUrl } },
     );
     this.worker.on('failed', (job, error) => {
-      console.error(`[queue:${this.name}] job ${job?.id ?? 'unknown'} failed`, error);
+      // The job id is logged; `job.data` deliberately is not. It is the
+      // notification payload, and for a delivery notification that payload
+      // carries the OTP the receiver is about to be asked for.
+      logger.error('queue job failed', { queue: this.name, jobId: job?.id ?? 'unknown', error });
     });
   }
 
@@ -220,7 +224,7 @@ export function createJobQueue<T>(name: string): JobQueue<T> {
     const runtime = require('bullmq') as typeof import('bullmq');
     return new BullQueue<T>(name, url, runtime);
   } catch (error) {
-    console.error(`[queue:${name}] BullMQ unavailable, using the in-process queue`, error);
+    logger.warn('BullMQ unavailable, falling back to the in-process queue', { queue: name, error });
     return new InProcessQueue<T>(name);
   }
 }

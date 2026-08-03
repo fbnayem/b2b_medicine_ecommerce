@@ -14,6 +14,7 @@ import {
   ReviewVersionSchema,
 } from '@medsupply/validation';
 import { AuthRequest } from '../middlewares/auth';
+import { logger } from '../services/logger';
 import { Order } from '../models/Order';
 import { OrderApproval } from '../models/OrderApproval';
 import { MedicineBatch } from '../models/MedicineBatch';
@@ -345,7 +346,7 @@ async function announceCreditBlock(req: AuthRequest, error: unknown) {
     });
   } catch (announceError) {
     // Never let a notification failure mask the original approval error.
-    console.error('[approvals] failed to announce a credit block', announceError);
+    logger.error('failed to announce a credit block', { error: announceError });
   }
 }
 export async function clarify(req: AuthRequest, res: Response, next: NextFunction) {

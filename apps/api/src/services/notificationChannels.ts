@@ -5,6 +5,8 @@ import {
   NotificationPriority,
 } from '@medsupply/shared-types';
 import { PushDevice } from '../models/PushDevice';
+import { isProduction } from '../env';
+import { logger } from './logger';
 
 export interface OutboundRecipient {
   id: string;
@@ -97,10 +99,30 @@ class WebhookChannelAdapter implements ChannelAdapter {
 
     const url = this.url;
     if (!url) {
-      // Local development adapter: the message is still produced and observable.
-      console.info(
-        `[notification:${this.channel}] ${destination} :: ${message.title} — ${message.body}`,
-      );
+      // Local development adapter: the message is still produced and observable,
+      // which is how a developer reads a delivery OTP without an SMS provider.
+      //
+      // That observability must not survive into production. This branch is
+      // reached whenever the channel's webhook variable is unset, so a
+      // production deployment that has simply not configured SMS yet would
+      // otherwise print every OTP, in plaintext, on the ordinary success path —
+      // no error required. The body is therefore withheld off development, and
+      // the missing configuration is reported as the fault it is.
+      if (isProduction) {
+        logger.warn('notification channel is not configured; no provider was called', {
+          channel: this.channel,
+          variable: this.urlVariable,
+          event: message.event,
+          notificationId: message.notificationId,
+        });
+      } else {
+        logger.info('notification delivered to the development log adapter', {
+          channel: this.channel,
+          to: destination,
+          subject: message.title,
+          body: message.body,
+        });
+      }
       return { providerReference: `log:${message.notificationId ?? message.event}` };
     }
 

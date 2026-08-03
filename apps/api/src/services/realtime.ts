@@ -6,6 +6,7 @@ import { Session } from '../models/Session';
 import { Shop } from '../models/Shop';
 import { User } from '../models/User';
 import { redisUrl } from './jobQueue';
+import { logger } from './logger';
 import { verifyAccessToken } from './tokenService';
 
 interface SocketIdentity {
@@ -78,7 +79,7 @@ export function initialiseRealtime(httpServer: HttpServer, corsOrigins: string[]
       server.adapter(createAdapter(pubClient, subClient));
       driver = 'redis';
     } catch (error) {
-      console.error('[realtime] Redis adapter unavailable; running single-instance', error);
+      logger.warn('Redis adapter unavailable; running single-instance', { error });
     }
   }
 

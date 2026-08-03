@@ -48,6 +48,7 @@ export function redact(value: unknown, depth = 0): unknown {
   if (value === null || value === undefined) return value;
   if (value instanceof Date) return value.toISOString();
   if (Buffer.isBuffer(value)) return `[buffer ${value.length} bytes]`;
+  if (value instanceof Error) return redactError(value, depth);
   if (Array.isArray(value)) {
     return value.slice(0, 20).map((entry) => redact(entry, depth + 1));
   }
@@ -60,6 +61,34 @@ export function redact(value: unknown, depth = 0): unknown {
   const output: Record<string, unknown> = {};
   for (const key of Object.keys(source).slice(0, 40)) {
     output[key] = SENSITIVE_KEY.test(key) ? REDACTED : redact(source[key], depth + 1);
+  }
+  return output;
+}
+
+/**
+ * An error is not an ordinary object: `name`, `message`, `stack` and a `cause`
+ * set through the constructor option are all non-enumerable, so `Object.keys`
+ * returns `[]` and `JSON.stringify(error)` is `{}`. Without this branch, routing
+ * a caught error through the logger would print `"detail":{}` and discard the
+ * only part anyone reads. That is the trap that kept these call sites on
+ * `console.error` — it prints errors correctly and redacts nothing.
+ *
+ * Enumerable own properties are kept and redacted by name, because that is
+ * where a payload rides along: a failed notification job attaches its data to
+ * the error, and that data can carry a delivery OTP.
+ */
+function redactError(error: Error, depth: number): Record<string, unknown> {
+  const attached = error as Error & Record<string, unknown>;
+  const output: Record<string, unknown> = { name: error.name, message: error.message };
+
+  // Enough frames to locate the throw, not so many that one failure fills the
+  // log. The generic string cap is 512 characters, which truncates mid-frame.
+  if (error.stack) output.stack = error.stack.split('\n').slice(0, 12).join('\n');
+  if (error.cause !== undefined) output.cause = redact(error.cause, depth + 1);
+
+  for (const key of Object.keys(attached).slice(0, 40)) {
+    if (key === 'cause') continue;
+    output[key] = SENSITIVE_KEY.test(key) ? REDACTED : redact(attached[key], depth + 1);
   }
   return output;
 }
