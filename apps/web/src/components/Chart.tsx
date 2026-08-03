@@ -1,5 +1,7 @@
 import { useId } from 'react';
 import { formatMoneyMinor, formatQuantity } from '@medsupply/utilities';
+import { chartDark, chartLight } from '@medsupply/design-tokens';
+import { resolveTheme, storedTheme } from '../lib/theme';
 
 export interface ChartSeries {
   key: string;
@@ -19,7 +21,27 @@ interface ChartProps {
   emptyMessage?: string;
 }
 
-const PALETTE = ['#1f6feb', '#0f9d58', '#d97706', '#9333ea', '#dc2626'];
+/**
+ * The token palette, picked by surface.
+ *
+ * This file carried its own unrelated blue-and-purple palette, unconnected to
+ * anything else in the product, and a single set of colours for both themes —
+ * the light greens are unreadable on a dark ground and the dark ones are
+ * unreadable on white.
+ */
+function palette(): readonly string[] {
+  return resolveTheme(storedTheme()) === 'dark' ? chartDark : chartLight;
+}
+
+/**
+ * A dash pattern per series, so the lines are distinguishable **without
+ * colour**.
+ *
+ * Around 8% of men have some form of colour blindness, and a printed report is
+ * monochrome regardless. The series were separated by hue alone, which means
+ * two of them were the same line to a meaningful share of readers.
+ */
+const DASHES = ['0', '6 4', '2 3', '10 4 2 4', '1 4', '8 3 1 3'];
 
 function formatValue(value: number, money: boolean) {
   return money ? formatMoneyMinor(value) : formatQuantity(value);
@@ -111,8 +133,8 @@ export function LineChart({
       >
         <defs>
           <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor={series[0].colour ?? PALETTE[0]} stopOpacity="0.25" />
-            <stop offset="100%" stopColor={series[0].colour ?? PALETTE[0]} stopOpacity="0" />
+            <stop offset="0%" stopColor={series[0].colour ?? palette()[0]} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={series[0].colour ?? palette()[0]} stopOpacity="0" />
           </linearGradient>
         </defs>
         <line
@@ -123,7 +145,7 @@ export function LineChart({
           y2={pointY(Math.max(0, min))}
         />
         {series.map((entry, seriesIndex) => {
-          const colour = entry.colour ?? PALETTE[seriesIndex % PALETTE.length];
+          const colour = entry.colour ?? palette()[seriesIndex % palette().length];
           const points = entry.values.map((value, index) => `${pointX(index)},${pointY(value)}`);
           return (
             <g key={entry.key}>
@@ -135,7 +157,12 @@ export function LineChart({
                   )},${pointY(Math.max(0, min))}`}
                 />
               ) : null}
-              <polyline className="chart-line" points={points.join(' ')} stroke={colour} />
+              <polyline
+                className="chart-line"
+                points={points.join(' ')}
+                stroke={colour}
+                strokeDasharray={DASHES[seriesIndex % DASHES.length]}
+              />
             </g>
           );
         })}
@@ -145,7 +172,7 @@ export function LineChart({
           <li key={entry.key}>
             <span
               className="chart-swatch"
-              style={{ background: entry.colour ?? PALETTE[index % PALETTE.length] }}
+              style={{ background: entry.colour ?? palette()[index % palette().length] }}
             />
             {entry.label}
           </li>
@@ -184,7 +211,7 @@ export function BarChart({
                   className="chart-bar"
                   style={{
                     height: `${Math.round(((entry.values[index] ?? 0) / max) * 100)}%`,
-                    background: entry.colour ?? PALETTE[seriesIndex % PALETTE.length],
+                    background: entry.colour ?? palette()[seriesIndex % palette().length],
                   }}
                 />
               ))}
@@ -198,7 +225,7 @@ export function BarChart({
           <li key={entry.key}>
             <span
               className="chart-swatch"
-              style={{ background: entry.colour ?? PALETTE[index % PALETTE.length] }}
+              style={{ background: entry.colour ?? palette()[index % palette().length] }}
             />
             {entry.label}
           </li>
@@ -238,7 +265,7 @@ export function ShareBars({
               className="share-fill"
               style={{
                 width: `${Math.max(2, Math.round((slice.value / total) * 100))}%`,
-                background: PALETTE[index % PALETTE.length],
+                background: palette()[index % palette().length],
               }}
             />
           </span>

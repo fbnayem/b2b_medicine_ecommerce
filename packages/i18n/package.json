@@ -1,5 +1,5 @@
 {
-  "name": "@medsupply/api-client",
+  "name": "@medsupply/i18n",
   "version": "0.0.0",
   "main": "dist/index.js",
   "types": "index.ts",
@@ -8,6 +8,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@medsupply/i18n": "workspace:^"
+    "@medsupply/shared-types": "workspace:^"
   }
 }

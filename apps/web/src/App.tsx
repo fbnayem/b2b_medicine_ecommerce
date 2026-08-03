@@ -9,6 +9,7 @@ import { SessionGate } from './components/SessionGate';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoadingState } from './components/ui';
 import { resolvedRoutes } from './app/routes';
+import { LanguageProvider } from './lib/useLanguage';
 
 /**
  * Every route, generated from the manifest.
@@ -31,35 +32,39 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <BrowserRouter>
-        <SessionGate>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
+      <LanguageProvider>
+        <BrowserRouter>
+          <SessionGate>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/unauthorized" element={<Unauthorized />} />
 
-            <Route element={<AppShell />}>
-              {routes.map((route) => {
-                const Element = route.element;
-                return (
-                  <Route key={route.id} element={<RoleGate allowedRoles={route.nav.roles} />}>
-                    <Route
-                      path={route.nav.path}
-                      element={
-                        <Suspense fallback={<LoadingState label={`Opening ${route.nav.label}`} />}>
-                          <Element {...(route.props ?? {})} />
-                        </Suspense>
-                      }
-                    />
-                  </Route>
-                );
-              })}
-            </Route>
+              <Route element={<AppShell />}>
+                {routes.map((route) => {
+                  const Element = route.element;
+                  return (
+                    <Route key={route.id} element={<RoleGate allowedRoles={route.nav.roles} />}>
+                      <Route
+                        path={route.nav.path}
+                        element={
+                          <Suspense
+                            fallback={<LoadingState label={`Opening ${route.nav.label}`} />}
+                          >
+                            <Element {...(route.props ?? {})} />
+                          </Suspense>
+                        }
+                      />
+                    </Route>
+                  );
+                })}
+              </Route>
 
-            {/* A real screen, not a redirect to the sign-in form. */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </SessionGate>
-      </BrowserRouter>
+              {/* A real screen, not a redirect to the sign-in form. */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </SessionGate>
+        </BrowserRouter>
+      </LanguageProvider>
     </ErrorBoundary>
   );
 }

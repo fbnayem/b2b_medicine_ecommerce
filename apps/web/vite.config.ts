@@ -65,7 +65,9 @@ export default defineConfig({
       '@medsupply/design-tokens/theme.css': fileURLToPath(
         new URL('../../packages/design-tokens/theme.css', import.meta.url),
       ),
+      '@medsupply/api-client': workspacePackage('api-client'),
       '@medsupply/design-tokens': workspacePackage('design-tokens'),
+      '@medsupply/i18n': workspacePackage('i18n'),
       '@medsupply/navigation': workspacePackage('navigation'),
       '@medsupply/shared-types': workspacePackage('shared-types'),
       '@medsupply/utilities': workspacePackage('utilities'),

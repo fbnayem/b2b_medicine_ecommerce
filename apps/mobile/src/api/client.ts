@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { REQUEST_TIMEOUT_MS, correlationId, shouldAttemptRefresh } from '@medsupply/api-client';
 import { useAuthStore } from '../store/useAuth';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
@@ -14,6 +15,13 @@ let refreshRequest: Promise<TokenPair> | null = null;
 
 export const apiClient = axios.create({
   baseURL,
+  /*
+   * There was no timeout at all. A request over a rural cellular connection
+   * that never answers left a rider looking at a spinner with no way back —
+   * which, on the delivery screens, means standing at a shop counter unable to
+   * confirm a delivery they have already made.
+   */
+  timeout: REQUEST_TIMEOUT_MS,
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -21,6 +29,8 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // So a failure on a phone can be traced to the exact server log line.
+  config.headers['X-Request-Id'] = correlationId();
   return config;
 });
 
@@ -49,7 +59,23 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config as typeof error.config & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    /*
+     * The shared policy, rather than this client's own answer.
+     *
+     * This condition used to be `status === 401 && !_retry`, which is wrong in
+     * two ways web had already fixed: a failed `/auth/refresh` was retried
+     * through the refresh path, making one expired session an endless loop; and
+     * a mistyped password at sign-in was treated as an expired token, so the
+     * user was shown the refresh failure instead of "that password is wrong"
+     * and was signed out of a session they never had.
+     */
+    if (
+      shouldAttemptRefresh({
+        status: error.response?.status,
+        url: originalRequest?.url,
+        alreadyRetried: originalRequest?._retry,
+      })
+    ) {
       originalRequest._retry = true;
       try {
         const { accessToken, refreshToken: newRefreshToken } = await refreshTokens();
@@ -60,9 +86,12 @@ apiClient.interceptors.response.use(
 
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return apiClient(originalRequest);
-      } catch (refreshError) {
+      } catch {
         await useAuthStore.getState().logout();
-        return Promise.reject(refreshError);
+        // The caller asked about *their* request, so they get their own error.
+        // Substituting the refresh failure replaces a sentence about the thing
+        // the user was doing with one about a mechanism they have never met.
+        return Promise.reject(error);
       }
     }
     return Promise.reject(error);

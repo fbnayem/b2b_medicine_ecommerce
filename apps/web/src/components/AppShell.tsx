@@ -10,12 +10,16 @@ import {
   type NavItem,
 } from '@medsupply/navigation';
 import { UserRole } from '@medsupply/shared-types';
+import type { Language } from '@medsupply/i18n';
 import { useAuthStore } from '../store/useAuth';
 import { signOut } from '../api/client';
 import { connectRealtime, disconnectRealtime } from '../realtime/socket';
 import { NotificationBell } from './NotificationBell';
 import { Toaster } from './ui/toast';
 import { AskProvider } from './ui/ask';
+import { RouteAnnouncer } from './RouteAnnouncer';
+import { useLanguage } from '../lib/useLanguage';
+import { LANGUAGE_LABEL, LANGUAGES } from '@medsupply/i18n';
 import { applyTheme, storedTheme, setTheme, type ThemeChoice } from '../lib/theme';
 import { useBranding } from '../lib/useBranding';
 import { routeIdForPath } from '../app/routes';
@@ -48,6 +52,7 @@ export function AppShell() {
   const { isAuthenticated, user } = useAuthStore();
   const location = useLocation();
   const branding = useBranding();
+  const { t, language, setLanguage } = useLanguage();
   const [theme, setThemeChoice] = useState<ThemeChoice>(() => storedTheme());
   const [navOpen, setNavOpen] = useState(false);
 
@@ -90,8 +95,9 @@ export function AppShell() {
     <AskProvider>
       <div data-test="app-shell" className="min-h-screen bg-canvas text-text">
         <a href="#main" className="skip-link">
-          Skip to the main content
+          {t('nav.skipToContent')}
         </a>
+        <RouteAnnouncer />
 
         <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-surface px-4 py-2">
           <button
@@ -120,6 +126,8 @@ export function AppShell() {
                 setTheme(next);
                 setThemeChoice(next);
               }}
+              language={language}
+              onLanguage={setLanguage}
             />
           </div>
         </header>
@@ -128,7 +136,7 @@ export function AppShell() {
           <nav
             id="app-sidebar"
             data-test="app-sidebar"
-            aria-label="Sections"
+            aria-label={t('nav.sections')}
             className={[
               'w-64 shrink-0 border-e border-border bg-surface p-3',
               'lg:block lg:sticky lg:top-[3.25rem] lg:h-[calc(100vh-3.25rem)] lg:overflow-y-auto',
@@ -164,7 +172,11 @@ export function AppShell() {
             ))}
           </nav>
 
-          <main id="main" className="min-w-0 flex-1 px-4 py-6">
+          {/*
+            `tabIndex={-1}` so `RouteAnnouncer` can move focus here after a
+            navigation without adding another stop to the tab order.
+          */}
+          <main id="main" tabIndex={-1} className="min-w-0 flex-1 px-4 py-6">
             <Breadcrumbs />
             <Outlet />
           </main>
@@ -279,12 +291,17 @@ function AccountMenu({
   role,
   theme,
   onTheme,
+  language,
+  onLanguage,
 }: {
   name: string;
   role: UserRole;
   theme: ThemeChoice;
   onTheme: (choice: ThemeChoice) => void;
+  language: Language;
+  onLanguage: (next: Language) => void;
 }) {
+  const { t, c } = useLanguage();
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
@@ -304,7 +321,7 @@ function AccountMenu({
         >
           <DropdownMenu.Label className="px-3 py-2 text-xs text-text-muted">
             {/* The role in words. `dashboard.tsx` on mobile showed the raw enum. */}
-            {ROLE_LABEL[role]}
+            {c.roles[role] ?? ROLE_LABEL[role]}
           </DropdownMenu.Label>
           <DropdownMenu.Item asChild>
             <Link
@@ -316,7 +333,24 @@ function AccountMenu({
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
           <DropdownMenu.Label className="px-3 py-1 text-xs text-text-muted">
-            Appearance
+            {t('nav.language')}
+          </DropdownMenu.Label>
+          {LANGUAGES.map((option) => (
+            <DropdownMenu.CheckboxItem
+              key={option}
+              checked={language === option}
+              onCheckedChange={() => onLanguage(option)}
+              className="flex min-h-11 items-center rounded px-3 text-sm hover:bg-surface-hover"
+            >
+              {/* Each language in its own script, so somebody who cannot read
+                  the current one can still find theirs. */}
+              {LANGUAGE_LABEL[option]}
+              {language === option && <span className="ms-auto">✓</span>}
+            </DropdownMenu.CheckboxItem>
+          ))}
+          <DropdownMenu.Separator className="my-1 h-px bg-border" />
+          <DropdownMenu.Label className="px-3 py-1 text-xs text-text-muted">
+            {t('nav.appearance')}
           </DropdownMenu.Label>
           {(['light', 'dark', 'system'] as const).map((choice) => (
             <DropdownMenu.CheckboxItem
@@ -334,7 +368,7 @@ function AccountMenu({
             onSelect={() => void signOut()}
             className="flex min-h-11 items-center rounded px-3 text-sm text-danger hover:bg-surface-hover"
           >
-            Sign out
+            {t('common.signOut')}
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

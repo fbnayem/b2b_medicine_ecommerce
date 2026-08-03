@@ -1,16 +1,13 @@
 import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/useAuth';
+import { REQUEST_TIMEOUT_MS, correlationId, shouldAttemptRefresh } from '@medsupply/api-client';
 import { apiBaseUrl } from './config';
 
 export const apiClient = axios.create({
   baseURL: apiBaseUrl,
   withCredentials: true, // For sending HTTP-only cookies
-  timeout: 60_000,
+  timeout: REQUEST_TIMEOUT_MS,
 });
-
-/** Correlates a browser action with the server log line it produced. */
-const correlationId = () =>
-  globalThis.crypto?.randomUUID?.() ?? `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
@@ -99,22 +96,26 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config as RetriableConfig | undefined;
     const status = error.response?.status;
 
-    /**
-     * The endpoints where 401 means "these credentials are wrong", not "this
-     * access token expired".
+    /*
+     * The shared policy, so the two clients cannot answer this differently
+     * again.
      *
      * A failed refresh must not be retried through this path, or one expired
-     * session becomes an endless loop of refresh attempts. Sign-in must not
-     * either, and that omission was user-visible: mistyping a password made
-     * this interceptor attempt a refresh, the refresh failed with "No refresh
-     * token", and *that* was the sentence shown to the person at the keyboard.
-     * A shop owner who fat-fingered their password was told the application had
-     * no refresh token — while being signed out of a session they had never
+     * session becomes an endless loop — mobile had no such guard at all. Nor
+     * must sign-in, and that omission was user-visible: mistyping a password
+     * made this interceptor attempt a refresh, the refresh failed with "No
+     * refresh token", and *that* was the sentence shown to the person at the
+     * keyboard, while they were signed out of a session they had never
      * established.
      */
-    const isCredentialCall = /\/auth\/(refresh|login)/.test(originalRequest?.url ?? '');
-
-    if (status === 401 && originalRequest && !originalRequest._retry && !isCredentialCall) {
+    if (
+      originalRequest &&
+      shouldAttemptRefresh({
+        status,
+        url: originalRequest.url,
+        alreadyRetried: originalRequest._retry,
+      })
+    ) {
       originalRequest._retry = true;
       try {
         const token = await refreshAccessToken();
@@ -142,8 +143,8 @@ apiClient.interceptors.response.use(
 /**
  * The correlation identifier the server attached to a failure, so a support
  * message can quote the exact request rather than the time it happened.
+ *
+ * Re-exported from the shared package rather than reimplemented: this cast was
+ * being written out about 29 times across the two applications.
  */
-export function failureReference(error: unknown): string | undefined {
-  const failure = error as { response?: { data?: { error?: { correlationId?: string } } } };
-  return failure.response?.data?.error?.correlationId;
-}
+export { apiFailure, errorMessage, failureReference } from '@medsupply/api-client';

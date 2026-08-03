@@ -37,7 +37,9 @@ config.resolver.nodeModulesPaths = [
 
 config.resolver.extraNodeModules = {
   ...config.resolver.extraNodeModules,
+  '@medsupply/api-client': path.resolve(workspaceRoot, 'packages/api-client'),
   '@medsupply/design-tokens': path.resolve(workspaceRoot, 'packages/design-tokens'),
+  '@medsupply/i18n': path.resolve(workspaceRoot, 'packages/i18n'),
   '@medsupply/navigation': path.resolve(workspaceRoot, 'packages/navigation'),
   '@medsupply/shared-types': path.resolve(workspaceRoot, 'packages/shared-types'),
   '@medsupply/utilities': path.resolve(workspaceRoot, 'packages/utilities'),

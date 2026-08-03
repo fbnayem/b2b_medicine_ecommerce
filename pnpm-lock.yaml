@@ -117,9 +117,15 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@medsupply/api-client':
+        specifier: workspace:^
+        version: link:../../packages/api-client
       '@medsupply/design-tokens':
         specifier: workspace:^
         version: link:../../packages/design-tokens
+      '@medsupply/i18n':
+        specifier: workspace:^
+        version: link:../../packages/i18n
       '@medsupply/navigation':
         specifier: workspace:^
         version: link:../../packages/navigation
@@ -208,9 +214,15 @@ importers:
 
   apps/web:
     dependencies:
+      '@medsupply/api-client':
+        specifier: workspace:^
+        version: link:../../packages/api-client
       '@medsupply/design-tokens':
         specifier: workspace:^
         version: link:../../packages/design-tokens
+      '@medsupply/i18n':
+        specifier: workspace:^
+        version: link:../../packages/i18n
       '@medsupply/navigation':
         specifier: workspace:^
         version: link:../../packages/navigation
@@ -300,13 +312,23 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.1.5(@types/node@24.13.3)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.0))
 
-  packages/api-client: {}
+  packages/api-client:
+    dependencies:
+      '@medsupply/i18n':
+        specifier: workspace:^
+        version: link:../i18n
 
   packages/config: {}
 
   packages/constants: {}
 
   packages/design-tokens: {}
+
+  packages/i18n:
+    dependencies:
+      '@medsupply/shared-types':
+        specifier: workspace:^
+        version: link:../shared-types
 
   packages/navigation:
     dependencies:

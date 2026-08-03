@@ -115,6 +115,24 @@
     border-radius: 8px;
   }
 
+  /*
+   * Visually hidden but still read aloud. The route announcer and several
+   * status messages need somewhere to say something without changing the
+   * layout, and the application had no such utility — nor any live region at
+   * all — so asynchronous changes were silent.
+   */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
   .skip-link:focus {
     left: 8px;
     top: 8px;
