@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { brand as fallback } from '@medsupply/design-tokens';
-import { configureFormatting } from '@medsupply/utilities';
+import { configureFormatting, formattingLocale, type DateFormat } from '@medsupply/utilities';
 import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
 
@@ -53,10 +53,21 @@ export function useBranding(): Branding {
         const resolved: Branding = { ...DEFAULTS, ...response.data.data };
         cached = resolved;
         setBranding(resolved);
-        // The formatter is told once, here, so every screen renders the
-        // tenant's symbol and timezone rather than the built-in defaults.
+        /*
+         * The formatter is told once, here, so every screen renders the
+         * tenant's own settings rather than the built-in defaults.
+         *
+         * This used to pass two of the five fields. `currencyCode` and
+         * `dateFormat` were fetched, held in state and rendered in the settings
+         * screen while reaching no formatter, so choosing `YYYY-MM-DD` changed
+         * nothing anywhere and every amount was scaled as though the currency
+         * had two minor digits.
+         */
         configureFormatting({
+          locale: formattingLocale(resolved.locale),
+          currencyCode: resolved.currencyCode,
           currencySymbol: resolved.currencySymbol,
+          dateFormat: resolved.dateFormat as DateFormat,
           timeZone: resolved.timezone,
         });
       })

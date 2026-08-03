@@ -17,7 +17,11 @@ import {
   reconcileShopFinance,
   backfillCreditReservation,
 } from '../services/financeService';
-import { dhakaDateString, dhakaDayBoundary, postLedgerAdjustment } from '../services/ledgerService';
+import {
+  businessDateString,
+  businessDayBoundary,
+  postLedgerAdjustment,
+} from '../services/ledgerService';
 import { formatDate, formatMoneyMinor } from '@medsupply/utilities';
 import { createSimplePdf } from '../services/pdfService';
 import { businessSettings } from '../services/settingsService';
@@ -42,7 +46,7 @@ async function myShop(req: AuthRequest) {
 }
 
 function statementDates(req: AuthRequest) {
-  const to = String(req.query.to ?? dhakaDateString());
+  const to = String(req.query.to ?? businessDateString());
   const from = String(req.query.from ?? `${to.slice(0, 8)}01`);
   return { from, to };
 }
@@ -169,7 +173,7 @@ export async function summaryReport(_req: AuthRequest, res: Response, next: Next
 export async function outstandingReport(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const result = await getOutstandingReport(
-      req.query.asOf ? dhakaDayBoundary(String(req.query.asOf), true) : new Date(),
+      req.query.asOf ? businessDayBoundary(String(req.query.asOf), true) : new Date(),
       Math.max(1, Number(req.query.page) || 1),
       Math.min(200, Math.max(1, Number(req.query.limit) || 100)),
     );
@@ -182,7 +186,7 @@ export async function outstandingReport(req: AuthRequest, res: Response, next: N
 export async function overdueReport(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const result = await getOverdueReport(
-      req.query.asOf ? dhakaDayBoundary(String(req.query.asOf), true) : new Date(),
+      req.query.asOf ? businessDayBoundary(String(req.query.asOf), true) : new Date(),
       Math.max(1, Number(req.query.page) || 1),
       Math.min(200, Math.max(1, Number(req.query.limit) || 100)),
     );

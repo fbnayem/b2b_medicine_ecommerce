@@ -19,7 +19,7 @@ import { Payment } from '../models/Payment';
 import { Return } from '../models/Return';
 import { Shop } from '../models/Shop';
 import { StockMovement } from '../models/StockMovement';
-import { dhakaDateString, dhakaDayBoundary } from './ledgerService';
+import { businessDateString, businessDayBoundary } from './ledgerService';
 import {
   basisPoints,
   bucketExpression,
@@ -38,8 +38,8 @@ export interface RangeInput {
 
 function resolveRange(input: RangeInput) {
   return {
-    start: dhakaDayBoundary(input.from),
-    end: dhakaDayBoundary(input.to, true),
+    start: businessDayBoundary(input.from),
+    end: businessDayBoundary(input.to, true),
     labels: bucketLabels(input.from, input.to, input.granularity),
     period: { from: input.from, to: input.to, granularity: input.granularity },
   };
@@ -538,7 +538,7 @@ export async function orderFunnel(input: RangeInput) {
 /* -------------------------------------------------------------- inventory */
 
 export async function inventoryAnalytics(input: { asOf?: string; deadStockDays: number }) {
-  const asOfDate = input.asOf ? dhakaDayBoundary(input.asOf, true) : new Date();
+  const asOfDate = input.asOf ? businessDayBoundary(input.asOf, true) : new Date();
   const settings = await inventorySettings();
   const deadStockCutoff = new Date(asOfDate.getTime() - input.deadStockDays * 86_400_000);
 
@@ -1163,7 +1163,7 @@ const AGEING_BUCKETS = [
 type AgeingBucket = (typeof AGEING_BUCKETS)[number];
 
 export async function receivablesAgeing(input: { asOf?: string } = {}) {
-  const asOfDate = input.asOf ? dhakaDayBoundary(input.asOf, true) : new Date();
+  const asOfDate = input.asOf ? businessDayBoundary(input.asOf, true) : new Date();
   const rows = await Invoice.aggregate<{
     shopId: Types.ObjectId;
     shopReference: string;
@@ -1444,7 +1444,7 @@ async function buildOverview(input: RangeInput) {
 
 /** Default range used when a client asks for "this month" without dates. */
 export function defaultRange(granularity: ReportGranularity = ReportGranularity.DAY): RangeInput {
-  const to = dhakaDateString();
+  const to = businessDateString();
   return { from: `${to.slice(0, 8)}01`, to, granularity };
 }
 

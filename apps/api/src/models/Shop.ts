@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { ShopStatus } from '@medsupply/shared-types';
+import { nextReference } from './Counter';
 
 const addressSchema = new mongoose.Schema(
   {
@@ -47,12 +48,21 @@ const shopSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Auto-generate shop reference before save (Mongoose 9: return promise, no next() call)
+/**
+ * Auto-generate the shop reference before save (Mongoose 9: return a promise,
+ * no `next()` call).
+ *
+ * This used to be `SHP-${new Date().getFullYear()}-${countDocuments() + 1}`,
+ * which was the only reference in the system not produced by `nextReference`,
+ * and was wrong in three ways. Counting documents is not atomic, so two shops
+ * created at the same moment computed the same number and one save failed on
+ * the unique index. A deleted shop made the count repeat a number already
+ * issued. And the sequence never reset per year, so the year in the reference
+ * and the number beside it disagreed about what they were counting.
+ */
 shopSchema.pre('save', async function () {
   if (!this.reference) {
-    const year = new Date().getFullYear();
-    const count = await Shop.countDocuments();
-    this.reference = `SHP-${year}-${String(count + 1).padStart(6, '0')}`;
+    this.reference = await nextReference('SHP');
   }
 });
 

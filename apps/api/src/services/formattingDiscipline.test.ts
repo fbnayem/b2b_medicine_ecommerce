@@ -32,6 +32,23 @@ const FLOAT_MONEY = /\/\s*100\s*\)\s*\.toFixed\s*\(/;
 /** Yields the UTC calendar day — `toDateInputValue` replaces it. */
 const UTC_DAY = /toISOString\(\)\s*\.slice\(\s*0\s*,\s*10\s*\)/;
 
+/**
+ * The shared formatters carry process-wide state, so exactly one module may
+ * set it. Two call sites would mean the last write wins and neither author
+ * knows which one that is — and the defect this replaces was the opposite
+ * failure, nobody calling it at all, which left every server-rendered document
+ * in taka and Dhaka time regardless of what the tenant had configured.
+ */
+const CONFIGURES_FORMATTING = /\bconfigureFormatting\b/;
+
+/**
+ * Reading the package defaults is how a module quietly opts out of the
+ * tenant's settings, which is the same bug one level down.
+ */
+const READS_PACKAGE_DEFAULTS = /\bDEFAULT_FORMAT_SETTINGS\b/;
+
+const FORMATTING_OWNER = new Set<string>(['services/localisation.ts']);
+
 const MONEY_ALLOWED = new Set<string>([
   /*
    * Basis points to a percentage, not money: `sharePercentBasisPoints` and
@@ -44,8 +61,9 @@ const MONEY_ALLOWED = new Set<string>([
 
 const DATE_ALLOWED = new Set<string>([
   /*
-   * The one implementation of "the calendar date in Dhaka". Everything else
-   * delegates here, so this is where the rule is satisfied rather than broken.
+   * The one implementation of "today, on the business calendar". Everything
+   * else delegates here, so this is where the rule is satisfied rather than
+   * broken.
    */
   'services/ledgerService.ts',
 ]);
@@ -100,7 +118,23 @@ test('no source renders the UTC calendar day where the Dhaka one is meant', () =
   assert.deepEqual(
     found.map(({ name }) => name),
     [],
-    'Use toDateInputValue or dhakaDateString instead of toISOString().slice(0, 10)',
+    'Use toDateInputValue or businessDateString instead of toISOString().slice(0, 10)',
+  );
+});
+
+test('one module owns the shared formatter configuration', () => {
+  assert.deepEqual(
+    offenders(CONFIGURES_FORMATTING, FORMATTING_OWNER).map(({ name }) => name),
+    [],
+    'configureFormatting belongs in services/localisation.ts, which every settings load goes through',
+  );
+});
+
+test('nothing falls back to the package defaults instead of the tenant settings', () => {
+  assert.deepEqual(
+    offenders(READS_PACKAGE_DEFAULTS, FORMATTING_OWNER).map(({ name }) => name),
+    [],
+    'Read the configured settings; DEFAULT_FORMAT_SETTINGS is taka, Dhaka and en-GB',
   );
 });
 
@@ -112,4 +146,13 @@ test('the guards match the patterns they claim to, so a clean run means somethin
   assert.ok(UTC_DAY.test('value.toISOString().slice(0, 10)'));
   assert.ok(UTC_DAY.test('d.toISOString().slice(0,10)'));
   assert.ok(!UTC_DAY.test('toDateInputValue(value)'));
+  assert.ok(CONFIGURES_FORMATTING.test('configureFormatting({ timeZone })'));
+  assert.ok(!CONFIGURES_FORMATTING.test('formatSettings()'));
+  assert.ok(READS_PACKAGE_DEFAULTS.test('{ ...DEFAULT_FORMAT_SETTINGS, timeZone }'));
+  assert.ok(!READS_PACKAGE_DEFAULTS.test('formatSettingsFrom(localisation)'));
+
+  // The owner really does configure the formatters, so the allow-list above is
+  // naming a live call site rather than an empty exemption.
+  const owner = readFileSync(join(apiRoot(), 'src', 'services', 'localisation.ts'), 'utf8');
+  assert.ok(CONFIGURES_FORMATTING.test(withoutComments(owner)));
 });

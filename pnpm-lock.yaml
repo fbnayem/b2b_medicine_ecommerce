@@ -32,6 +32,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@medsupply/jurisdictions':
+        specifier: workspace:^
+        version: link:../../packages/jurisdictions
       '@medsupply/shared-types':
         specifier: workspace:^
         version: link:../../packages/shared-types
@@ -135,6 +138,9 @@ importers:
       '@medsupply/i18n':
         specifier: workspace:^
         version: link:../../packages/i18n
+      '@medsupply/jurisdictions':
+        specifier: workspace:^
+        version: link:../../packages/jurisdictions
       '@medsupply/navigation':
         specifier: workspace:^
         version: link:../../packages/navigation
@@ -232,6 +238,9 @@ importers:
       '@medsupply/i18n':
         specifier: workspace:^
         version: link:../../packages/i18n
+      '@medsupply/jurisdictions':
+        specifier: workspace:^
+        version: link:../../packages/jurisdictions
       '@medsupply/navigation':
         specifier: workspace:^
         version: link:../../packages/navigation
@@ -339,6 +348,8 @@ importers:
         specifier: workspace:^
         version: link:../shared-types
 
+  packages/jurisdictions: {}
+
   packages/navigation:
     dependencies:
       '@medsupply/shared-types':
@@ -347,7 +358,11 @@ importers:
 
   packages/shared-types: {}
 
-  packages/utilities: {}
+  packages/utilities:
+    dependencies:
+      '@medsupply/jurisdictions':
+        specifier: workspace:^
+        version: link:../jurisdictions
 
   packages/validation:
     dependencies:

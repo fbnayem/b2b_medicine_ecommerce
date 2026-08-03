@@ -4,10 +4,16 @@ import { useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { apiClient, refreshTokens } from '../src/api/client';
 import { View, Text } from 'react-native';
+import { useBrandingFormatting } from '../src/settings/branding';
 
 export default function RootLayout() {
   const { setAuth, logout, isAuthenticated } = useAuthStore();
   const [loading, setLoading] = useState(true);
+
+  // Renders every amount and date in the tenant's currency, zone and pattern
+  // rather than the package defaults. Runs once a session exists, because the
+  // branding endpoint is authenticated.
+  useBrandingFormatting(isAuthenticated);
 
   useEffect(() => {
     async function checkAuth() {

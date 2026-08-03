@@ -8,7 +8,7 @@ import {
 } from '@medsupply/validation';
 import { AuthRequest } from '../middlewares/auth';
 import { csvFilename, csvMinor, toCsv, type CsvColumn } from '../services/csv';
-import { dhakaDateString } from '../services/ledgerService';
+import { businessDateString } from '../services/ledgerService';
 import {
   analyticsOverview,
   deliveryPerformance,
@@ -28,7 +28,7 @@ import {
  * request we narrow it, so the same report screen works for every role.
  */
 async function scopedRange(req: AuthRequest): Promise<RangeInput> {
-  const today = dhakaDateString();
+  const today = businessDateString();
   const parsed = ReportRangeSchema.parse({
     from: req.query.from ?? `${today.slice(0, 8)}01`,
     to: req.query.to ?? today,

@@ -17,13 +17,17 @@ import { AuditLog } from '../models/AuditLog';
 import { Session } from '../models/Session';
 import { SystemSetting } from '../models/SystemSetting';
 import { User } from '../models/User';
+import { formatDate, formatMoneyMinor } from '@medsupply/utilities';
 import {
   deliverySettings,
   financeSettings,
+  getSettings,
   getSettingsWithMetadata,
   invalidateSettingsCache,
 } from './settingsService';
 import { configuredProofRequirements } from './deliveryService';
+import { businessTimeZone } from './localisation';
+import { businessDateString } from './ledgerService';
 
 let memoryReplica: MongoMemoryReplSet | undefined;
 let server: Server | undefined;
@@ -224,6 +228,60 @@ test('saved settings change domain behaviour without a restart', async () => {
     DeliveryProofType.PHOTOGRAPH,
   ]);
   assert.equal((await deliverySettings()).otpExpiryMinutes, 5);
+});
+
+test('saving localisation reconfigures what the server itself renders', async () => {
+  /*
+   * The gap this closes: `configureFormatting` was called from exactly one
+   * place in the repository, the web client. The API therefore rendered every
+   * invoice PDF, CSV export and server-side date with the package defaults —
+   * taka, Asia/Dhaka, `en-GB` — however the deployment was configured. An
+   * administrator could change the currency symbol, watch every screen follow
+   * it, and still receive documents printed in taka.
+   *
+   * Asserted on the shared formatter rather than on a PDF's bytes because that
+   * is the actual seam: `formattingDiscipline.test.ts` already fails the build
+   * if a server module renders money or dates any other way.
+   */
+  const admin = await createUser({
+    email: 'settings-localisation@test.local',
+    role: UserRole.ADMIN,
+  });
+  const snapshot = await readSettings(admin._id);
+
+  assert.equal(formatMoneyMinor(123456789), '৳1,234,567.89');
+  assert.equal(formatDate('2026-08-02T20:30:00.000Z'), '03 Aug 2026');
+
+  const response = await fetch(`${base}/api/v1/settings/localisation`, {
+    method: 'PUT',
+    headers: authorization(admin._id),
+    body: JSON.stringify({
+      version: snapshot.body.data.versions.localisation,
+      values: {
+        timezone: 'Europe/Berlin',
+        locale: 'en',
+        dateFormat: 'DD/MM/YYYY',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+      },
+    }),
+  });
+  assert.equal(response.status, 200);
+
+  // Read through the same cache the save just invalidated.
+  await getSettings();
+  assert.equal(formatMoneyMinor(123456789), '1.234.567,89 €');
+  // Berlin is still on the 2nd when Dhaka has reached the 3rd.
+  assert.equal(formatDate('2026-08-02T20:30:00.000Z'), '02/08/2026');
+
+  /*
+   * The business calendar deliberately does not move with the display zone.
+   * `docs/ASSUMPTIONS.md` argued that changing which period a posted
+   * transaction belongs to is a finance decision rather than a display one, and
+   * that still holds — the answer now comes from the deployment's country pack.
+   */
+  assert.equal(businessTimeZone(), 'Asia/Dhaka');
+  assert.equal(businessDateString('2026-08-02T20:30:00.000Z'), '2026-08-03');
 });
 
 test('resetting a group restores the fallback and keeps the previous values in the audit', async () => {

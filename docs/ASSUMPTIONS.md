@@ -1,7 +1,7 @@
 # Assumptions
 
 - Real-time updates via Socket.IO will use standard authorization patterns (passing JWT token).
-- Currency is strictly BDT, stored as integer minor units (poisha).
+- ~~Currency is strictly BDT, stored as integer minor units (poisha).~~ **Superseded in Phase 12.** Amounts are still integer minor units, but the _scale_ of a minor unit is now the configured currency's ISO 4217 exponent rather than a hard-coded hundred — yen has none and dinar has three, so assuming two was a hundredfold error in one direction and a tenfold one in the other. One currency per deployment, set by `PRIMARY_CURRENCY`; a multi-currency ledger is Phase 14.
 - Deliveries are internally handled by the system's own delivery persons, not third-party couriers.
 - A single mobile app will serve all roles via Expo Router role-based navigation.
 - The `packages/` monorepo configuration will heavily rely on simple TypeScript exports mapped via `package.json` `main` and `types`.
@@ -159,3 +159,66 @@
 - **`@medsupply/config` and `@medsupply/constants` remain empty.** They were
   given the standard package scaffold so CI covers them, but nothing in the
   plan calls for content and none was invented.
+
+## Part III, phase 12 — the country-pack seam
+
+- **A country pack is data, not behaviour.** `@medsupply/jurisdictions` holds
+  what differs between countries — currency, fiscal year, weekend, week start,
+  address rules, licence types — and holds no functions that do anything. The
+  date and money functions stay in `@medsupply/utilities`, which reads it. The
+  dependency runs one way, which is also what stops the two forming a cycle.
+- **Bangladesh was transcribed, not designed.** Every value in the `BD` pack was
+  read out of the code it replaces: `Asia/Dhaka` from `DEFAULT_FORMAT_SETTINGS`,
+  the Saturday week start from `reportPeriod.ts`, the two licence fields from
+  `Shop.ts`, the required `district` from its address sub-schema. The seam is
+  only trustworthy if lifting existing behaviour into it changes nothing, so
+  this phase introduces no new decision for the installed base.
+- **Nothing speculative is modelled.** `LicenceType` lists the two instruments
+  Bangladesh issues and `TaxEngineId` lists the one engine that exists. Each
+  grows when a pack that needs it arrives, alongside a deployment that can say
+  whether the entry is right. Plausible-looking values for countries nobody has
+  sold to yet are guesses with types on them.
+- **`PRIMARY_COUNTRY` is environment configuration, never an administrable
+  setting.** The pack decides the year reference sequences reset on, the day the
+  finance calendar starts and the currency amounts are stored in. Changing any
+  of those on a live deployment restates history, so it is a migration rather
+  than a setting — the same reasoning that already keeps the database URI and
+  the signing secrets out of the settings screen. An unrecognised code stops the
+  process at boot.
+- **Supersedes the Phase 8 entry on the fixed `+06:00` boundary.** Day
+  boundaries are resolved through `Intl` in the configured zone, in two passes so
+  they stay correct across a daylight-saving transition. Dhaka has none, so the
+  Bangladeshi result is byte-identical to the literal offset it replaces; a
+  boundary an hour out anywhere that observes DST would move transactions
+  between reporting periods.
+- **Clarifies the Phase 10 and Phase 11 entries on the finance calendar.** Those
+  pinned finance day boundaries and report periods to Asia/Dhaka on the grounds
+  that moving them is "a finance-calendar decision rather than a display
+  setting". That reasoning is kept intact: the business calendar comes from the
+  country pack and **changing `localisation.timezone` still does not move the
+  books**. All that changed is that the answer is looked up instead of compiled
+  in.
+- **Display formatting reaches the server.** `configureFormatting` was called
+  from one place in the repository — the web client — so the API rendered every
+  invoice, receipt and CSV export with the package defaults regardless of
+  configuration. It is now applied on every settings load, and
+  `formattingDiscipline.test.ts` fails the build if a second module tries to own
+  that state or falls back to the defaults.
+- **The settings field named `locale` is a language, not a locale tag.** Its
+  schema is `['en', 'bn']`. Passing it to `Intl` directly renders times as
+  `03:30 PM` where this product has always shown `03:30 pm`, and `en-BD` is not
+  a CLDR locale at all — it silently resolves to `en`. `formattingLocale` maps
+  the language to a real tag, and every date formatter forces `-u-nu-latn` so a
+  Bangla month name never arrives with Bengali digits, which is what
+  `docs/ASSUMPTIONS.md` settled on and what both money parsers can read back.
+- **Reference series stay on the calendar year for Bangladesh.** Many tax
+  authorities require the invoice series to be gapless within the _financial_
+  year, so the basis is a pack property — but switching an existing deployment
+  changes the references its customers already quote, which is a decision for
+  the business. The year is now read in the business zone rather than from
+  `getUTCFullYear()`, which labelled anything issued between midnight and 6 am
+  on 1 January in Dhaka with the previous year.
+- **Multi-currency is explicitly not in this phase.** One currency per
+  deployment; the ledger still balances in raw minor units. Ledger entries
+  carrying their own currency, FX rates, revaluation and realised gain/loss are
+  Phase 14, and were chosen with the cost stated.

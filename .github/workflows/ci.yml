@@ -47,6 +47,7 @@ jobs:
       # `packages/*` went unchecked here for twelve phases.
       - name: Build shared packages
         run: |
+          pnpm --filter @medsupply/jurisdictions build
           pnpm --filter @medsupply/shared-types build
           pnpm --filter @medsupply/utilities build
           pnpm --filter @medsupply/validation build
@@ -64,6 +65,7 @@ jobs:
       # removing a gate.
       - name: Typecheck
         run: |
+          pnpm --filter @medsupply/jurisdictions run typecheck
           pnpm --filter @medsupply/shared-types run typecheck
           pnpm --filter @medsupply/utilities run typecheck
           pnpm --filter @medsupply/validation run typecheck
@@ -167,6 +169,7 @@ jobs:
 
       - name: Build shared packages
         run: |
+          pnpm --filter @medsupply/jurisdictions build
           pnpm --filter @medsupply/shared-types build
           pnpm --filter @medsupply/utilities build
           pnpm --filter @medsupply/validation build

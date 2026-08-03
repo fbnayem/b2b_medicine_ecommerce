@@ -15,6 +15,7 @@
     "@medsupply/api-client": "workspace:^",
     "@medsupply/design-tokens": "workspace:^",
     "@medsupply/i18n": "workspace:^",
+    "@medsupply/jurisdictions": "workspace:^",
     "@medsupply/navigation": "workspace:^",
     "@medsupply/shared-types": "workspace:^",
     "@medsupply/utilities": "workspace:^",

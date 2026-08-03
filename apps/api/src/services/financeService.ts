@@ -11,8 +11,8 @@ import { Shop } from '../models/Shop';
 import { Order } from '../models/Order';
 import { OrderApproval } from '../models/OrderApproval';
 import {
-  dhakaDateString,
-  dhakaDayBoundary,
+  businessDateString,
+  businessDayBoundary,
   FinanceActor,
   getAvailableAdvance,
   getLedgerBalance,
@@ -200,8 +200,8 @@ export async function getCreditSummary(
 }
 
 export async function getStatement(shopId: string, fromValue: string, toValue: string) {
-  const from = dhakaDayBoundary(fromValue);
-  const to = dhakaDayBoundary(toValue, true);
+  const from = businessDayBoundary(fromValue);
+  const to = businessDayBoundary(toValue, true);
   if (from > to)
     throw financeError('Statement start date must not be after end date', 'DATE_RANGE');
   const shop = await Shop.findById(shopId).select('reference name').lean();
@@ -449,7 +449,7 @@ async function receivablesRows(options: {
   const shopById = new Map(shops.map((shop) => [String(shop._id), shop]));
 
   const overdueThreshold = Math.max(0, finance.creditBlockOverdueThresholdMinor);
-  const today = dhakaDayBoundary(dhakaDateString(asOf));
+  const today = businessDayBoundary(businessDateString(asOf));
 
   const all = balances
     .filter((row) => shopById.has(String(row._id)))
@@ -591,8 +591,8 @@ export async function getCollectionReport(options: {
   const filter: Record<string, unknown> = {};
   if (options.from || options.to) {
     filter.collectedAt = {
-      ...(options.from ? { $gte: dhakaDayBoundary(options.from) } : {}),
-      ...(options.to ? { $lte: dhakaDayBoundary(options.to, true) } : {}),
+      ...(options.from ? { $gte: businessDayBoundary(options.from) } : {}),
+      ...(options.to ? { $lte: businessDayBoundary(options.to, true) } : {}),
     };
   }
   if (options.status) filter.status = options.status;
@@ -674,7 +674,7 @@ export async function getFinanceDashboardSummary() {
 }
 
 export async function getCollectorSummary(actorId: string, page = 1, limit = 30) {
-  const today = dhakaDateString();
+  const today = businessDateString();
   const result = await getCollectionReport({
     collectedBy: actorId,
     page,
@@ -684,7 +684,7 @@ export async function getCollectorSummary(actorId: string, page = 1, limit = 30)
     {
       $match: {
         collectedBy: new Types.ObjectId(actorId),
-        collectedAt: { $gte: dhakaDayBoundary(today), $lte: dhakaDayBoundary(today, true) },
+        collectedAt: { $gte: businessDayBoundary(today), $lte: businessDayBoundary(today, true) },
         status: { $nin: [PaymentStatus.FAILED, PaymentStatus.REVERSED] },
       },
     },

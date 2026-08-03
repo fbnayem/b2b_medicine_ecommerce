@@ -1,6 +1,7 @@
 import { ClientSession, Types } from 'mongoose';
 import { LedgerAccount, LedgerTransactionType, UserRole } from '@medsupply/shared-types';
-import { toDateInputValue } from '@medsupply/utilities';
+import { formatSettings, toDateInputValue, zonedDayBoundary } from '@medsupply/utilities';
+import { businessTimeZone } from './localisation';
 import { AuditLog } from '../models/AuditLog';
 import { nextReference } from '../models/Counter';
 import { Invoice } from '../models/Invoice';
@@ -285,29 +286,32 @@ export async function postLedgerAdjustment(
   return result;
 }
 
-export function dhakaDayBoundary(value: string, end = false) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+/**
+ * The instant a business day begins or ends.
+ *
+ * This used to build `${value}T00:00:00.000+06:00`. A fixed offset is right for
+ * Bangladesh only because Dhaka has no daylight saving; anywhere that observes
+ * it, the boundary is an hour out for half the year, and a finance day boundary
+ * an hour out moves transactions between reporting periods.
+ */
+export function businessDayBoundary(value: string, end = false) {
+  try {
+    return zonedDayBoundary(value, businessTimeZone(), end);
+  } catch {
     throw Object.assign(new Error('Dates must use YYYY-MM-DD'), {
       statusCode: 400,
       code: 'INVALID_DATE',
     });
   }
-  const date = new Date(`${value}T${end ? '23:59:59.999' : '00:00:00.000'}+06:00`);
-  if (Number.isNaN(date.getTime())) {
-    throw Object.assign(new Error('Date is invalid'), { statusCode: 400, code: 'INVALID_DATE' });
-  }
-  return date;
 }
 
 /**
- * The calendar date in Dhaka, as `YYYY-MM-DD`.
+ * The calendar date on the business calendar, as `YYYY-MM-DD`.
  *
- * This used to add six hours to the clock and slice the ISO string, which is
- * right for Bangladesh only for as long as the offset never changes and only
- * because Dhaka has no daylight saving. `toDateInputValue` asks `Intl` for the
- * date in the configured zone instead, so the answer stays correct if the
- * deployment is ever configured for a different one.
+ * Reads the deployment's own zone rather than the display setting, so a report
+ * and the statement summarising it always agree about which day a transaction
+ * belongs to.
  */
-export function dhakaDateString(value = new Date()) {
-  return toDateInputValue(value);
+export function businessDateString(value: string | number | Date = new Date()) {
+  return toDateInputValue(value, { ...formatSettings(), timeZone: businessTimeZone() });
 }

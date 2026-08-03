@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { COUNTRY_PACKS, DEFAULT_COUNTRY_CODE } from '@medsupply/jurisdictions';
 
 /**
  * Infrastructure configuration only.
@@ -80,6 +81,30 @@ const envSchema = z
     METRICS_TOKEN: z.string().default(''),
     /** Where uncaught server errors are reported. Empty disables reporting. */
     ERROR_REPORTING_DSN: z.string().default(''),
+
+    /**
+     * Which country pack this deployment runs under (ISO 3166-1 alpha-2).
+     *
+     * Deliberately here and **not** in the administrable System Settings. The
+     * pack decides the fiscal year that reference sequences reset on, the day
+     * the finance calendar starts, and the currency amounts are stored in —
+     * changing any of those on a live deployment restates history, so it is a
+     * migration rather than a setting, and it must not be reachable from an
+     * authenticated web form. The same reasoning already keeps the database URI
+     * and the signing secrets out of that screen.
+     *
+     * Validated against the registry, so an unrecognised code stops the process
+     * at boot instead of producing a subtly wrong invoice weeks later.
+     */
+    PRIMARY_COUNTRY: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .default(DEFAULT_COUNTRY_CODE)
+      .refine(
+        (value) => Object.hasOwn(COUNTRY_PACKS, value),
+        `must be a country this build carries a pack for (${Object.keys(COUNTRY_PACKS).join(', ')})`,
+      ),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== 'production') return;

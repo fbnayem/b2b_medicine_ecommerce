@@ -526,6 +526,33 @@ test('the report aggregations are served by an index rather than a collection sc
   }
 });
 
+test('shops created at the same moment get distinct references', async () => {
+  /*
+   * The reference used to be `SHP-${year}-${countDocuments() + 1}`, built in a
+   * pre-save hook. Counting is not atomic, so concurrent creates computed the
+   * same number and one save died on the unique index — surfacing to whoever
+   * lost the race as a 500 rather than as a shop. It was the only reference in
+   * the system not produced by `nextReference`, which does one atomic `$inc`.
+   */
+  const created = await Promise.all(
+    Array.from({ length: 12 }, (_, index) =>
+      Shop.create({
+        name: `Concurrent Pharmacy ${index}`,
+        primaryPhone: `0179000${String(index).padStart(4, '0')}`,
+        billingAddress: { label: 'Head office', line1: 'Street', city: 'Dhaka', district: 'Dhaka' },
+        createdBy: admin._id,
+      }),
+    ),
+  );
+
+  const references = created.map((shop) => shop.reference);
+  assert.equal(new Set(references).size, references.length, `collided: ${references.join(', ')}`);
+  for (const reference of references) {
+    // The same shape every other reference in the system uses.
+    assert.match(String(reference), /^SHP-\d{4}-\d{6}$/);
+  }
+});
+
 test('an aggregation carries a server-side time limit', async () => {
   // The guard is what stops one wide report from occupying a database thread
   // indefinitely, so it is asserted on the pipeline the server will send.

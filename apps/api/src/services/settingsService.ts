@@ -31,6 +31,7 @@ import {
   SETTINGS_GROUPS,
 } from './settingsDefaults';
 import { emitToRoles } from './realtime';
+import { applyFormatting } from './localisation';
 
 export interface SettingsActor {
   _id: Types.ObjectId | string;
@@ -107,6 +108,15 @@ async function loadSettings(): Promise<CachedSettings> {
       ? SettingSource.ENVIRONMENT
       : SettingSource.DEFAULT;
   }
+
+  /*
+   * The shared formatters are told here rather than at start-up alone, because
+   * this is the one path both start-up and a later settings change go through.
+   * Without it the API rendered every PDF, CSV and server-side date with the
+   * package defaults — taka, Dhaka, `en-GB` — no matter what the tenant had
+   * configured, since `configureFormatting` was called only by the web client.
+   */
+  applyFormatting(settings.localisation);
 
   return { settings, sources, versions, expiresAt: Date.now() + CACHE_TTL_MS };
 }

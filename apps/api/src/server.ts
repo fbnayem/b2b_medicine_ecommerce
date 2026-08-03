@@ -19,6 +19,7 @@ import {
   startNotificationSchedules,
   stopNotificationSchedules,
 } from './services/notificationSchedules';
+import { getSettings } from './services/settingsService';
 
 const port = env.PORT;
 
@@ -27,6 +28,15 @@ const SHUTDOWN_GRACE_MS = 15_000;
 
 const startServer = async () => {
   await connectDB();
+
+  /*
+   * Read the settings once before the port opens, so the shared formatters are
+   * configured before the first request rather than by whichever request
+   * happens to read settings first. It also means a currency or time zone this
+   * build cannot resolve stops the process here, where somebody is watching,
+   * instead of throwing inside an invoice render.
+   */
+  await getSettings();
 
   // Express and Socket.IO share one HTTP server so both use the same port and TLS.
   const httpServer = createServer(app);
