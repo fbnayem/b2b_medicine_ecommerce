@@ -32,6 +32,25 @@ const medicineBatchSchema = new mongoose.Schema(
     receivedQuantity: { type: Number, required: true, min: 1 },
     quantities: { type: quantitiesSchema, required: true },
     warehouseLocation: { type: String, required: true, trim: true },
+
+    /**
+     * Where this stock came from.
+     *
+     * **Nullable on purpose.** Every batch received before purchasing existed
+     * has none of it, and making these required would invalidate stock
+     * physically sitting on the shelf — a migration that turns real inventory
+     * into a validation error is not a migration. New stock arrives through a
+     * goods receipt and always carries them; `recallService` says plainly when
+     * a batch predates the change rather than implying the supplier is unknown
+     * for some other reason.
+     */
+    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', index: true },
+    purchaseOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder', index: true },
+    goodsReceiptId: { type: mongoose.Schema.Types.ObjectId, ref: 'GoodsReceipt', index: true },
+    /** The supplier's own batch number, when it differs from ours. */
+    supplierBatchReference: { type: String, trim: true },
+    supplierInvoiceReference: { type: String, trim: true },
+
     isBlocked: { type: Boolean, default: false, index: true },
     isQuarantined: { type: Boolean, default: false, index: true },
     notes: String,

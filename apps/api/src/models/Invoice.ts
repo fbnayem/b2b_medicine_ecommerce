@@ -78,6 +78,18 @@ schema.index({ shopId: 1, status: 1, dueDate: 1 });
 schema.index({ shopId: 1, status: 1, invoiceDate: 1 });
 schema.index({ issuedAt: 1 });
 
+/**
+ * The index a recall depends on.
+ *
+ * `items.batchId` has been required and populated on every invoice line since
+ * the invoicing phase, and was **indexed by nothing** — so the one query a
+ * recall must run, "which invoices contain this batch", was a full collection
+ * scan across every invoice ever issued. Nothing performed that query, which is
+ * why nobody noticed; a recall is not a query you want to discover is slow on
+ * the day you need it.
+ */
+schema.index({ 'items.batchId': 1 });
+
 applyQueryGuards(schema);
 
 export const Invoice = mongoose.model('Invoice', schema);

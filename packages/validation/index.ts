@@ -909,3 +909,61 @@ export const CancellationDecisionSchema = z.object({
   version: z.number().int().min(0),
   idempotencyKey: z.string().trim().min(8).max(120).optional(),
 });
+
+// ─── Purchasing and recall ───────────────────────────────────────────────────
+
+export const CreateSupplierSchema = z.object({
+  name: z.string().trim().min(2).max(160),
+  primaryPhone: bdPhone,
+  email: z.string().email().optional(),
+  contactName: z.string().trim().max(120).optional(),
+  drugLicenceNumber: z.string().trim().max(80).optional(),
+  drugLicenceExpiryDate: z.coerce.date().optional(),
+  address: z.string().trim().max(500).optional(),
+  paymentTermsDays: z.number().int().min(0).max(365).default(30),
+  notes: z.string().trim().max(1000).optional(),
+});
+
+export const CreatePurchaseOrderSchema = z.object({
+  supplierId: z.string().min(1),
+  lines: z
+    .array(
+      z.object({
+        medicineId: z.string().min(1),
+        orderedQuantity: z.number().int().positive(),
+        // Integer minor units. Never a float, per AGENTS.md.
+        unitCostMinor: z.number().int().min(0),
+      }),
+    )
+    .min(1),
+  expectedDate: z.coerce.date().optional(),
+  supplierReference: z.string().trim().max(120).optional(),
+  notes: z.string().trim().max(1000).optional(),
+});
+
+export const ReceiveGoodsSchema = z.object({
+  supplierInvoiceReference: z.string().trim().max(120).optional(),
+  receivedAt: z.coerce.date().optional(),
+  notes: z.string().trim().max(1000).optional(),
+  lines: z
+    .array(
+      z.object({
+        purchaseOrderLineId: z.string().min(1),
+        batchNumber: z
+          .string()
+          .trim()
+          .min(1)
+          .max(80)
+          .transform((value) => value.toUpperCase()),
+        manufacturingDate: z.coerce.date(),
+        expiryDate: z.coerce.date(),
+        receivedQuantity: z.number().int().positive(),
+        unitCostMinor: z.number().int().min(0).optional(),
+        warehouseLocation: z.string().trim().min(1).max(100),
+        supplierBatchReference: z.string().trim().max(80).optional(),
+        /** Required by the service whenever less arrived than was ordered. */
+        varianceReason: z.string().trim().max(500).optional(),
+      }),
+    )
+    .min(1),
+});

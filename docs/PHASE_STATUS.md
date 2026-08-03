@@ -799,18 +799,85 @@ delivery OTPs in plaintext on the ordinary success path.
 Full detail in `docs/CHANGELOG.md`. Each defect is covered by a guard that was
 demonstrated to fail when the defect is reintroduced.
 
-### Exact next phase
+## RTP Phase 2 — The verification harness
 
-**RTP Phase 2: the verification harness.** Make the existing checks real - the
-web application has never been strict-typechecked, because
-`apps/web/tsconfig.app.json` carries neither `extends` nor `strict`, and CI
-hand-lists per-package commands so `packages/*` are typechecked by nothing.
-Then a deterministic seed script, a Playwright suite covering each role's
-sign-in and the money-and-stock journeys, run against the dev server as well as
-the built bundle, and a route-coverage reconciliation test that fails the build
-on an endpoint no test exercises. Roughly 53% of the route surface has no
-integration coverage today.
+**Status:** COMPLETED
+
+Strict TypeScript now genuinely applies to the web application; a pipeline-wiring
+test reconciles CI against the workspace so a package cannot go unchecked again;
+route coverage is reconciled against a route table reflected off the live
+routers, with the gaps written out endpoint by endpoint rather than as a
+percentage. A deterministic seed builds a working system by driving the real API.
+Playwright runs six roles through both the built bundle and the dev server, and
+axe holds at strict zero across fifteen screens.
+
+Each guard was reintroduced against its own defect and watched go red.
+
+## RTP Phase 3 — Design foundation and app shell
+
+**Status:** COMPLETED
+
+`@medsupply/design-tokens` replaces roughly 141 hand-picked hex values and three
+simultaneous brand greens, with a parity test between its TypeScript and CSS
+halves and WCAG AA asserted on both themes. Tailwind v4 replaces the Vite starter
+template that had been shipping as the global stylesheet. `@medsupply/navigation`
+holds the permission matrix that was written out three times. The shell adds
+role-filtered navigation, breadcrumbs, search, sign-out and a theme toggle;
+routes are lazy, so a shop owner no longer downloads the administration surface.
+Mobile gained the per-role tab bar `AGENTS.md` has specified since phase 1.
+
+## RTP Phase 4 — Closing the dead ends
+
+**Status:** COMPLETED
+
+Order cancellation now performs the transition `ORDER_STATE_MACHINE.md` has
+promised since phase 4 of the original build, releasing the credit reservation
+and the stock allocation with it. Passwords can be changed, and
+`forcePasswordChange` is enforced. Credit override is settled as an
+administrator decision and has a control on both clients. All 22 native browser
+dialogs are gone.
+
+## RTP Phase 5 — Language, errors and accessibility
+
+**Status:** COMPLETED
+
+English and Bangla, switchable, with the Bangla catalogue typed against the
+English one so a missing key is a compile error. Numbers stay in Western digits
+in both, deliberately. `@medsupply/api-client` holds the refresh policy the two
+clients had diverged on. Server error codes become sentences a shop owner can
+act on, carrying the correlation identifier the backend has always emitted.
+
+## RTP Phase 6 — Regulatory traceability
+
+**Status:** COMPLETED for purchasing, recall and retention
+
+Suppliers, purchase orders and goods receipts, with batches carrying their
+provenance and ordered-versus-received variance recorded rather than silently
+accepted. `recallService` answers, for any batch, every shop that received it —
+with a telephone number — and where it came from. The `invoices.items.batchId`
+index that query needs did not exist, so a recall would have scanned every
+invoice ever issued. A prescription-medicine movement return reads
+`MedicineClassification`, which had been stored since the catalogue phase and
+read by nothing. Retention archives the audit log with a verified digest before
+pruning, and never deletes without one.
+
+### What is not done
+
+- **The purchasing and recall screens exist only as API endpoints.** The
+  services, routes and tests are complete and verified; no web or mobile UI has
+  been built for them, so today they are reachable only by a client that calls
+  the API directly.
+- **A `Recall` record with its own lifecycle** — initiated, notified, quantities
+  returned, closed — is not built. The trace is read-only, which is deliberate,
+  but tracking a recall through to closure is not yet possible.
+- **Mobile's tab navigation has not been run on a device or emulator.** Sixteen
+  screens were moved into a `(tabs)` group and the file-based routing is
+  asserted by tests, but no emulator was available here, so it is verified as
+  far as static checks reach and no further.
+- **Translation covers the shell, navigation, statuses, errors and
+  authentication.** Individual page bodies are still English-only; the catalogue
+  and the switcher are in place for them.
+- **Visual-regression baselines** were deferred rather than captured.
 
 The operational work listed above - production secrets, TLS, index application,
-real provider credentials, mobile distribution - still stands, and now depends
-on the phases above rather than only on Phase 12.
+real provider credentials, mobile distribution - still stands.

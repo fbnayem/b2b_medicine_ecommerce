@@ -1,5 +1,118 @@
 # Changelog
 
+## Road to production, phases 2-6
+
+Five phases, delivered in one run. The through-line is unchanged from phase 1:
+almost everything corrected here was found by running the system, and the things
+that were not were found by a guard written during these phases.
+
+### Phase 2 — The verification harness
+
+- The web application had **never been strict-typechecked**. `tsconfig.app.json`
+  carried neither `extends` nor `strict`, so the root config's strictness had
+  never reached it, while `AGENTS.md` required it and `PHASE_STATUS.md` claimed
+  it passed. The existing code already satisfied it — the finding was the absent
+  gate, not wrong code.
+- CI hand-lists a command per workspace, and for twelve phases nobody added
+  `packages/*`, so five packages were checked by nothing. `pipelineWiring.test.ts`
+  now reconciles the workflow against the workspace and found all seven gaps
+  immediately.
+- Route coverage is reconciled against a route table **reflected off the live
+  routers**. It found five documented endpoints that do not exist, so a client
+  written against the specification would have received 404s. Of 150 routes, the
+  gaps are written out endpoint by endpoint — a percentage would have read "88%"
+  and named nothing, and the endpoint that mattered was `POST /users`, whose role
+  bug survived twelve phases because nothing called it.
+- V5 was a **wrong finding** and is recorded as such: `securityRules.test.ts`
+  compares the built document's operation count against the source array, so a
+  duplicate declaration fails it. The delivery half was worse than described —
+  the transition policy table was imported by no service or controller at all,
+  so it was documentation the code could contradict silently.
+- Registering the coverage middleware revealed that `app.use([])` throws in
+  Express 5, which would have stopped the server booting anywhere except under
+  test. Found by running the seed.
+- The browser suite found three defects on its first run: a wrong password told
+  the user **"No refresh token"**; the login form's fields had **no programmatic
+  label**; and two greys shipped at 2.47:1 and 3.62:1 against WCAG AA.
+
+### Phase 3 — Design foundation and app shell
+
+- The specified frontend stack had never been installed, while three pages
+  including the sign-in screen were written entirely in Tailwind classes that
+  resolved to nothing. `index.css` was the Vite starter template, purple accent
+  and `#root { width: 1126px }` included, shipped for twelve phases.
+- `@medsupply/design-tokens` replaces roughly 141 hex values and **three brand
+  greens in simultaneous use**. Its parity test caught two of my own errors: a
+  chart series at 2.22:1 on white, and the fact that one chart palette cannot
+  serve both surfaces.
+- `@medsupply/navigation` holds the permission matrix that was written out three
+  times. `App.tsx` went from 208 lines to 68.
+- Routes are lazy: one 546 kB chunk became a 472 kB entry plus 47 route chunks.
+  `RoleGate` sits outside the lazy boundary, so an unauthorised role never
+  fetches the chunk.
+- Mobile gained the per-role tab bar `AGENTS.md` has specified since phase 1 and
+  the `metro.config.js` it never had — without one the shared packages resolved
+  to a `dist` that only npm lifecycle hooks ever build.
+
+### Phase 4 — Closing the dead ends
+
+- **Order cancellation performs the transition `ORDER_STATE_MACHINE.md` has
+  promised since phase 4 of the original build.** Nothing anywhere set that
+  status; the endpoint stamped a timestamp, announced that the order had been
+  cancelled, and dead-ended — so the shop owner saw a confirmation and the
+  warehouse picked the order anyway. Cancelling releases the credit reservation
+  and the stock allocation in the same transaction.
+- Passwords could not be changed at all. `forcePasswordChange` was set, returned
+  and rendered as advisory text, and **checked nowhere**, so an administrator's
+  temporary password was permanent. The first version of the guard was
+  mount-level middleware that **passed every request**, because it ran before
+  `requireAuth` set `req.user`; its own test caught that.
+- Credit override: two documents disagreed and the code checked nobody's role.
+  Settled as an administrator decision.
+- All 22 native browser dialogs are gone, including an administrative password
+  reset typed in clear text into a `window.prompt`.
+
+### Phase 5 — Language, errors and accessibility
+
+- English and Bangla, with the Bangla catalogue typed against the English one so
+  a missing key is a compile error. Numbers stay in Western digits in both,
+  because money here is reconciled against printed invoices and both parsers
+  accept only `[0-9]`.
+- Mobile had **no guard against retrying `/auth/refresh`** and **no request
+  timeout**. Both fixed by the shared policy in `@medsupply/api-client`.
+- Server error codes reached users verbatim. There is now a catalogue in both
+  languages, and `failureReference` surfaces the correlation identifier the
+  backend has emitted on every failure since phase 12 and which reached no user.
+- All 51 routes shared the title `web`. Titles are per-route, focus moves to
+  `<main>` on navigation, and chart series carry dash patterns.
+
+### Phase 6 — Regulatory traceability
+
+- Suppliers, purchase orders and goods receipts. `receiveStock` created
+  inventory from nothing, so the system could say where a batch went and never
+  where it came from — the half an inspector asks for first. Ordered-versus-
+  received variance is recorded rather than silently accepted, and expired stock
+  is refused on arrival rather than booked in for FEFO to be trusted to skip.
+- `recallService` answers, for any batch, every shop that received it with a
+  telephone number, and the supplier, purchase order and receipt it came from.
+  Every fact it needs already existed and **nothing had ever asked for them**.
+  `invoices.items.batchId` was indexed by nothing, so a recall would have
+  scanned every invoice ever issued.
+- A prescription-medicine movement return reads `MedicineClassification`, stored
+  since the catalogue phase and read by nothing. It compares its own arithmetic
+  against the shelf rather than only adding up its own movements.
+- Retention archives the audit log to a file with a SHA-256 digest, **reads it
+  back and verifies the digest before deleting anything**, and never prunes
+  without one.
+
+Batch provenance is nullable on purpose: making it required would have turned
+stock physically sitting on the shelf into a validation error. `recallService`
+says plainly when a batch predates purchasing, because "we do not know" and
+"this arrived before we recorded suppliers" are different answers to an
+inspector.
+
+280 tests became 434: 94 API unit, 101 API integration, 122 web, 60 mobile and 57 in a browser.
+
 ## Road to production, phase 1 - Production blockers and money correctness
 
 Everything here was found by running the system or auditing it against real

@@ -11,6 +11,7 @@ import inventoryRoutes from './inventoryRoutes';
 import notificationRoutes from './notificationRoutes';
 import orderRoutes from './orderRoutes';
 import paymentRoutes from './paymentRoutes';
+import purchasingRoutes from './purchasingRoutes';
 import reportRoutes from './reportRoutes';
 import returnRoutes from './returnRoutes';
 import settingsRoutes from './settingsRoutes';
@@ -59,6 +60,7 @@ export const API_MOUNTS: readonly ApiMount[] = [
   { prefix: '/api/v1/settings', router: settingsRoutes, tier: 'write' },
   { prefix: '/api/v1/admin', router: adminRoutes, tier: 'write' },
   { prefix: '/api/v1/returns', router: returnRoutes, tier: 'write' },
+  { prefix: '/api/v1/purchasing', router: purchasingRoutes, tier: 'write' },
   // Every report recomputes from source records, so these are the most
   // expensive reads in the system and carry their own budget.
   { prefix: '/api/v1/reports', router: reportRoutes, tier: 'report' },
