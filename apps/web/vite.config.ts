@@ -1,13 +1,38 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+// `defineConfig` from vitest rather than vite, so the `test` block below is
+// typed. Vitest re-exports vite's own config type with its additions.
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 const workspacePackage = (name: string) =>
   fileURLToPath(new URL(`../../packages/${name}/index.ts`, import.meta.url));
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  /**
+   * Tailwind v4 is configured in CSS, not in a config file. There is
+   * deliberately **no `tailwind.config.js`**: v4 does not auto-detect one, and
+   * loading one through `@config` switches off `corePlugins`, `safelist` and
+   * `separator` — so a file added "just in case" would silently change how the
+   * framework behaves.
+   *
+   * The plugin is skipped under vitest. It has no job in jsdom — no layout is
+   * computed there — and it intercepts every `.css` import including
+   * `?raw` ones, which made the token parity test read an empty string and
+   * report agreement between a file and nothing.
+   */
+  plugins: [...(process.env.VITEST ? [] : [tailwindcss()]), react()],
+
+  /**
+   * `css: true` so a `?raw` stylesheet import returns the stylesheet.
+   *
+   * Vitest short-circuits anything ending in `.css` by default and hands back
+   * an empty string, which is usually harmless — and here was not: the token
+   * parity test would have compared `index.ts` against nothing and reported
+   * that the two agreed. A gate that reads an empty file always passes.
+   */
+  test: { css: true },
   resolve: {
     /**
      * Resolve the shared workspace packages to their TypeScript source rather
@@ -32,6 +57,16 @@ export default defineConfig({
      * test suite and a container deployment.
      */
     alias: {
+      /*
+       * The stylesheet first. These aliases are prefix matches applied in
+       * order, so a bare `@medsupply/design-tokens` entry alone would rewrite
+       * `@medsupply/design-tokens/theme.css` to `…/index.ts/theme.css`.
+       */
+      '@medsupply/design-tokens/theme.css': fileURLToPath(
+        new URL('../../packages/design-tokens/theme.css', import.meta.url),
+      ),
+      '@medsupply/design-tokens': workspacePackage('design-tokens'),
+      '@medsupply/navigation': workspacePackage('navigation'),
       '@medsupply/shared-types': workspacePackage('shared-types'),
       '@medsupply/utilities': workspacePackage('utilities'),
       '@medsupply/validation': workspacePackage('validation'),

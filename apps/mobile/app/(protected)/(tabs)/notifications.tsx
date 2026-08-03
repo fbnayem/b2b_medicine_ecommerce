@@ -14,10 +14,10 @@ import {
   fetchNotifications,
   markAllNotificationsRead,
   markNotificationsRead,
-} from '../../src/notifications/api';
-import { onRealtime } from '../../src/notifications/realtime';
-import { routeForPush } from '../../src/notifications/push';
-import { formatFinanceDateTime } from '../../src/finance/date';
+} from '../../../src/notifications/api';
+import { onRealtime } from '../../../src/notifications/realtime';
+import { routeForPush } from '../../../src/notifications/push';
+import { formatFinanceDateTime } from '../../../src/finance/date';
 
 export default function NotificationsScreen() {
   const [items, setItems] = useState<NotificationRecord[]>([]);

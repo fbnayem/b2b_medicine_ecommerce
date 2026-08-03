@@ -1,139 +1,109 @@
 import { Link } from 'react-router-dom';
-import { UserRole } from '@medsupply/shared-types';
+import { NAV_GROUP_LABEL, navItemsFor, type NavGroup } from '@medsupply/navigation';
+import type { UserRole } from '@medsupply/shared-types';
 import { useAuthStore } from '../store/useAuth';
-import './inventory.css';
+import { useBranding } from '../lib/useBranding';
+import { Card, PageHeader } from '../components/ui';
 
-const financeRoles: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER];
+/**
+ * The home screen, generated from the same manifest as the sidebar.
+ *
+ * It used to hand-write a tile per role — 139 lines of `<Link>` elements behind
+ * `canManageFinance` and `isAdministrator` booleans — which made it the third
+ * copy of the permission matrix, after `App.tsx` and mobile's guards. A tile
+ * could therefore be offered to somebody the router would refuse, or withheld
+ * from somebody entitled to it, and nothing would notice — and because the tile
+ * grid was also the only navigation there was, a missing tile meant a screen
+ * you simply could not reach.
+ *
+ * The descriptions are the one thing the manifest cannot supply, because they
+ * are written for a reader rather than for a menu.
+ */
+
+/** What each section is *for*, in the words of the person who uses it. */
+const PURPOSE: Record<string, string> = {
+  orders: 'Track what has been ordered and where each order has reached.',
+  approvals: 'Orders waiting for a decision on price, quantity and credit.',
+  fulfilment: 'Pick lists waiting to be worked, and the ones in progress.',
+  'fulfilment-ready': 'Packed orders waiting to be handed to a rider.',
+  deliveries: 'Who is carrying what, and what has arrived.',
+  returns: 'Goods coming back, and the credit notes raised against them.',
+  medicines: 'The catalogue: what is sold, and at what price.',
+  inventory: 'Batches on hand, what is reserved, and what is near expiry.',
+  cart: 'The order you are putting together.',
+  payments: 'Record, post, inspect and reverse customer payments.',
+  collections: 'Cash riders have collected, waiting to be checked in.',
+  'report-outstanding': 'What every shop owes today.',
+  'report-overdue': 'What is past its due date, and by how long.',
+  'report-collections': 'What has been collected, by whom, over a period.',
+  analytics: 'Sales, stock and receivables at a glance.',
+  'analytics-sales': 'What has been bought and returned over time.',
+  'analytics-returns': 'What is coming back, and why.',
+  'analytics-inventory': 'Stock cover, movement and expiry risk.',
+  'analytics-deliveries': 'How deliveries are performing.',
+  'analytics-receivables': 'How the debt is ageing.',
+  shops: 'Customers, their credit terms and their licences.',
+  users: 'People who can sign in, and what each of them may do.',
+  settings: 'Tax, credit, expiry windows, notifications and branding.',
+  audit: 'Every privileged action, who took it and when.',
+  'shop-account': 'What you owe, what credit you have left, and your invoices.',
+  'my-payments': 'Payments recorded against your account.',
+  'my-statement': 'Your account, period by period.',
+  notifications: 'Everything the system has told you.',
+  activity: 'What has happened recently, across the business.',
+  security: 'Where you are signed in, and how to sign out elsewhere.',
+};
+
+const GROUP_ORDER: NavGroup[] = [
+  'work',
+  'catalogue',
+  'money',
+  'insight',
+  'administration',
+  'account',
+];
 
 export function Dashboard() {
   const user = useAuthStore((state) => state.user);
-  const canManageFinance = user ? financeRoles.includes(user.role) : false;
-  const isAdministrator = user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.ADMIN;
+  const branding = useBranding();
+  if (!user) return null;
+
+  const items = navItemsFor(user.role as UserRole).filter((item) => item.id !== 'dashboard');
+  const groups = GROUP_ORDER.map((group) => ({
+    group,
+    items: items.filter((item) => item.group === group),
+  })).filter((entry) => entry.items.length > 0);
+
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">MedSupply B2B</p>
-          <h1>Dashboard</h1>
-          <p>Welcome back, {user?.firstName ?? 'team member'}.</p>
-        </div>
-      </header>
-      <section className="catalogue-grid dashboard-links">
-        {user?.role === UserRole.SHOP_OWNER ? (
-          <>
-            <Link className="medicine-card" to="/account">
-              <h2>Account and credit</h2>
-              <p>Current due, available credit, invoices and payments.</p>
-            </Link>
-            <Link className="medicine-card" to="/medicines">
-              <h2>Medicines</h2>
-              <p>Browse the catalogue and prepare an order.</p>
-            </Link>
-            <Link className="medicine-card" to="/cart">
-              <h2>Cart</h2>
-              <p>Review your current order request.</p>
-            </Link>
-            <Link className="medicine-card" to="/orders">
-              <h2>Orders</h2>
-              <p>Track submitted and completed orders.</p>
-            </Link>
-            <Link className="medicine-card" to="/returns">
-              <h2>Returns</h2>
-              <p>Request a return against a delivered invoice and follow its credit note.</p>
-            </Link>
-            <Link className="medicine-card" to="/analytics/sales">
-              <h2>My purchasing</h2>
-              <p>What you have bought and returned over time.</p>
-            </Link>
-          </>
-        ) : null}
-        {canManageFinance ? (
-          <>
-            <Link className="medicine-card" to="/payments">
-              <h2>Payments</h2>
-              <p>Record, post, inspect and reverse customer payments.</p>
-            </Link>
-            <Link className="medicine-card" to="/payments/collections">
-              <h2>Collection review</h2>
-              <p>Verify Delivery Person collections before ledger posting.</p>
-            </Link>
-            <Link className="medicine-card" to="/reports/outstanding">
-              <h2>Financial reports</h2>
-              <p>Outstanding, overdue and collection reporting.</p>
-            </Link>
-            <Link className="medicine-card" to="/analytics">
-              <h2>Business analytics</h2>
-              <p>Sales, order pipeline, delivery performance, returns and receivables ageing.</p>
-            </Link>
-            <Link className="medicine-card" to="/returns">
-              <h2>Customer returns</h2>
-              <p>Review, receive and credit returned goods.</p>
-            </Link>
-            <Link className="medicine-card" to="/shops">
-              <h2>Customers</h2>
-              <p>Shop details, credit controls, ledgers and statements.</p>
-            </Link>
-          </>
-        ) : null}
-        {user?.role === UserRole.STOREKEEPER ? (
-          <>
-            <Link className="medicine-card" to="/fulfilment">
-              <h2>Fulfilment queue</h2>
-              <p>Pick and pack approved orders.</p>
-            </Link>
-            <Link className="medicine-card" to="/inventory">
-              <h2>Inventory</h2>
-              <p>Receive and manage batch stock.</p>
-            </Link>
-            <Link className="medicine-card" to="/returns">
-              <h2>Returns to receive</h2>
-              <p>Book in and inspect returned goods.</p>
-            </Link>
-            <Link className="medicine-card" to="/analytics/inventory">
-              <h2>Inventory report</h2>
-              <p>Valuation, expiry exposure, low stock and dead stock.</p>
-            </Link>
-          </>
-        ) : null}
-        {user?.role === UserRole.DELIVERY_PERSON ? (
-          <Link className="medicine-card" to="/returns">
-            <h2>Returns to collect</h2>
-            <p>Approved returns waiting for pickup from the shop.</p>
-          </Link>
-        ) : null}
-        {isAdministrator ? (
-          <>
-            <Link className="medicine-card" to="/admin/settings">
-              <h2>System settings</h2>
-              <p>
-                Business identity, finance, inventory, delivery, notification and security policy.
-              </p>
-            </Link>
-            <Link className="medicine-card" to="/admin/audit">
-              <h2>Audit log</h2>
-              <p>Append-only history of every sensitive operation.</p>
-            </Link>
-          </>
-        ) : null}
-        {canManageFinance ? (
-          <Link className="medicine-card" to="/admin/users">
-            <h2>Users and roles</h2>
-            <p>Accounts, roles, status, password resets and sessions.</p>
-          </Link>
-        ) : null}
-        <Link className="medicine-card" to="/notifications">
-          <h2>Notifications</h2>
-          <p>Everything the system has told you, with per-channel preferences.</p>
-        </Link>
-        <Link className="medicine-card" to="/activity">
-          <h2>Activity feed</h2>
-          <p>Live business events across orders, fulfilment, delivery and finance.</p>
-        </Link>
-        <Link className="medicine-card" to="/account/security">
-          <h2>Security centre</h2>
-          <p>Where your account is signed in, and how to end a session you do not recognise.</p>
-        </Link>
-      </section>
-    </main>
+    <>
+      <PageHeader
+        routeId="dashboard"
+        title={`Welcome back, ${user.firstName}`}
+        description={`Everything you can do in ${branding.name}, grouped by what it is for.`}
+      />
+
+      {groups.map(({ group, items: groupItems }) => (
+        <section key={group} className="mb-8">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
+            {NAV_GROUP_LABEL[group]}
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {groupItems.map((item) => (
+              <Card key={item.id} className="p-0">
+                <Link
+                  to={item.path}
+                  className="flex h-full flex-col gap-1 rounded-lg p-4 hover:bg-surface-hover"
+                >
+                  <span className="text-lg font-semibold text-text">{item.label}</span>
+                  {PURPOSE[item.id] && (
+                    <span className="text-sm text-text-muted">{PURPOSE[item.id]}</span>
+                  )}
+                </Link>
+              </Card>
+            ))}
+          </div>
+        </section>
+      ))}
+    </>
   );
 }

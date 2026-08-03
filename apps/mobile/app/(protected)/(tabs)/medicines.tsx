@@ -12,10 +12,10 @@ import {
 import { router } from 'expo-router';
 import { UserRole } from '@medsupply/shared-types';
 import type { Medicine } from '@medsupply/shared-types';
-import { apiClient } from '../../src/api/client';
-import { useCart } from '../../src/store/useCart';
-import { useAuthStore } from '../../src/store/useAuth';
-import { formatMoneyMinor } from '../../src/finance/money';
+import { apiClient } from '../../../src/api/client';
+import { useCart } from '../../../src/store/useCart';
+import { useAuthStore } from '../../../src/store/useAuth';
+import { formatMoneyMinor } from '../../../src/finance/money';
 export default function MedicinesScreen() {
   const add = useCart((state) => state.add);
   const user = useAuthStore((state) => state.user);

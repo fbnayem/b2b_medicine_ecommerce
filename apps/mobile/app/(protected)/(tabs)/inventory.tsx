@@ -11,8 +11,8 @@ import {
   View,
 } from 'react-native';
 import { Medicine, MedicineBatch, StockMovementType } from '@medsupply/shared-types';
-import { apiClient } from '../../src/api/client';
-import { formatFinanceDate } from '../../src/finance/date';
+import { apiClient } from '../../../src/api/client';
+import { formatFinanceDate } from '../../../src/finance/date';
 
 const actions: StockMovementType[] = [
   StockMovementType.ADDITION,

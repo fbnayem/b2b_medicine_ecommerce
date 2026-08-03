@@ -51,6 +51,7 @@ jobs:
           pnpm --filter @medsupply/utilities build
           pnpm --filter @medsupply/validation build
           pnpm --filter @medsupply/design-tokens build
+          pnpm --filter @medsupply/navigation build
           pnpm --filter @medsupply/api-client build
           pnpm --filter @medsupply/config build
           pnpm --filter @medsupply/constants build
@@ -66,6 +67,7 @@ jobs:
           pnpm --filter @medsupply/utilities run typecheck
           pnpm --filter @medsupply/validation run typecheck
           pnpm --filter @medsupply/design-tokens run typecheck
+          pnpm --filter @medsupply/navigation run typecheck
           pnpm --filter @medsupply/api-client run typecheck
           pnpm --filter @medsupply/config run typecheck
           pnpm --filter @medsupply/constants run typecheck
@@ -167,6 +169,7 @@ jobs:
           pnpm --filter @medsupply/utilities build
           pnpm --filter @medsupply/validation build
           pnpm --filter @medsupply/design-tokens build
+          pnpm --filter @medsupply/navigation build
           pnpm --filter @medsupply/api-client build
           pnpm --filter @medsupply/config build
           pnpm --filter @medsupply/constants build

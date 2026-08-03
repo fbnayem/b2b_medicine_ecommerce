@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { UserRole } from '@medsupply/shared-types';
-import { FinanceState } from '../../src/finance/components';
-import { apiErrorMessage } from '../../src/finance/api';
-import { formatFinanceDate } from '../../src/finance/date';
-import { formatMoneyMinor } from '../../src/finance/money';
-import { getReturns, returnStatusLabel, type ReturnSummary } from '../../src/returns/api';
-import { useAuthStore } from '../../src/store/useAuth';
+import { FinanceState } from '../../../src/finance/components';
+import { apiErrorMessage } from '../../../src/finance/api';
+import { formatFinanceDate } from '../../../src/finance/date';
+import { formatMoneyMinor } from '../../../src/finance/money';
+import { getReturns, returnStatusLabel, type ReturnSummary } from '../../../src/returns/api';
+import { useAuthStore } from '../../../src/store/useAuth';
 
 const named = (value: ReturnSummary['shopId']) =>
   typeof value === 'object' && value ? value : undefined;

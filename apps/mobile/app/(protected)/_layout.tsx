@@ -10,13 +10,32 @@ import {
   type PushPayload,
 } from '../../src/notifications/push';
 import { connectRealtime, disconnectRealtime } from '../../src/notifications/realtime';
+import { colour } from '../../src/theme';
 
 configureForegroundPresentation();
 
+/**
+ * The stack that hosts the tab bar.
+ *
+ * `(tabs)` is the first screen: everything reachable from the bottom bar lives
+ * inside it, and everything below — a specific order, a pick list, a delivery's
+ * proof capture — is pushed on top, so those screens keep their back button and
+ * their place in the history. Making every screen a tab would have taken the
+ * back button away from exactly the screens that need it.
+ *
+ * The role booleans that used to sit here have mostly gone: they were a fourth
+ * copy of the permission matrix, after `App.tsx`, `Dashboard.tsx` and web's
+ * guards. Tab membership now comes from `@medsupply/navigation`. What remains
+ * guards the screens that are *only* reachable by pushing, where there is no
+ * tab to omit.
+ */
 export default function ProtectedLayout() {
   const role = useAuthStore((state) => state.user?.role);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const isAdministrator = role === UserRole.SUPER_ADMIN || role === UserRole.ADMIN;
+  const isOwner = role === UserRole.SHOP_OWNER;
+  const isManager =
+    role === UserRole.SUPER_ADMIN || role === UserRole.ADMIN || role === UserRole.MANAGER;
+  const isDeliveryPerson = role === UserRole.DELIVERY_PERSON;
 
   // One realtime connection and one push registration per signed-in session.
   useEffect(() => {
@@ -36,54 +55,36 @@ export default function ProtectedLayout() {
     };
   }, [isAuthenticated]);
 
-  const isOwner = role === UserRole.SHOP_OWNER;
-  const isManager =
-    role === UserRole.SUPER_ADMIN || role === UserRole.ADMIN || role === UserRole.MANAGER;
-  const isDeliveryPerson = role === UserRole.DELIVERY_PERSON;
-
   return (
-    <Stack>
-      <Stack.Screen name="dashboard" options={{ title: 'Dashboard' }} />
-      <Stack.Screen name="medicines" options={{ title: 'Medicines' }} />
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: colour.surface },
+        headerTintColor: colour.text,
+      }}
+    >
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+
       <Stack.Screen name="medicine-detail" options={{ title: 'Medicine details' }} />
-      <Stack.Screen name="inventory" options={{ title: 'Inventory' }} />
-      <Stack.Screen name="cart" options={{ title: 'Cart' }} />
       <Stack.Screen name="checkout" options={{ title: 'Checkout' }} />
-      <Stack.Screen name="orders" options={{ title: 'Orders' }} />
       <Stack.Screen name="order-detail" options={{ title: 'Order details' }} />
-      <Stack.Screen name="approvals" options={{ title: 'Approvals' }} />
       <Stack.Screen name="approval-review" options={{ title: 'Review order' }} />
-      <Stack.Screen name="fulfilment" options={{ title: 'Fulfilment queue' }} />
       <Stack.Screen name="picking" options={{ title: 'Picking and packing' }} />
-      <Stack.Screen name="ready" options={{ title: 'Ready for delivery' }} />
-      <Stack.Screen name="deliveries" options={{ title: 'My deliveries' }} />
       <Stack.Screen name="delivery-detail" options={{ title: 'Delivery details' }} />
       <Stack.Screen name="delivery-proof" options={{ title: 'Proof of delivery' }} />
-      <Stack.Screen name="returns" options={{ title: 'Returns' }} />
       <Stack.Screen name="return-detail" options={{ title: 'Return details' }} />
-      <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
-      {/* Every role can see and end its own sign-ins. */}
-      <Stack.Screen name="security" options={{ title: 'Security' }} />
       <Stack.Screen
         name="notification-preferences"
         options={{ title: 'Notification preferences' }}
       />
+
       <Stack.Protected guard={isOwner}>
-        <Stack.Screen name="account" options={{ title: 'Account and credit' }} />
         <Stack.Screen name="invoices" options={{ title: 'Invoices' }} />
         <Stack.Screen name="payments" options={{ title: 'Payment history' }} />
         <Stack.Screen name="statement" options={{ title: 'Account statement' }} />
       </Stack.Protected>
       <Stack.Protected guard={isManager}>
-        <Stack.Screen name="finance-dashboard" options={{ title: 'Due and collections' }} />
         <Stack.Screen name="overdue-shops" options={{ title: 'Overdue shops' }} />
         <Stack.Screen name="collection-review" options={{ title: 'Collection review' }} />
-      </Stack.Protected>
-      <Stack.Protected guard={isManager}>
-        <Stack.Screen name="analytics" options={{ title: 'Business analytics' }} />
-      </Stack.Protected>
-      <Stack.Protected guard={isAdministrator}>
-        <Stack.Screen name="system-settings" options={{ title: 'System settings' }} />
       </Stack.Protected>
       <Stack.Protected guard={isDeliveryPerson}>
         <Stack.Screen name="collections" options={{ title: 'My collections' }} />

@@ -1,11 +1,11 @@
 import { UserRole } from '@medsupply/shared-types';
 
 export type FinanceRoute =
-  | '/(protected)/account'
+  | '/(protected)/(tabs)/account'
   | '/(protected)/invoices'
   | '/(protected)/payments'
   | '/(protected)/statement'
-  | '/(protected)/finance-dashboard'
+  | '/(protected)/(tabs)/finance-dashboard'
   | '/(protected)/overdue-shops'
   | '/(protected)/collection-review'
   | '/(protected)/collections';
@@ -16,14 +16,14 @@ export type FinanceNavigationItem = {
 };
 
 const ownerItems: FinanceNavigationItem[] = [
-  { label: 'Account and credit', route: '/(protected)/account' },
+  { label: 'Account and credit', route: '/(protected)/(tabs)/account' },
   { label: 'Invoices', route: '/(protected)/invoices' },
   { label: 'Payment history', route: '/(protected)/payments' },
   { label: 'Account statement', route: '/(protected)/statement' },
 ];
 
 const managerItems: FinanceNavigationItem[] = [
-  { label: 'Due and collections', route: '/(protected)/finance-dashboard' },
+  { label: 'Due and collections', route: '/(protected)/(tabs)/finance-dashboard' },
   { label: 'Overdue shops', route: '/(protected)/overdue-shops' },
   { label: 'Collection review', route: '/(protected)/collection-review' },
 ];

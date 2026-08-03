@@ -1,17 +1,16 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "MedSupply B2B",
+    "slug": "medsupply-b2b",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#126b45",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -40,11 +39,12 @@
       [
         "expo-notifications",
         {
-          "color": "#16724A",
+          "color": "#126b45",
           "defaultChannel": "medsupply-operations"
         }
       ],
       "expo-status-bar"
-    ]
+    ],
+    "scheme": "medsupply"
   }
 }

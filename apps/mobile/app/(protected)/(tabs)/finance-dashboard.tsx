@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { FinanceCard, FinanceState } from '../../src/finance/components';
-import { apiErrorMessage, getFinanceReportSummary } from '../../src/finance/api';
-import { formatMoneyMinor } from '../../src/finance/money';
-import type { FinanceReportSummary } from '../../src/finance/types';
+import { FinanceCard, FinanceState } from '../../../src/finance/components';
+import { apiErrorMessage, getFinanceReportSummary } from '../../../src/finance/api';
+import { formatMoneyMinor } from '../../../src/finance/money';
+import type { FinanceReportSummary } from '../../../src/finance/types';
 
 export default function FinanceDashboardScreen() {
   const [summary, setSummary] = useState<FinanceReportSummary>();

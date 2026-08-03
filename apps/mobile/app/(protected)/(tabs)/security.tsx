@@ -18,8 +18,8 @@ import {
   revokeEverySession,
   revokeSession,
   type SessionSummary,
-} from '../../src/security/api';
-import { formatFinanceDate } from '../../src/finance/date';
+} from '../../../src/security/api';
+import { formatFinanceDate } from '../../../src/finance/date';
 
 /**
  * Where this account is signed in, and how to end a session.

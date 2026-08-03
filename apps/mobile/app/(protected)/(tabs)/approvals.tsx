@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import type { Order, Shop } from '@medsupply/shared-types';
-import { apiClient } from '../../src/api/client';
-import { formatMoneyMinor } from '../../src/finance/money';
+import { apiClient } from '../../../src/api/client';
+import { formatMoneyMinor } from '../../../src/finance/money';
 export default function ApprovalsScreen() {
   const [data, setData] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);

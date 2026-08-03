@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { AnalyticsOverview } from '@medsupply/shared-types';
-import { FinanceState } from '../../src/finance/components';
-import { apiErrorMessage } from '../../src/finance/api';
-import { formatMoneyMinor } from '../../src/finance/money';
-import { getAnalyticsOverview } from '../../src/returns/api';
+import { FinanceState } from '../../../src/finance/components';
+import { apiErrorMessage } from '../../../src/finance/api';
+import { formatMoneyMinor } from '../../../src/finance/money';
+import { getAnalyticsOverview } from '../../../src/returns/api';
 
 /** Asia/Dhaka, matching the server's report calendar. */
 function dhakaToday() {

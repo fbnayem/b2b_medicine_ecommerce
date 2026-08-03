@@ -15,7 +15,7 @@ export default function LoginScreen() {
       const response = await apiClient.post('/auth/login', { email, password });
       const { user, accessToken, refreshToken } = response.data.data;
       await setAuth(user, accessToken, refreshToken);
-      router.replace('/(protected)/dashboard');
+      router.replace('/(protected)/(tabs)/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.error?.message || 'Login failed');
     }

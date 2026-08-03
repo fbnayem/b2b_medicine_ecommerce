@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { FinanceCard, FinanceState, StatusBadge } from '../../src/finance/components';
-import { apiErrorMessage, getMyFinanceSummary } from '../../src/finance/api';
-import { formatMoneyMinor, formatPercentFromBasisPoints } from '../../src/finance/money';
-import type { ShopFinanceSummary } from '../../src/finance/types';
+import { FinanceCard, FinanceState, StatusBadge } from '../../../src/finance/components';
+import { apiErrorMessage, getMyFinanceSummary } from '../../../src/finance/api';
+import { formatMoneyMinor, formatPercentFromBasisPoints } from '../../../src/finance/money';
+import type { ShopFinanceSummary } from '../../../src/finance/types';
 
 export default function AccountScreen() {
   const [summary, setSummary] = useState<ShopFinanceSummary>();

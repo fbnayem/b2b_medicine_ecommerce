@@ -5,7 +5,7 @@ import {
   SOURCE_LABELS,
   toRows,
   type EffectiveSettings,
-} from '../../src/settings/api';
+} from '../../../src/settings/api';
 
 const GROUP_LABELS: Record<string, string> = {
   business: 'Business identity',

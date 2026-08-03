@@ -243,7 +243,7 @@ export default function DeliveryProofScreen() {
             : 'Delivery completion confirmed by the server. No payment was collected.',
         );
         setError('');
-        setTimeout(() => router.replace('/(protected)/deliveries'), 900);
+        setTimeout(() => router.replace('/(protected)/(tabs)/deliveries'), 900);
       } catch (caught) {
         const failure = caught as ApiFailure;
         if (!failure.response || (failure.response.status ?? 0) >= 500) {

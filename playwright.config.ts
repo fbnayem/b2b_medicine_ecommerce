@@ -77,7 +77,7 @@ export default defineConfig({
   projects: [
     {
       name: 'smoke-preview',
-      testMatch: /(smoke|accessibility)\.spec\.ts/,
+      testMatch: /(smoke|accessibility|navigation)\.spec\.ts/,
       use: { baseURL: `http://127.0.0.1:${PREVIEW_PORT}` },
     },
     {

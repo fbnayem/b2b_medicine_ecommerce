@@ -1,8 +1,8 @@
 import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { apiClient } from '../../src/api/client';
-import { useCart } from '../../src/store/useCart';
-import { formatMoneyMinor } from '../../src/finance/money';
+import { apiClient } from '../../../src/api/client';
+import { useCart } from '../../../src/store/useCart';
+import { formatMoneyMinor } from '../../../src/finance/money';
 export default function CartScreen() {
   const { items, quantity, remove, draftId, recover } = useCart();
   async function save() {
@@ -34,7 +34,7 @@ export default function CartScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.title}>Your cart is empty</Text>
-            <Pressable onPress={() => router.push('/(protected)/medicines')}>
+            <Pressable onPress={() => router.push('/(protected)/(tabs)/medicines')}>
               <Text style={styles.link}>Browse medicines</Text>
             </Pressable>
           </View>

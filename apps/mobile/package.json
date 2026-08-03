@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@medsupply/design-tokens": "workspace:^",
+    "@medsupply/navigation": "workspace:^",
     "@medsupply/shared-types": "workspace:^",
     "@medsupply/utilities": "workspace:^",
     "@medsupply/validation": "workspace:^",

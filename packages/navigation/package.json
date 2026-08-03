@@ -1,0 +1,13 @@
+{
+  "name": "@medsupply/navigation",
+  "version": "0.0.0",
+  "main": "dist/index.js",
+  "types": "index.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@medsupply/shared-types": "workspace:^"
+  }
+}

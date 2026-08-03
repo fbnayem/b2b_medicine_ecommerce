@@ -5,7 +5,7 @@ import { getFinanceNavigation } from './navigation';
 describe('role-gated Phase 8 navigation', () => {
   it('shows owner account, invoices, payments, and statement only', () => {
     expect(getFinanceNavigation(UserRole.SHOP_OWNER).map((item) => item.route)).toEqual([
-      '/(protected)/account',
+      '/(protected)/(tabs)/account',
       '/(protected)/invoices',
       '/(protected)/payments',
       '/(protected)/statement',
@@ -14,7 +14,7 @@ describe('role-gated Phase 8 navigation', () => {
 
   it('shows management finance operations to authorised internal roles', () => {
     const expected = [
-      '/(protected)/finance-dashboard',
+      '/(protected)/(tabs)/finance-dashboard',
       '/(protected)/overdue-shops',
       '/(protected)/collection-review',
     ];
