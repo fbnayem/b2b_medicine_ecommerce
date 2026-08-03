@@ -492,6 +492,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: 'activity',
   },
   {
+    id: 'change-password',
+    label: 'Change your password',
+    path: '/account/password',
+    roles: EVERYONE,
+    group: 'account',
+    icon: 'settings',
+    hidden: true,
+    parent: 'security',
+  },
+  {
     id: 'security',
     label: 'Sign-in and security',
     path: '/account/security',

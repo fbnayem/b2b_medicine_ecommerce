@@ -15,6 +15,7 @@ import {
 } from '@medsupply/shared-types';
 import { AuthRequest } from '../middlewares/auth';
 import { PickingList } from '../models/PickingList';
+import { MedicineBatch } from '../models/MedicineBatch';
 import { Invoice } from '../models/Invoice';
 import { Package } from '../models/Package';
 import { Shop } from '../models/Shop';
@@ -64,7 +65,32 @@ export async function detail(req: AuthRequest, res: Response, next: NextFunction
       return res
         .status(404)
         .json({ error: { code: 'NOT_FOUND', message: 'Picking list not found' } });
-    res.json({ data: list });
+
+    /*
+     * U11: the picker's Batch column rendered the raw 24-character ObjectId.
+     * AGENTS.md forbids exposing MongoDB ids as a visible reference, and more
+     * to the point a warehouse picker cannot check a hex string against a
+     * carton — the number printed on the box is the batch number.
+     *
+     * Sent alongside rather than populated over `batchId`: the client posts
+     * that id straight back when recording progress, so replacing it with a
+     * document would break picking to fix a label.
+     */
+    const batches = await MedicineBatch.find({
+      _id: { $in: list.items.map((item) => item.batchId).filter(Boolean) },
+    }).select('batchNumber expiryDate');
+
+    res.json({
+      data: {
+        ...list.toObject(),
+        batchNumbers: Object.fromEntries(
+          batches.map((batch) => [
+            String(batch._id),
+            { batchNumber: batch.batchNumber, expiryDate: batch.expiryDate },
+          ]),
+        ),
+      },
+    });
   } catch (error) {
     next(error);
   }

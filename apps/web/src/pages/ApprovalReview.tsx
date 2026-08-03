@@ -5,10 +5,22 @@ import type { Order, Shop } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import './inventory.css';
 import { formatMinor } from '../lib/finance';
+import { Badge, Card, requireReason, useAsk } from '../components/ui';
 type Stock = {
   _id: string;
   available: number;
   batches: Array<{ batchNumber: string; expiryDate: string; available: number }>;
+};
+/** What the server will actually enforce, rather than what this page can guess. */
+type Credit = {
+  creditLimitMinor: number;
+  outstandingMinor: number;
+  overdueMinor: number;
+  reservedExposureMinor: number;
+  availableCreditMinor: number;
+  projectedExposureMinor: number;
+  orderBlocked: boolean;
+  blockReasons: string[];
 };
 type Line = {
   orderItemId: string;
@@ -17,11 +29,14 @@ type Line = {
   lineDiscountMinor: number;
 };
 export function ApprovalReview() {
+  const ask = useAsk();
   const { id } = useParams();
   const [data, setData] = useState<{
     order: Order;
     stock: Stock[];
     history: Order[];
+    credit?: Credit;
+    canOverrideCredit?: boolean;
     approvals: unknown[];
   } | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
@@ -31,6 +46,7 @@ export function ApprovalReview() {
   const [ownerNote, setOwnerNote] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [overrideCredit, setOverrideCredit] = useState(false);
   async function load() {
     try {
       const value = (await apiClient.get(`/approvals/${id}`)).data.data;
@@ -62,6 +78,52 @@ export function ApprovalReview() {
       delivery,
     [lines, orderDiscount, delivery],
   );
+  /**
+   * Answering a cancellation request.
+   *
+   * The request endpoint existed and stamped a timestamp; nothing anywhere
+   * decided it, so every request a shop owner made sat unanswered while the
+   * warehouse carried on picking the order.
+   */
+  async function decideCancellation(approve: boolean) {
+    if (!data) return;
+    const reason = await ask.prompt({
+      title: approve ? 'Cancel this order?' : 'Refuse the cancellation?',
+      description: approve
+        ? 'The stock it is holding goes back on the shelf and the credit it reserved is released. ' +
+          'This cannot be undone — a new order would have to be raised.'
+        : 'The order carries on as normal and the shop is told why you could not cancel it.',
+      label: approve ? 'Why is it being cancelled?' : 'Why can it not be cancelled?',
+      multiline: true,
+      confirmLabel: approve ? 'Cancel the order' : 'Refuse the request',
+      danger: approve,
+      validate: requireReason(),
+    });
+    if (!reason) return;
+
+    setError('');
+    try {
+      const response = await apiClient.post(`/orders/${data.order._id}/cancellation-decision`, {
+        approve,
+        reason,
+        version: data.order.version,
+      });
+      const meta = response.data?.meta ?? {};
+      setSuccess(
+        approve
+          ? `Order cancelled. ${formatMinor(meta.releasedCreditMinor ?? 0)} of credit and ` +
+              `${meta.releasedStockUnits ?? 0} units were released.`
+          : 'The cancellation was refused and the shop has been told why.',
+      );
+      await load();
+    } catch (caught: unknown) {
+      setError(
+        (caught as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error
+          ?.message ?? 'Unable to record that decision.',
+      );
+    }
+  }
+
   async function action(name: 'start' | 'hold' | 'reject' | 'approve') {
     if (!data) return;
     setError('');
@@ -75,10 +137,24 @@ export function ApprovalReview() {
           deliveryChargeMinor: delivery,
           internalNotes: internal || undefined,
           shopOwnerNotes: ownerNote || undefined,
-          creditOverride: false,
+          // Was hard-coded `false` on both clients, so a manager facing a
+          // blocked order had no path forward at all — the service supported an
+          // override that nothing could ever ask for.
+          creditOverride: overrideCredit,
         };
       else if (name !== 'start') {
-        const reason = window.prompt(`${name === 'hold' ? 'Hold' : 'Rejection'} reason:`);
+        const reason = await ask.prompt({
+          title: name === 'hold' ? 'Put this order on hold' : 'Reject this order',
+          description:
+            name === 'hold'
+              ? 'The shop will see that their order is waiting on something, and what.'
+              : 'The shop will be told their order was rejected, and why.',
+          label: 'Reason',
+          multiline: true,
+          confirmLabel: name === 'hold' ? 'Put on hold' : 'Reject order',
+          danger: name !== 'hold',
+          validate: requireReason(),
+        });
         if (!reason) return;
         body = {
           ...body,
@@ -88,7 +164,14 @@ export function ApprovalReview() {
         };
       }
       await apiClient.post(`/approvals/${id}/${name}`, body);
-      setSuccess(`${name} completed.`);
+      setSuccess(
+        {
+          start: 'Review started.',
+          hold: 'This order is on hold, and the shop has been told why.',
+          reject: 'Order rejected, and the shop has been told why.',
+          approve: 'Order approved and sent to the warehouse for picking.',
+        }[name],
+      );
       await load();
     } catch (caught: unknown) {
       setError(
@@ -105,9 +188,16 @@ export function ApprovalReview() {
         </section>
       </main>
     );
-  const { order, stock, history } = data;
+  const { order, stock, history, credit } = data;
   const shop = order.shopId as Shop;
-  const availableCredit = shop.creditLimit - shop.outstandingBalance;
+  /*
+   * From the server, which counts `reservedCreditMinor` — the exposure of
+   * orders already approved and not yet invoiced. This page used to compute
+   * `creditLimit - outstandingBalance` locally and could therefore show
+   * comfortable headroom on an order the server was about to refuse.
+   */
+  const availableCredit =
+    credit?.availableCreditMinor ?? shop.creditLimit - shop.outstandingBalance;
   return (
     <main className="inventory-page">
       <header className="page-heading">
@@ -138,10 +228,73 @@ export function ApprovalReview() {
           <strong>{formatMinor(availableCredit)}</strong>
         </article>
         <article>
+          <span>Already committed</span>
+          <strong>{formatMinor(credit?.reservedExposureMinor ?? 0)}</strong>
+        </article>
+        <article>
           <span>Payment terms</span>
           <strong>{shop.paymentTermsDays} days</strong>
         </article>
       </section>
+
+      {order.cancellationRequestedAt ? (
+        <Card className="border-warning bg-warning-subtle">
+          <h2 className="text-lg font-semibold">This shop has asked to cancel</h2>
+          <p className="mt-1">{order.cancellationReason}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="min-h-11 rounded-md bg-danger px-4 font-medium text-on-brand"
+              onClick={() => void decideCancellation(true)}
+            >
+              Cancel the order
+            </button>
+            <button
+              type="button"
+              className="min-h-11 rounded-md border border-border bg-surface px-4 font-medium"
+              onClick={() => void decideCancellation(false)}
+            >
+              Refuse and carry on
+            </button>
+          </div>
+        </Card>
+      ) : null}
+
+      {credit?.orderBlocked ? (
+        <Card className="border-danger bg-danger-subtle">
+          <h2 className="text-lg font-semibold">This order is blocked</h2>
+          <ul className="mt-2 flex list-disc flex-col gap-1 ps-5">
+            {credit.blockReasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-sm text-text-muted">
+            Approving it would take {shop.name} to {formatMinor(credit.projectedExposureMinor)}{' '}
+            against a limit of {formatMinor(credit.creditLimitMinor)}.
+          </p>
+
+          {data.canOverrideCredit ? (
+            <label className="mt-3 flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={overrideCredit}
+                onChange={(event) => setOverrideCredit(event.target.checked)}
+              />
+              <span>
+                <strong>Approve it anyway.</strong> Write the reason in the internal notes below —
+                it is required, it is recorded against your name, and it cannot be edited
+                afterwards.
+              </span>
+            </label>
+          ) : (
+            <p className="mt-3">
+              <Badge tone="warning">Administrator decision</Badge> Only an administrator can approve
+              an order past its credit limit. Ask one to review it, or reduce the quantities until
+              the order fits.
+            </p>
+          )}
+        </Card>
+      ) : null}
       <section className="panel">
         <h2>Requested medicines</h2>
         <div className="table-wrap">

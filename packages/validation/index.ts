@@ -894,3 +894,18 @@ export const AgeingReportQuerySchema = z.object({
   asOf: reportDate.optional(),
   format: z.enum(['json', 'csv']).default('json'),
 });
+
+/**
+ * A manager's answer to a cancellation request.
+ *
+ * `approve: false` is a real answer, not an absence of one: refusing clears the
+ * request so the order resumes, and the shop owner is told why. The reason is
+ * mandatory in both directions because both are decisions somebody may later
+ * have to account for.
+ */
+export const CancellationDecisionSchema = z.object({
+  approve: z.boolean(),
+  reason: z.string().trim().min(5).max(500),
+  version: z.number().int().min(0),
+  idempotencyKey: z.string().trim().min(8).max(120).optional(),
+});

@@ -4,8 +4,10 @@ import { apiClient } from '../api/client';
 import { createActionKey, formatFinanceDateTime, formatMinor } from '../lib/finance';
 import { populatedName, type ApiFailure, type FinancePayment } from './financeTypes';
 import './inventory.css';
+import { requireReason, useAsk } from '../components/ui';
 
 export function CollectionReview() {
+  const ask = useAsk();
   const [payments, setPayments] = useState<FinancePayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState('');
@@ -159,9 +161,14 @@ export function CollectionReview() {
                           <button
                             className="primary-button"
                             disabled={working}
-                            onClick={() =>
-                              window.confirm(`Post ${payment.reference} to the customer ledger?`) &&
-                              void act(payment, 'post')
+                            onClick={async () =>
+                              (await ask.confirm({
+                                title: `Post ${payment.reference} to the ledger?`,
+                                description:
+                                  'The rider’s collection becomes a permanent ledger entry and the ' +
+                                  'invoice balance changes immediately.',
+                                confirmLabel: 'Post it',
+                              })) && void act(payment, 'post')
                             }
                           >
                             Verify
@@ -169,8 +176,18 @@ export function CollectionReview() {
                           <button
                             className="danger-button"
                             disabled={working}
-                            onClick={() => {
-                              const reason = window.prompt('Reason for rejecting this collection:');
+                            onClick={async () => {
+                              const reason = await ask.prompt({
+                                title: 'Reject this collection',
+                                description:
+                                  'The cash did not reconcile. The rider will be told, and this is ' +
+                                  'recorded against your name.',
+                                label: 'Reason',
+                                multiline: true,
+                                confirmLabel: 'Reject collection',
+                                danger: true,
+                                validate: requireReason(),
+                              });
                               if (reason?.trim()) void act(payment, 'fail', reason.trim());
                             }}
                           >

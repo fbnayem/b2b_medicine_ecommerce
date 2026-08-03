@@ -77,6 +77,16 @@ const orderSchema = new mongoose.Schema(
     submissionIdempotencyKey: { type: String, unique: true, sparse: true },
     cancellationRequestedAt: Date,
     cancellationReason: String,
+    /**
+     * The decision on that request. A request used to have no answer at all:
+     * the endpoint stamped `cancellationRequestedAt`, notified management that
+     * the order was cancelled, and stopped — so the shop owner saw a
+     * confirmation and the warehouse picked the order anyway.
+     */
+    cancellationDecision: { type: String, enum: ['APPROVED', 'REFUSED'] },
+    cancellationDecisionReason: String,
+    cancellationDecidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    cancellationDecidedAt: Date,
     submittedAt: Date,
     version: { type: Number, default: 0 },
   },

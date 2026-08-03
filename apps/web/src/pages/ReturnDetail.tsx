@@ -13,6 +13,7 @@ import {
 } from '../lib/finance';
 import { statusLabel } from './returnLabels';
 import './inventory.css';
+import { requireReason, useAsk } from '../components/ui';
 
 interface DetailLine {
   medicineId: string;
@@ -74,6 +75,7 @@ const number = (value: string) => Math.max(0, Math.trunc(Number(value) || 0));
 const MANAGEMENT: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER];
 
 export function ReturnDetail() {
+  const ask = useAsk();
   const { id = '' } = useParams();
   const role = useAuthStore((state) => state.user?.role);
   const [record, setRecord] = useState<ReturnDetailData | null>(null);
@@ -606,13 +608,17 @@ export function ReturnDetail() {
               className="primary-button"
               disabled={Boolean(busy)}
               onClick={() => {
-                if (
-                  window.confirm(
-                    `Issue a credit note for ${formatMinor(record.approvedTotalMinor)}? This posts to the customer ledger and cannot be edited afterwards.`,
-                  )
-                ) {
-                  void act('credit-note', {}, 'Credit note issued and posted to the ledger.');
-                }
+                void (async () => {
+                  const agreed = await ask.confirm({
+                    title: `Issue a credit note for ${formatMinor(record.approvedTotalMinor)}?`,
+                    description:
+                      'This posts to the customer’s ledger straight away and cannot be edited ' +
+                      'afterwards. The amount comes off what they owe.',
+                    confirmLabel: 'Issue credit note',
+                  });
+                  if (agreed)
+                    await act('credit-note', {}, 'Credit note issued and posted to the ledger.');
+                })();
               }}
             >
               {busy === 'credit-note' ? 'Issuing...' : 'Issue credit note'}
@@ -622,8 +628,18 @@ export function ReturnDetail() {
             <button
               className="danger-button"
               disabled={Boolean(busy)}
-              onClick={() => {
-                const reason = window.prompt('Why is this return being cancelled?');
+              onClick={async () => {
+                const reason = await ask.prompt({
+                  title: 'Cancel this return request',
+                  description:
+                    'The claim against the invoice is released, so the invoice goes back to being ' +
+                    'due in full.',
+                  label: 'Reason',
+                  multiline: true,
+                  confirmLabel: 'Cancel the return',
+                  danger: true,
+                  validate: requireReason(),
+                });
                 if (reason && reason.trim().length >= 5) {
                   void act('cancel', { reason: reason.trim() }, 'Return cancelled.');
                 }

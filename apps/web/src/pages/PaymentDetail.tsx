@@ -6,12 +6,14 @@ import { createActionKey, formatFinanceDateTime, formatMinor } from '../lib/fina
 import { useAuthStore } from '../store/useAuth';
 import { populatedName, type ApiFailure, type FinancePayment } from './financeTypes';
 import './inventory.css';
+import { requireReason, useAsk } from '../components/ui';
 
 interface PaymentDetailProps {
   ownerMode?: boolean;
 }
 
 export function PaymentDetail({ ownerMode = false }: PaymentDetailProps) {
+  const ask = useAsk();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const role = useAuthStore((state) => state.user?.role);
@@ -204,10 +206,18 @@ export function PaymentDetail({ ownerMode = false }: PaymentDetailProps) {
               <button
                 className="primary-button"
                 disabled={working}
-                onClick={() =>
-                  window.confirm('Post this payment to the customer ledger?') &&
-                  void runAction('post')
-                }
+                onClick={() => {
+                  void (async () => {
+                    const agreed = await ask.confirm({
+                      title: 'Post this payment to the ledger?',
+                      description:
+                        'Posting is permanent. The invoice balance changes immediately and the ' +
+                        'entry cannot be edited afterwards — only reversed, which leaves both records.',
+                      confirmLabel: 'Post payment',
+                    });
+                    if (agreed) await runAction('post');
+                  })();
+                }}
               >
                 Post payment
               </button>
@@ -215,8 +225,18 @@ export function PaymentDetail({ ownerMode = false }: PaymentDetailProps) {
                 className="danger-button"
                 disabled={working}
                 onClick={() => {
-                  const reason = window.prompt('Reason this collection failed:');
-                  if (reason?.trim()) void runAction('fail', reason.trim());
+                  void (async () => {
+                    const reason = await ask.prompt({
+                      title: 'Mark this collection as failed',
+                      description: 'The money was not received. Say what happened.',
+                      label: 'Reason',
+                      multiline: true,
+                      confirmLabel: 'Mark as failed',
+                      danger: true,
+                      validate: requireReason(),
+                    });
+                    if (reason) await runAction('fail', reason);
+                  })();
                 }}
               >
                 Mark failed
@@ -228,10 +248,26 @@ export function PaymentDetail({ ownerMode = false }: PaymentDetailProps) {
               className="danger-button"
               disabled={working}
               onClick={() => {
-                if (!window.confirm('Create an immutable reversal for this posted payment?'))
-                  return;
-                const reason = window.prompt('Reversal reason:');
-                if (reason?.trim()) void runAction('reverse', reason.trim());
+                void (async () => {
+                  /*
+                   * Reversing posted money used to be a `window.confirm` followed
+                   * by a `window.prompt`, and Playwright dismisses both — so a
+                   * test could have claimed to cover this while cancelling it.
+                   */
+                  const reason = await ask.prompt({
+                    title: 'Reverse this payment?',
+                    description:
+                      'This does not delete anything. It writes an opposite entry, so both the ' +
+                      'payment and the reversal stay on the customer’s ledger for good, and the ' +
+                      'invoice goes back to being due.',
+                    label: 'Why is it being reversed?',
+                    multiline: true,
+                    confirmLabel: 'Reverse payment',
+                    danger: true,
+                    validate: requireReason(),
+                  });
+                  if (reason) await runAction('reverse', reason);
+                })();
               }}
             >
               Reverse payment

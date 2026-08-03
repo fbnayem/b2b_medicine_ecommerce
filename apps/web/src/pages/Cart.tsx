@@ -3,6 +3,7 @@ import { apiClient } from '../api/client';
 import { useCart } from '../store/useCart';
 import './inventory.css';
 import { formatMinor } from '../lib/finance';
+import { toast } from '../components/ui';
 const money = formatMinor;
 export function Cart() {
   const { items, setQuantity, remove, draftId, setDraftId } = useCart();
@@ -22,7 +23,7 @@ export function Cart() {
       ? await apiClient.patch(`/orders/drafts/${draftId}`, body)
       : await apiClient.post('/orders/drafts', body);
     setDraftId(response.data.data._id);
-    window.alert('Draft saved.');
+    toast.success('Draft saved.');
   }
   return (
     <main className="inventory-page">

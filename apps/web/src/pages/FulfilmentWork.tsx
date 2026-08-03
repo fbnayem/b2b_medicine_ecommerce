@@ -5,6 +5,7 @@ import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
 import './inventory.css';
 import { formatMinor } from '../lib/finance';
+import { requireReason, useAsk } from '../components/ui';
 
 type PickingItem = {
   _id: string;
@@ -27,6 +28,14 @@ type PickingList = {
   status: string;
   version: number;
   items: PickingItem[];
+  /**
+   * Batch numbers, keyed by batch id.
+   *
+   * Sent alongside the items rather than populated over `batchId`, because the
+   * picker posts that id straight back when recording progress — replacing it
+   * with a document would have broken picking in order to fix a label.
+   */
+  batchNumbers?: Record<string, { batchNumber: string; expiryDate: string }>;
   orderId: { reference: string; shopId: { name: string } };
   discrepancies: Discrepancy[];
 };
@@ -64,6 +73,7 @@ const discrepancyTypes = [
 ] as const;
 
 export function FulfilmentWork() {
+  const ask = useAsk();
   const { id } = useParams();
   const role = useAuthStore((state) => state.user?.role);
   const isStorekeeper = role === UserRole.STOREKEEPER;
@@ -185,7 +195,14 @@ export function FulfilmentWork() {
   }
 
   async function resolveDiscrepancy() {
-    const resolutionNotes = window.prompt('Enter resolution notes:');
+    const resolutionNotes = await ask.prompt({
+      title: 'Resolve this discrepancy',
+      description: 'Say what was actually found and what was done about it.',
+      label: 'What happened?',
+      multiline: true,
+      confirmLabel: 'Resolve',
+      validate: requireReason(),
+    });
     if (!resolutionNotes || !list) return;
     try {
       await apiClient.post(`/fulfilment/picking/${id}/discrepancies/resolve`, {
@@ -411,7 +428,10 @@ export function FulfilmentWork() {
                       <td>
                         {item.medicineId.brandName} {item.medicineId.strength}
                       </td>
-                      <td>{item.batchId}</td>
+                      <td>
+                        {/* The number printed on the carton, not the database id. */}
+                        {list.batchNumbers?.[item.batchId]?.batchNumber ?? '—'}
+                      </td>
                       <td>{item.quantity}</td>
                       <td>
                         {list.status === 'PICKING' ? (

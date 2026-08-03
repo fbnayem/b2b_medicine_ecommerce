@@ -26,7 +26,7 @@ Shop Owners can create/edit/delete their own drafts, submit orders, see only the
 
 ## Phase 5 approvals
 
-Managers, Admins and Super Admins can review, hold, reject and approve orders. They may apply an exceptional credit override only with a meaningful reason; the ledger-derived position and override actor/role are captured in the immutable reservation decision. Storekeepers receive approved picking notifications but cannot make approval decisions. Shop Owners see decision status and owner-visible notes, never internal Manager notes.
+Managers, Admins and Super Admins can review, hold, reject and approve orders. **Only Admins and Super Admins may apply an exceptional credit override**, and only with a meaningful reason — overriding a credit block extends unsecured credit beyond an agreed limit, which is a decision for whoever carries that risk. This page previously said Managers could, `PHASE_STATUS.md` said they could not, and the service checked nobody's role at all; the ledger-derived position and override actor/role are captured in the immutable reservation decision. Storekeepers receive approved picking notifications but cannot make approval decisions. Shop Owners see decision status and owner-visible notes, never internal Manager notes.
 
 ## Phase 6 fulfilment
 

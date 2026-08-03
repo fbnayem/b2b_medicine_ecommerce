@@ -45,36 +45,40 @@ export async function signOut(page: Page) {
 }
 
 /**
- * Confirms a destructive action, whatever it is implemented with today.
+ * Confirms a destructive action.
  *
  * This exists because of a trap rather than for convenience. Playwright
  * auto-dismisses native dialogs, so a spec written against the 22
- * `window.confirm` sites this project still has would *pass* while silently
- * cancelling the very action it claims to test — and would then start
- * *performing* that action the day those become real dialogs. Routing every
- * confirmation through one helper makes that swap a one-file change instead of
- * a silent change of meaning in twenty-two specs.
+ * `window.confirm` sites this project used to have would *pass* while silently
+ * cancelling the very action it claimed to test — and would then start
+ * *performing* that action the day those became real dialogs.
  *
- * Today: accept the native dialog. From phase 4: click the AlertDialog's
- * confirm button. The `data-test="dialog-confirm"` branch is already here so
- * the change is a deletion, not a rewrite.
+ * Phase 4 replaced all of them, and this is the one-file change that was
+ * budgeted for: it now clicks the real dialog. The native-dialog listener is
+ * kept as an **assertion**, not a fallback — if one ever comes back, the test
+ * fails and says so, rather than quietly cancelling again.
  */
 export async function confirmAction(page: Page, trigger: () => Promise<void>) {
   let nativeDialogSeen = false;
-  const handler = (dialog: { accept: () => Promise<void> }) => {
+  const handler = (dialog: { dismiss: () => Promise<void> }) => {
     nativeDialogSeen = true;
-    void dialog.accept();
+    void dialog.dismiss();
   };
   page.on('dialog', handler);
   try {
     await trigger();
-    // A real dialog, once phase 4 has replaced the native ones.
-    const confirm = page.getByTestId('dialog-confirm');
-    if (!nativeDialogSeen && (await confirm.count())) await confirm.click();
+    const confirm = page.getByTestId(TEST_IDS.dialogConfirm);
+    await expect(confirm).toBeVisible();
+    await confirm.click();
   } finally {
     page.off('dialog', handler);
   }
-  return { nativeDialogSeen };
+
+  expect(
+    nativeDialogSeen,
+    'A native browser dialog appeared. Those were all replaced in phase 4 because Playwright ' +
+      'dismisses them silently, so a spec can pass while cancelling the action it tests.',
+  ).toBe(false);
 }
 
 /**

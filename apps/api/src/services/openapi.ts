@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import {
   AdminPasswordResetSchema,
+  CancellationDecisionSchema,
+  CancellationRequestSchema,
+  ChangePasswordSchema,
   AdminUserUpdateSchema,
   ApprovalSchema,
   CreateMedicineSchema,
@@ -215,6 +218,30 @@ const OPERATIONS: Operation[] = [
     tag: 'Orders',
     roles: [UserRole.SHOP_OWNER],
     body: SubmitOrderSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/orders/{id}/cancellation-request',
+    summary: 'Ask for an order to be cancelled',
+    tag: 'Orders',
+    roles: [UserRole.SHOP_OWNER],
+    body: CancellationRequestSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/orders/{id}/cancellation-decision',
+    summary: 'Grant or refuse a cancellation request, releasing stock and credit',
+    tag: 'Orders',
+    roles: MANAGEMENT,
+    body: CancellationDecisionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/auth/change-password',
+    summary: 'Change your own password, revoking every other session',
+    tag: 'Authentication',
+    roles: ALL_ROLES,
+    body: ChangePasswordSchema,
   },
   {
     method: 'get',

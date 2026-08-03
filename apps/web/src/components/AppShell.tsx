@@ -15,6 +15,7 @@ import { signOut } from '../api/client';
 import { connectRealtime, disconnectRealtime } from '../realtime/socket';
 import { NotificationBell } from './NotificationBell';
 import { Toaster } from './ui/toast';
+import { AskProvider } from './ui/ask';
 import { applyTheme, storedTheme, setTheme, type ThemeChoice } from '../lib/theme';
 import { useBranding } from '../lib/useBranding';
 import { routeIdForPath } from '../app/routes';
@@ -67,96 +68,111 @@ export function AppShell() {
 
   if (!isAuthenticated || !user) return <Navigate to="/login" replace />;
 
+  /*
+   * A user carrying `forcePasswordChange` goes to one screen and stays there.
+   *
+   * The server refuses every other endpoint with `PASSWORD_CHANGE_REQUIRED`, so
+   * without this they would reach a page that renders nothing but errors and
+   * would have no way of knowing why. The flag was previously advisory text on
+   * the sign-in response and nothing else — the temporary password an
+   * administrator issued never expired and was never replaced.
+   */
+  if (user.forcePasswordChange && location.pathname !== NAV_BY_ID['change-password'].path) {
+    return <Navigate to={NAV_BY_ID['change-password'].path} replace />;
+  }
+
   const grouped = GROUP_ORDER.map((group) => ({
     group,
     items: items.filter((item) => item.group === group),
   })).filter((entry) => entry.items.length > 0);
 
   return (
-    <div data-test="app-shell" className="min-h-screen bg-canvas text-text">
-      <a href="#main" className="skip-link">
-        Skip to the main content
-      </a>
+    <AskProvider>
+      <div data-test="app-shell" className="min-h-screen bg-canvas text-text">
+        <a href="#main" className="skip-link">
+          Skip to the main content
+        </a>
 
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-surface px-4 py-2">
-        <button
-          type="button"
-          onClick={() => setNavOpen((open) => !open)}
-          aria-expanded={navOpen}
-          aria-controls="app-sidebar"
-          className="min-h-11 rounded-md border border-border px-3 lg:hidden"
-        >
-          Menu
-        </button>
+        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-surface px-4 py-2">
+          <button
+            type="button"
+            onClick={() => setNavOpen((open) => !open)}
+            aria-expanded={navOpen}
+            aria-controls="app-sidebar"
+            className="min-h-11 rounded-md border border-border px-3 lg:hidden"
+          >
+            Menu
+          </button>
 
-        <Link to="/dashboard" className="text-lg font-semibold text-brand">
-          {branding.name}
-        </Link>
+          <Link to="/dashboard" className="text-lg font-semibold text-brand">
+            {branding.name}
+          </Link>
 
-        <NavigationSearch items={items} />
+          <NavigationSearch items={items} />
 
-        <div className="ms-auto flex items-center gap-2">
-          <NotificationBell />
-          <AccountMenu
-            name={`${user.firstName} ${user.lastName}`}
-            role={user.role as UserRole}
-            theme={theme}
-            onTheme={(next) => {
-              setTheme(next);
-              setThemeChoice(next);
-            }}
-          />
+          <div className="ms-auto flex items-center gap-2">
+            <NotificationBell />
+            <AccountMenu
+              name={`${user.firstName} ${user.lastName}`}
+              role={user.role as UserRole}
+              theme={theme}
+              onTheme={(next) => {
+                setTheme(next);
+                setThemeChoice(next);
+              }}
+            />
+          </div>
+        </header>
+
+        <div className="flex">
+          <nav
+            id="app-sidebar"
+            data-test="app-sidebar"
+            aria-label="Sections"
+            className={[
+              'w-64 shrink-0 border-e border-border bg-surface p-3',
+              'lg:block lg:sticky lg:top-[3.25rem] lg:h-[calc(100vh-3.25rem)] lg:overflow-y-auto',
+              navOpen ? 'block fixed inset-y-0 start-0 z-[100] overflow-y-auto' : 'hidden',
+            ].join(' ')}
+          >
+            {grouped.map(({ group, items: groupItems }) => (
+              <div key={group} className="mb-4">
+                <h2 className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+                  {NAV_GROUP_LABEL[group]}
+                </h2>
+                <ul className="flex flex-col gap-0.5">
+                  {groupItems.map((item) => (
+                    <li key={item.id}>
+                      <NavLink
+                        to={item.path}
+                        end={item.path === '/dashboard'}
+                        className={({ isActive }) =>
+                          [
+                            'flex min-h-11 items-center rounded-md px-3 text-sm',
+                            isActive
+                              ? 'bg-brand-subtle font-semibold text-brand'
+                              : 'text-text hover:bg-surface-hover',
+                          ].join(' ')
+                        }
+                      >
+                        {item.label}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </nav>
+
+          <main id="main" className="min-w-0 flex-1 px-4 py-6">
+            <Breadcrumbs />
+            <Outlet />
+          </main>
         </div>
-      </header>
 
-      <div className="flex">
-        <nav
-          id="app-sidebar"
-          data-test="app-sidebar"
-          aria-label="Sections"
-          className={[
-            'w-64 shrink-0 border-e border-border bg-surface p-3',
-            'lg:block lg:sticky lg:top-[3.25rem] lg:h-[calc(100vh-3.25rem)] lg:overflow-y-auto',
-            navOpen ? 'block fixed inset-y-0 start-0 z-[100] overflow-y-auto' : 'hidden',
-          ].join(' ')}
-        >
-          {grouped.map(({ group, items: groupItems }) => (
-            <div key={group} className="mb-4">
-              <h2 className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
-                {NAV_GROUP_LABEL[group]}
-              </h2>
-              <ul className="flex flex-col gap-0.5">
-                {groupItems.map((item) => (
-                  <li key={item.id}>
-                    <NavLink
-                      to={item.path}
-                      end={item.path === '/dashboard'}
-                      className={({ isActive }) =>
-                        [
-                          'flex min-h-11 items-center rounded-md px-3 text-sm',
-                          isActive
-                            ? 'bg-brand-subtle font-semibold text-brand'
-                            : 'text-text hover:bg-surface-hover',
-                        ].join(' ')
-                      }
-                    >
-                      {item.label}
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </nav>
-
-        <main id="main" className="min-w-0 flex-1 px-4 py-6">
-          <Breadcrumbs />
-          <Outlet />
-        </main>
+        <Toaster />
       </div>
-
-      <Toaster />
-    </div>
+    </AskProvider>
   );
 }
 

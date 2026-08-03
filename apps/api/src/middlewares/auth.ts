@@ -88,8 +88,53 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
       context.role = String(user.role);
     }
 
+    /*
+     * Checked here rather than as a separate mount-level middleware, because a
+     * mount-level one runs *before* this and therefore sees no `req.user` at
+     * all — it passed every request, silently, which is exactly the shape of
+     * defect this whole plan is about. Every authenticated route runs through
+     * this function, so there is nowhere for a new endpoint to hide.
+     */
+    if (user.forcePasswordChange && !passwordChangeExempt(req)) {
+      return res.status(403).json({
+        error: {
+          code: 'PASSWORD_CHANGE_REQUIRED',
+          message: 'Choose a new password before continuing.',
+          correlationId: correlationId(),
+        },
+      });
+    }
+
     next();
   } catch (error) {
     next(error);
   }
 };
+
+/**
+ * The endpoints a user carrying `forcePasswordChange` may still reach.
+ *
+ * Deliberately tiny, and deliberately an allow-list rather than a deny-list: a
+ * new endpoint should be closed to a user who has not yet chosen a password,
+ * not open by omission.
+ */
+const PERMITTED_WHILE_FORCED = new Set([
+  'POST /api/v1/auth/change-password',
+  'GET /api/v1/users/me',
+  'POST /api/v1/auth/logout',
+  'POST /api/v1/auth/logout-all',
+  'POST /api/v1/auth/refresh',
+]);
+
+/**
+ * Whether this request is one of the few a forced user may make.
+ *
+ * Matched on `originalUrl` rather than on `baseUrl + path`: inside a
+ * `router.use` those two do not reconstruct the request line — `req.path` is
+ * "/" for a request to the mount root — and a guard that silently matches
+ * nothing is a guard that permits everything.
+ */
+function passwordChangeExempt(req: Request): boolean {
+  const path = req.originalUrl.split('?')[0].replace(/\/$/, '');
+  return PERMITTED_WHILE_FORCED.has(`${req.method} ${path}`);
+}

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithUi } from '../testing/render';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../api/client';
@@ -41,7 +42,7 @@ describe('CollectionReview', () => {
   });
 
   it('loads only pending delivery collections and safely verifies one', async () => {
-    render(
+    renderWithUi(
       <MemoryRouter>
         <CollectionReview />
       </MemoryRouter>,
@@ -51,6 +52,12 @@ describe('CollectionReview', () => {
       params: { status: 'PENDING', source: 'DELIVERY_COLLECTION', limit: 100 },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
+    // The confirmation is now a real dialog rather than `window.confirm`.
+    // Playwright and jsdom both dismiss the native one silently, so a test
+    // written against it would have passed while cancelling the very action it
+    // claims to verify — this step is what makes the assertion below mean
+    // something.
+    fireEvent.click(await screen.findByTestId('dialog-confirm'));
     await waitFor(() =>
       expect(post).toHaveBeenCalledWith('/payments/payment-1/post', {
         idempotencyKey: expect.stringContaining('post-collection-'),

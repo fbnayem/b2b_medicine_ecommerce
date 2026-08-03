@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { SettingSource, SettingsGroup } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import './inventory.css';
+import { requireReason, useAsk } from '../components/ui';
 
 type GroupValues = Record<string, unknown>;
 
@@ -69,6 +70,7 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export function SystemSettings() {
+  const ask = useAsk();
   const [payload, setPayload] = useState<SettingsPayload | null>(null);
   const [draft, setDraft] = useState<Record<string, GroupValues>>({});
   const [activeGroup, setActiveGroup] = useState<string>(SettingsGroup.BUSINESS);
@@ -134,9 +136,17 @@ export function SystemSettings() {
 
   const reset = async (group: string) => {
     if (!payload) return;
-    const reason = window.prompt(
-      `Reset ${GROUP_LABELS[group]} to the environment or built-in values? Give a reason:`,
-    );
+    const reason = await ask.prompt({
+      title: `Reset ${GROUP_LABELS[group]}?`,
+      description:
+        'The saved values are discarded and the built-in or environment values take over. The ' +
+        'discarded values stay in the audit log.',
+      label: 'Why is this being reset?',
+      multiline: true,
+      confirmLabel: 'Reset these settings',
+      danger: true,
+      validate: requireReason(),
+    });
     if (!reason) return;
     setStatus('Resetting...');
     try {

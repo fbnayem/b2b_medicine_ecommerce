@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import mongoose from 'mongoose';
 import { User } from '../models/User';
 import { Session } from '../models/Session';
-import { LoginSchema } from '@medsupply/validation';
+import { ChangePasswordSchema, LoginSchema } from '@medsupply/validation';
 import { UserStatus, UserRole } from '@medsupply/shared-types';
 import type { AuthRequest } from '../middlewares/auth';
 import { AuditLog } from '../models/AuditLog';
@@ -341,6 +341,85 @@ export const revokeOwnSession = async (req: AuthRequest, res: Response, next: Ne
     }
     if (req.sessionId && String(session._id) === req.sessionId) clearRefreshCookie(res);
     res.json({ data: { success: true } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Changing your own password.
+ *
+ * There was no way to do this. `forcePasswordChange` was set on account
+ * creation and on an administrative reset, returned at sign-in, and rendered as
+ * a line of advisory text — but it was never checked in the auth middleware or
+ * in any client guard, and no endpoint existed to satisfy it. An
+ * administrator-issued temporary password was therefore permanent, and the flag
+ * was decoration on a security control.
+ *
+ * Every *other* session is revoked on success. Not this one: signing the user
+ * out of the browser they just used would be punishing them for doing the right
+ * thing. The reason to revoke the rest is that a password change is what
+ * somebody does when they think their credential is known to another person,
+ * and that person may be holding a live session.
+ */
+export const changePassword = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { currentPassword, newPassword } = ChangePasswordSchema.parse(req.body);
+    const user = await User.findById(req.user!._id).select('+passwordHash');
+    if (!user)
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found' } });
+
+    const policy = await securitySettings();
+    if (newPassword.length < policy.passwordMinLength) {
+      return res.status(400).json({
+        error: {
+          code: 'PASSWORD_TOO_SHORT',
+          message: `Choose a password of at least ${policy.passwordMinLength} characters.`,
+        },
+      });
+    }
+    if (newPassword === currentPassword) {
+      return res.status(400).json({
+        error: {
+          code: 'PASSWORD_UNCHANGED',
+          message: 'Choose a password you have not just been using.',
+        },
+      });
+    }
+
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      // Deliberately not "wrong password": this endpoint is reached only by
+      // somebody already signed in, so there is nothing to enumerate, and a
+      // vague message here would just make a typo hard to diagnose.
+      return res.status(400).json({
+        error: {
+          code: 'CURRENT_PASSWORD_INCORRECT',
+          message: 'That is not your current password.',
+        },
+      });
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 12);
+    user.forcePasswordChange = false;
+    await user.save();
+
+    const revoked = await Session.updateMany(
+      { userId: user._id, revokedAt: null, _id: { $ne: req.sessionId } },
+      { $set: { revokedAt: new Date() } },
+    );
+
+    await AuditLog.create({
+      actorId: user._id,
+      actorRole: user.role,
+      action: 'PASSWORD_CHANGED',
+      entityType: 'User',
+      entityId: user._id,
+      // The password itself is never recorded, in any form.
+      after: { otherSessionsRevoked: revoked.modifiedCount },
+      correlationId: correlationId(),
+    });
+
+    res.json({ data: { otherSessionsRevoked: revoked.modifiedCount } });
   } catch (error) {
     next(error);
   }

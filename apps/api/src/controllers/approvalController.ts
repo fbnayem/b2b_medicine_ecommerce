@@ -20,7 +20,8 @@ import { OrderApproval } from '../models/OrderApproval';
 import { MedicineBatch } from '../models/MedicineBatch';
 import { Shop } from '../models/Shop';
 import { AuditLog } from '../models/AuditLog';
-import { approveOrder } from '../services/approvalService';
+import { CREDIT_OVERRIDE_ROLES, approveOrder } from '../services/approvalService';
+import { getCreditSummary } from '../services/financeService';
 import { notify } from '../services/notificationService';
 import { ActivityVisibility, recordActivity } from '../services/activityService';
 import { emitEntityUpdate } from '../services/realtime';
@@ -180,8 +181,32 @@ export async function reviewDetail(req: AuthRequest, res: Response, next: NextFu
       .select('reference status estimatedTotalMinor createdAt')
       .sort({ createdAt: -1 })
       .limit(10);
+    /*
+     * The reviewer's credit position comes from the same function the approval
+     * itself enforces with.
+     *
+     * `ApprovalReview.tsx` was computing `creditLimit - outstandingBalance`
+     * locally, which ignores `reservedCreditMinor` — the exposure of other
+     * orders already approved and not yet invoiced — so the screen could show
+     * comfortable headroom while the server refused the approval. It also never
+     * rendered `blockReasons`, so a manager facing a blocked order was told
+     * only that it failed.
+     */
+    const credit = await getCreditSummary(String(order.shopId._id ?? order.shopId), {
+      proposedExposureMinor: order.estimatedTotalMinor ?? 0,
+    });
+
     res.json({
-      data: { order, stock, history, approvals: await OrderApproval.find({ orderId: order._id }) },
+      data: {
+        order,
+        stock,
+        history,
+        credit,
+        // So the client can offer the override control only to somebody who may
+        // actually use it, rather than a button that always fails.
+        canOverrideCredit: CREDIT_OVERRIDE_ROLES.includes(req.user!.role),
+        approvals: await OrderApproval.find({ orderId: order._id }),
+      },
     });
   } catch (error) {
     next(error);

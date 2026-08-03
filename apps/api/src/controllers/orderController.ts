@@ -9,6 +9,7 @@ import {
   UserRole,
 } from '@medsupply/shared-types';
 import {
+  CancellationDecisionSchema,
   CancellationRequestSchema,
   SaveOrderDraftSchema,
   SubmitOrderSchema,
@@ -20,6 +21,7 @@ import { User } from '../models/User';
 import { AuditLog } from '../models/AuditLog';
 import { nextReference } from '../models/Counter';
 import { buildOrderSnapshot } from '../services/orderService';
+import { decideCancellation } from '../services/cancellationService';
 import { notify } from '../services/notificationService';
 import { ActivityVisibility, recordActivity } from '../services/activityService';
 import { emitEntityUpdate } from '../services/realtime';
@@ -311,7 +313,10 @@ export async function requestCancellation(req: AuthRequest, res: Response, next:
     order.cancellationReason = reason;
     await order.save();
     await notify({
-      event: NotificationEvent.ORDER_CANCELLED,
+      // Not ORDER_CANCELLED. Asking is not cancelling, and management acted on
+      // the difference: they were told an order had been cancelled while the
+      // warehouse went on picking it.
+      event: NotificationEvent.ORDER_CANCELLATION_REQUESTED,
       recipientIds: await shopManagementIds(order.shopId as never),
       context: { reference: order.reference, reason, orderId: String(order._id) },
       entityType: 'Order',
@@ -345,6 +350,86 @@ export async function requestCancellation(req: AuthRequest, res: Response, next:
     });
     await audit(req, 'ORDER_CANCELLATION_REQUESTED', order);
     res.json({ data: order });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Deciding a cancellation request.
+ *
+ * The counterpart that never existed. `ORDER_STATE_MACHINE.md` has promised the
+ * controlled transition to `CANCELLED` since the fourth phase of the original
+ * build; until now nothing anywhere set that status, so every cancellation
+ * request was a dead end that had already told management the opposite.
+ */
+export async function decideCancellationRequest(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const input = CancellationDecisionSchema.parse(req.body);
+    const result = await decideCancellation(String(req.params.id), input, {
+      _id: req.user!._id,
+      role: req.user!.role,
+    });
+    const order = result.order;
+
+    await notify({
+      event: input.approve
+        ? NotificationEvent.ORDER_CANCELLED
+        : NotificationEvent.ORDER_CANCELLATION_REFUSED,
+      recipientIds: order.submittedBy ? [order.submittedBy] : [],
+      context: {
+        reference: order.reference,
+        reason: input.reason,
+        orderId: String(order._id),
+      },
+      entityType: 'Order',
+      entityId: order._id,
+      occurrenceKey: `CANCELLATION_DECIDED:${order.version}`,
+    });
+
+    await recordActivity({
+      action: input.approve ? 'ORDER_CANCELLED' : 'ORDER_CANCELLATION_REFUSED',
+      category: NotificationCategory.ORDER,
+      entityType: ActivityEntityType.ORDER,
+      entityId: order._id,
+      orderId: order._id,
+      shopId: order.shopId as never,
+      actor: req.user,
+      summary: input.approve
+        ? `Order ${order.reference} was cancelled`
+        : `Cancellation of order ${order.reference} was not granted`,
+      detail: input.reason,
+      visibleToRoles: ActivityVisibility.internal,
+      visibleToShop: true,
+      occurrenceKey: `CANCELLATION_DECIDED:${order.version}`,
+    });
+
+    emitEntityUpdate({
+      event: RealtimeEvent.ORDER_UPDATED,
+      entityType: ActivityEntityType.ORDER,
+      entityId: order._id,
+      reference: order.reference,
+      status: order.status,
+      orderId: order._id,
+      shopId: order.shopId as never,
+      roles: MANAGEMENT_ROLES,
+      notifyShop: true,
+    });
+
+    res.json({
+      data: order,
+      meta: {
+        idempotentReplay: result.idempotentReplay,
+        // Reported so the reviewer can see what the decision gave back, rather
+        // than having to trust that it did.
+        releasedCreditMinor: result.releasedCreditMinor,
+        releasedStockUnits: result.releasedStockUnits,
+      },
+    });
   } catch (error) {
     next(error);
   }

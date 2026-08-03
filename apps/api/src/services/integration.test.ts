@@ -913,10 +913,10 @@ test('concurrent credit approvals reserve exposure atomically and manager overri
       ? 'Manager accepted temporary exposure after account review'
       : undefined,
   });
-  const approve = (order: InstanceType<typeof Order>, override = false) =>
+  const approve = (order: InstanceType<typeof Order>, override = false, as = manager._id) =>
     fetch(`${base}/api/v1/approvals/${order._id}/approve`, {
       method: 'POST',
-      headers: authorization(manager._id),
+      headers: authorization(as),
       body: JSON.stringify(inputFor(order, override)),
     });
   const decisions = await Promise.all([approve(orderA), approve(orderB)]);
@@ -928,7 +928,38 @@ test('concurrent credit approvals reserve exposure atomically and manager overri
   assert.equal((await Shop.findById(creditShop._id))!.reservedCreditMinor, 200);
   const rejectedOrder =
     (await Order.findById(orderA._id))!.status === 'SUBMITTED' ? orderA : orderB;
-  const override = await approve(rejectedOrder, true);
+
+  /*
+   * A Manager may no longer override a credit block.
+   *
+   * This assertion is inverted from what it was, deliberately. Two documents
+   * disagreed — PHASE_STATUS.md recorded the intent as Admin-only,
+   * PERMISSIONS.md said Managers too — and the service checked nobody's role at
+   * all, so this test was encoding "whatever the code happens to do". Settled as
+   * Admin-only, which is the stricter reading and the documented intent:
+   * overriding a credit block extends unsecured credit past an agreed limit.
+   */
+  const managerAttempt = await approve(rejectedOrder, true);
+  assert.equal(managerAttempt.status, 403);
+  assert.equal(
+    ((await managerAttempt.json()) as { error: { code: string } }).error.code,
+    'CREDIT_OVERRIDE_FORBIDDEN',
+  );
+  assert.equal(
+    await CreditReservation.countDocuments({ shopId: creditShop._id, status: 'ACTIVE' }),
+    1,
+    'a refused override must not reserve anything',
+  );
+
+  const overrideAdmin = await User.create({
+    email: 'credit-override-admin@test.local',
+    passwordHash: 'x',
+    firstName: 'Credit',
+    lastName: 'Override',
+    role: UserRole.ADMIN,
+    status: UserStatus.ACTIVE,
+  });
+  const override = await approve(rejectedOrder, true, overrideAdmin._id);
   assert.equal(override.status, 200);
   assert.equal(
     await CreditReservation.countDocuments({ shopId: creditShop._id, status: 'ACTIVE' }),
@@ -937,7 +968,8 @@ test('concurrent credit approvals reserve exposure atomically and manager overri
   assert.equal((await Shop.findById(creditShop._id))!.reservedCreditMinor, 400);
   const overrideReservation = await CreditReservation.findOne({ orderId: rejectedOrder._id });
   assert.equal(overrideReservation!.decisionSnapshot.overrideApplied, true);
-  assert.equal(overrideReservation!.decisionSnapshot.overrideRole, UserRole.MANAGER);
+  // Whose decision it was, recorded immutably.
+  assert.equal(overrideReservation!.decisionSnapshot.overrideRole, UserRole.ADMIN);
 
   const legacyOrder = await makeOrder('ORD-CREDIT-BACKFILL');
   await Order.updateOne({ _id: legacyOrder._id }, { $set: { status: 'APPROVED' } });

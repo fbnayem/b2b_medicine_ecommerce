@@ -93,6 +93,12 @@ const tierMiddleware: Record<MountTier, ReturnType<typeof writeMethodRateLimit>[
   report: [reportRateLimit()],
 };
 
+/**
+ * A user carrying `forcePasswordChange` may reach only the endpoints that let
+ * them satisfy it. Applied once here rather than per router, because an
+ * allow-list that has to be remembered on every new mount is a deny-list
+ * wearing a disguise.
+ */
 for (const mount of API_MOUNTS) {
   app.use(mount.prefix, ...tierMiddleware[mount.tier], mount.router);
 }

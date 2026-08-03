@@ -8,8 +8,10 @@ import { ActivityTimeline } from '../components/ActivityTimeline';
 import { ActivityEntityType } from '@medsupply/shared-types';
 import './inventory.css';
 import { formatFinanceDateTime, formatMinor } from '../lib/finance';
+import { requireReason, useAsk } from '../components/ui';
 
 export function OrderDetail() {
+  const ask = useAsk();
   const { id } = useParams();
   const [params] = useSearchParams();
   const [order, setOrder] = useState<Order>();
@@ -49,7 +51,16 @@ export function OrderDetail() {
   }
 
   async function cancel() {
-    const reason = window.prompt('Why would you like to cancel this order?');
+    const reason = await ask.prompt({
+      title: 'Ask to cancel this order',
+      description:
+        'A manager decides cancellations. You will be told whether yours was granted, and the ' +
+        'order carries on in the meantime.',
+      label: 'Why do you want to cancel it?',
+      multiline: true,
+      confirmLabel: 'Send the request',
+      validate: requireReason(),
+    });
     if (!reason) return;
     await apiClient.post(`/orders/${id}/cancellation-request`, { reason });
     await load();

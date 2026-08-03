@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { renderWithUi } from '../testing/render';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReturnStatus, UserRole, UserStatus } from '@medsupply/shared-types';
@@ -90,7 +91,7 @@ function mockDetailRequests(record: unknown = detailRecord) {
 }
 
 function renderDetail() {
-  return render(
+  return renderWithUi(
     <MemoryRouter initialEntries={['/returns/r1']}>
       <Routes>
         <Route path="/returns/:id" element={<ReturnDetail />} />
@@ -107,7 +108,6 @@ beforeEach(() => {
   // matches elements from both renders.
   cleanup();
   vi.clearAllMocks();
-  window.confirm = () => true;
 });
 
 describe('Return list', () => {
@@ -184,6 +184,11 @@ describe('Return detail', () => {
     const issue = await screen.findByRole('button', { name: 'Issue credit note' });
     fireEvent.click(issue);
 
+    // Posting a credit note to a customer's ledger is irreversible, so it is
+    // confirmed in a real dialog. This test used to stub `window.confirm` to
+    // return true, which meant it never exercised the confirmation at all.
+    fireEvent.click(await screen.findByTestId('dialog-confirm'));
+
     await waitFor(() => expect(post).toHaveBeenCalled());
     const [path, body] = post.mock.calls[0];
     expect(path).toBe('/returns/r1/credit-note');
@@ -235,6 +240,7 @@ describe('Return detail', () => {
     renderDetail();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Issue credit note' }));
+    fireEvent.click(await screen.findByTestId('dialog-confirm'));
 
     // The reload must not clear the message, or the reviewer sees values change
     // with no explanation of why their action was refused.

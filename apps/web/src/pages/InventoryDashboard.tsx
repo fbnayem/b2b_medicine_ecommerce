@@ -5,6 +5,7 @@ import type { Medicine, MedicineBatch } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import './inventory.css';
 import { formatFinanceDate, formatFinanceDateTime } from '../lib/finance';
+import { requireReason, useAsk } from '../components/ui';
 
 type Movement = {
   _id: string;
@@ -18,6 +19,7 @@ type Movement = {
 const freshKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 
 export function InventoryDashboard() {
+  const ask = useAsk();
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [batches, setBatches] = useState<MedicineBatch[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
@@ -92,9 +94,29 @@ export function InventoryDashboard() {
     }
   }
   async function action(batch: MedicineBatch, type: StockMovementType) {
-    const raw = window.prompt(`Quantity to ${type.toLowerCase().replaceAll('_', ' ')}:`);
+    const label = type.toLowerCase().replaceAll('_', ' ');
+    const raw = await ask.prompt({
+      title: `Record ${label}`,
+      description: `Batch ${batch.batchNumber}. This changes what the system believes is on the shelf.`,
+      label: 'How many units?',
+      type: 'number',
+      confirmLabel: `Record ${label}`,
+      danger: true,
+      validate: (value) =>
+        Number.isInteger(Number(value)) && Number(value) > 0
+          ? null
+          : 'Enter a whole number of units, greater than zero.',
+    });
     if (!raw) return;
-    const reason = window.prompt('Reason for this stock operation:');
+    const reason = await ask.prompt({
+      title: 'Why is this stock being adjusted?',
+      description: 'Stock movements are permanent records; this explains the change later.',
+      label: 'Reason',
+      multiline: true,
+      confirmLabel: 'Record it',
+      danger: true,
+      validate: requireReason(),
+    });
     if (!reason) return;
     try {
       await apiClient.post(`/inventory/batches/${batch._id}/operations`, {

@@ -145,6 +145,30 @@ const templates: NotificationTemplate[] = [
     }),
   ),
   template(
+    NotificationEvent.ORDER_CANCELLATION_REQUESTED,
+    NotificationCategory.ORDER,
+    NotificationPriority.NORMAL,
+    [PUSH],
+    (context) => ({
+      title: `Cancellation asked for order ${reference(context)}`,
+      body: context.reason
+        ? `Reason: ${context.reason}`
+        : 'The shop has asked to cancel this order.',
+      link: orderLink(context),
+    }),
+  ),
+  template(
+    NotificationEvent.ORDER_CANCELLATION_REFUSED,
+    NotificationCategory.ORDER,
+    NotificationPriority.NORMAL,
+    [PUSH],
+    (context) => ({
+      title: `Order ${reference(context)} was not cancelled`,
+      body: context.reason ?? 'Your cancellation request was not granted.',
+      link: orderLink(context),
+    }),
+  ),
+  template(
     NotificationEvent.ORDER_CANCELLED,
     NotificationCategory.ORDER,
     NotificationPriority.NORMAL,

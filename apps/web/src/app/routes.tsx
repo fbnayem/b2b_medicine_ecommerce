@@ -177,6 +177,10 @@ export const ROUTES: readonly RouteNode[] = [
   },
   { id: 'activity', element: page(() => import('../pages/ActivityFeed'), 'ActivityFeed') },
   { id: 'security', element: page(() => import('../pages/SecurityCentre'), 'SecurityCentre') },
+  {
+    id: 'change-password',
+    element: page(() => import('../pages/ChangePassword'), 'ChangePassword'),
+  },
 ];
 /* eslint-enable @typescript-eslint/no-explicit-any */
 

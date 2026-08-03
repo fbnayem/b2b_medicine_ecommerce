@@ -4,6 +4,8 @@ import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
 import './inventory.css';
 import { formatFinanceDateTime } from '../lib/finance';
+import { requireReason, useAsk } from '../components/ui';
+import { usePasswordPolicy } from '../lib/usePasswordPolicy';
 
 interface DirectoryUser extends User {
   activeSessions?: number;
@@ -20,6 +22,10 @@ function failureMessage(caught: unknown, fallback: string) {
 
 export function UserAdministration() {
   const currentUser = useAuthStore((state) => state.user);
+  const ask = useAsk();
+  // Read from System Settings rather than hard-coded, so an administrator is
+  // held to the same minimum the server will enforce a moment later.
+  const passwordMinLength = usePasswordPolicy();
   const [items, setItems] = useState<DirectoryUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -76,11 +82,37 @@ export function UserAdministration() {
   };
 
   const resetPassword = async (user: DirectoryUser) => {
-    const temporaryPassword = window.prompt(
-      `Temporary password for ${user.firstName} ${user.lastName}. They will be forced to change it at next sign-in.`,
-    );
+    /*
+     * This was two `window.prompt` calls, the first of which took a password in
+     * clear text — no masking, no validation against the configured minimum —
+     * and the resulting credential was permanent, because nothing enforced
+     * `forcePasswordChange` and no endpoint existed to satisfy it. Both halves
+     * are fixed; this is the half the administrator sees.
+     */
+    const temporaryPassword = await ask.prompt({
+      title: `Reset the password for ${user.firstName} ${user.lastName}`,
+      description:
+        'They will be asked to choose their own password the next time they sign in, and ' +
+        'every device they are signed in on will be signed out.',
+      label: 'Temporary password',
+      hint: `At least ${passwordMinLength} characters. Read it to them; it is shown only now.`,
+      type: 'password',
+      confirmLabel: 'Reset password',
+      danger: true,
+      validate: (value) =>
+        value.length < passwordMinLength ? `Use at least ${passwordMinLength} characters.` : null,
+    });
     if (!temporaryPassword) return;
-    const reason = window.prompt('Why is this password being reset?');
+
+    const reason = await ask.prompt({
+      title: 'Why is this password being reset?',
+      description: 'This is recorded in the audit log against your name.',
+      label: 'Reason',
+      multiline: true,
+      confirmLabel: 'Reset password',
+      danger: true,
+      validate: requireReason(),
+    });
     if (!reason) return;
 
     setBusyId(user._id);
@@ -100,7 +132,17 @@ export function UserAdministration() {
   };
 
   const revokeSessions = async (user: DirectoryUser) => {
-    const reason = window.prompt(`Why are ${user.email}'s sessions being signed out?`);
+    const reason = await ask.prompt({
+      title: `Sign ${user.email} out everywhere?`,
+      description:
+        'Every device they are signed in on will be signed out immediately. They can sign back ' +
+        'in with their existing password.',
+      label: 'Reason',
+      multiline: true,
+      confirmLabel: 'Sign them out',
+      danger: true,
+      validate: requireReason(),
+    });
     if (!reason) return;
     setBusyId(user._id);
     try {

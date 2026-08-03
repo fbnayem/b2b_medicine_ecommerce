@@ -32,7 +32,7 @@ export default defineConfig({
    * parity test would have compared `index.ts` against nothing and reported
    * that the two agreed. A gate that reads an empty file always passes.
    */
-  test: { css: true },
+  test: { css: true, setupFiles: ['./src/testing/setup.ts'] },
   resolve: {
     /**
      * Resolve the shared workspace packages to their TypeScript source rather

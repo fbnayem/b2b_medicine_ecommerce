@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  changePassword,
   listOwnSessions,
   login,
   logout,
@@ -18,6 +19,9 @@ const limited = authRateLimit();
 
 router.post('/login', limited, login);
 router.post('/refresh', limited, refresh);
+// Reachable while carrying `forcePasswordChange`, because it is the one thing
+// such a user is supposed to do. See `requirePasswordChange`.
+router.post('/change-password', requireAuth, changePassword);
 router.post('/logout', requireAuth, logout);
 router.post('/logout-all', requireAuth, logoutAll);
 router.get('/sessions', requireAuth, listOwnSessions);

@@ -17,6 +17,14 @@ import { getCreditSummary } from './financeService';
 import { reserveCredit } from './creditReservationService';
 import { assertSafeMoney, safeAdd } from './financialMath';
 type Actor = { _id: Types.ObjectId; role: UserRole };
+
+/**
+ * Who may approve an order past its credit limit.
+ *
+ * Exported so the clients can decide whether to render the control at all,
+ * rather than offering a button that always fails.
+ */
+export const CREDIT_OVERRIDE_ROLES: readonly UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN];
 type Input = {
   version: number;
   lines: Array<{
@@ -200,6 +208,28 @@ export async function approveOrder(
           });
         }
         if (credit.orderBlocked && input.creditOverride) {
+          /**
+           * Overriding a credit block is a decision to extend unsecured credit
+           * past an agreed limit, so it belongs to whoever carries that risk.
+           *
+           * Two documents disagreed and the code matched neither:
+           * `PHASE_STATUS.md:166` recorded the intent as Admin and Super Admin
+           * only, `PERMISSIONS.md:29` said Managers as well, and the service
+           * applied **no role check at all** — any approver could grant one with
+           * a five-character reason. Settled as the stricter of the two, which
+           * is also the documented intent, and `PERMISSIONS.md` is corrected to
+           * match. Downgrading it later is a policy change somebody makes
+           * deliberately; leaving it undecided is how it stayed open.
+           */
+          if (!CREDIT_OVERRIDE_ROLES.includes(actor.role)) {
+            throw Object.assign(
+              new Error(
+                'Only an administrator can approve an order past its credit limit. ' +
+                  'Ask an administrator to review it.',
+              ),
+              { statusCode: 403, code: 'CREDIT_OVERRIDE_FORBIDDEN' },
+            );
+          }
           const reason = input.internalNotes?.trim() ?? '';
           if (reason.length < 5) {
             throw Object.assign(

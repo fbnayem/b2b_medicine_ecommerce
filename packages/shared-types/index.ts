@@ -566,6 +566,13 @@ export const NotificationEvent = {
   ORDER_ON_HOLD: 'ORDER_ON_HOLD',
   ORDER_REJECTED: 'ORDER_REJECTED',
   ORDER_APPROVED: 'ORDER_APPROVED',
+  /**
+   * A shop owner has *asked* to cancel. Separate from ORDER_CANCELLED because
+   * the request endpoint used to fire that one, telling management an order was
+   * cancelled when nothing had cancelled it.
+   */
+  ORDER_CANCELLATION_REQUESTED: 'ORDER_CANCELLATION_REQUESTED',
+  ORDER_CANCELLATION_REFUSED: 'ORDER_CANCELLATION_REFUSED',
   ORDER_CANCELLED: 'ORDER_CANCELLED',
   PICKING_READY: 'PICKING_READY',
   PICKING_DISCREPANCY: 'PICKING_DISCREPANCY',

@@ -7,6 +7,7 @@ import {
   duplicateOrder,
   getOrder,
   listOrders,
+  decideCancellationRequest,
   requestCancellation,
   saveDraft,
   submitOrder,
@@ -24,4 +25,11 @@ router.post('/drafts/:id/submit', requireRole([UserRole.SHOP_OWNER]), submitOrde
 router.get('/:id', requireRole(readers), getOrder);
 router.post('/:id/duplicate', requireRole([UserRole.SHOP_OWNER]), duplicateOrder);
 router.post('/:id/cancellation-request', requireRole([UserRole.SHOP_OWNER]), requestCancellation);
+// The decision the request never had. Management only; the service checks the
+// role again, because a route guard is not where a money-shaped rule belongs.
+router.post(
+  '/:id/cancellation-decision',
+  requireRole([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER]),
+  decideCancellationRequest,
+);
 export default router;

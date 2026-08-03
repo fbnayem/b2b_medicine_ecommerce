@@ -14,6 +14,7 @@ import { ActivityTimeline } from '../components/ActivityTimeline';
 import { useRealtimeEvent } from '../realtime/useRealtime';
 import './inventory.css';
 import { formatFinanceDateTime } from '../lib/finance';
+import { useAsk } from '../components/ui';
 
 type DeliveryPerson = Pick<User, '_id' | 'firstName' | 'lastName' | 'email'> & {
   activeDeliveries: number;
@@ -23,6 +24,7 @@ const managerRoles: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole
 const actionKey = (name: string) => `${name}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export function DeliveryDetail() {
+  const ask = useAsk();
   const { id } = useParams();
   const role = useAuthStore((state) => state.user?.role);
   const [delivery, setDelivery] = useState<Delivery>();
@@ -102,7 +104,15 @@ export function DeliveryDetail() {
       typeof delivery.invoiceId === 'string'
     )
       return;
-    if (!window.confirm(`Hand ${delivery.packageId.reference} to the assigned delivery person?`))
+    if (
+      !(await ask.confirm({
+        title: `Hand ${delivery.packageId.reference} over?`,
+        description:
+          'Custody of the package passes to the delivery person. Confirm only once they are ' +
+          'physically holding it.',
+        confirmLabel: 'Hand it over',
+      }))
+    )
       return;
     await post(
       'handover',
@@ -270,9 +280,15 @@ export function DeliveryDetail() {
             {delivery.status === DeliveryStatus.ASSIGNED ? (
               <button
                 className="secondary-button"
-                onClick={() =>
-                  window.confirm('Cancel this uncollected delivery?') &&
-                  void post('cancel', {}, 'Delivery cancelled.')
+                onClick={async () =>
+                  (await ask.confirm({
+                    title: 'Cancel this delivery?',
+                    description:
+                      'The delivery is called off and the order returns to needing a rider. Use ' +
+                      'this only while the package is still at the store.',
+                    confirmLabel: 'Cancel delivery',
+                    danger: true,
+                  })) && void post('cancel', {}, 'Delivery cancelled.')
                 }
               >
                 Cancel delivery
@@ -294,9 +310,14 @@ export function DeliveryDetail() {
             <h2>Returned package</h2>
             <p>Inspect the physical package before confirming it is back in store custody.</p>
             <button
-              onClick={() =>
-                window.confirm('Confirm the package is physically back at the store?') &&
-                void post('returned', {}, 'Return confirmed.')
+              onClick={async () =>
+                (await ask.confirm({
+                  title: 'Is the package back at the store?',
+                  description:
+                    'Confirm only once you are holding it. This returns custody to the store and ' +
+                    'the stock becomes available again.',
+                  confirmLabel: 'Yes, it is back',
+                })) && void post('returned', {}, 'Return confirmed.')
               }
             >
               Confirm returned to store
