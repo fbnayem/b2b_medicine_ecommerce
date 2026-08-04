@@ -1580,6 +1580,7 @@ export const en = {
   } as Record<string, string>,
 
   medicineForm: {
+    productType: 'Type of product',
     title: 'Add a medicine',
     subtitle: 'Prices are entered in taka. Everything else describes the pack itself.',
     sku: 'Stock code',
@@ -2385,6 +2386,19 @@ export const en = {
     administration: 'Administration',
     account: 'My account',
   } as Record<string, string>,
+
+  productType: {
+    MEDICINE: 'Medicine',
+    SUPPLEMENT: 'Supplement',
+    PERSONAL_CARE: 'Personal care',
+    BABY_CARE: 'Baby and mother care',
+    FOOD: 'Food and drink',
+    HERBAL: 'Herbal',
+    HOMEOPATHY: 'Homeopathy',
+    HOME_CARE: 'Household',
+    VETERINARY: 'Veterinary',
+    DEVICE: 'Device',
+  },
 
   navItem: {
     'order-entry': 'Take an order',

@@ -99,6 +99,36 @@ export const MedicineClassification = { PRESCRIPTION: 'PRESCRIPTION', OTC: 'OTC'
 export type MedicineClassification =
   (typeof MedicineClassification)[keyof typeof MedicineClassification];
 
+/**
+ * The shelf a catalogue line sits on.
+ *
+ * A pharmaceutical distributor in this market does not only move drugs. The
+ * same van carries skincare, baby care, food supplements and household goods,
+ * and a catalogue that can only describe a tablet forces every one of those to
+ * be entered as a tablet with an invented generic name — fabricated clinical
+ * data in a system a pharmacist reads.
+ *
+ * This is the **merchandising** shelf and nothing more. What decides whether
+ * clinical fields are required is `MedicineClassification`: a `PRESCRIPTION`
+ * line must name its active ingredient, strength and form, because nobody can
+ * dispense one without them. An `OTC` line need not, whatever shelf it is on —
+ * which is how a sunblock filed under "Dermatological Preparations" and a box
+ * of nappies both become describable without either being called a drug.
+ */
+export const ProductType = {
+  MEDICINE: 'MEDICINE',
+  SUPPLEMENT: 'SUPPLEMENT',
+  PERSONAL_CARE: 'PERSONAL_CARE',
+  BABY_CARE: 'BABY_CARE',
+  FOOD: 'FOOD',
+  HERBAL: 'HERBAL',
+  HOMEOPATHY: 'HOMEOPATHY',
+  HOME_CARE: 'HOME_CARE',
+  VETERINARY: 'VETERINARY',
+  DEVICE: 'DEVICE',
+} as const;
+export type ProductType = (typeof ProductType)[keyof typeof ProductType];
+
 export const StockMovementType = {
   RECEIPT: 'RECEIPT',
   ADDITION: 'ADDITION',
@@ -151,11 +181,28 @@ export interface Medicine {
   reference: string;
   sku: string;
   barcode?: string;
+  /**
+   * The shelf.
+   *
+   * Optional because it is absent from every row written before it existed —
+   * the model defaults it on write, which does not reach documents already in
+   * the collection. Read it as `MEDICINE` when it is missing, which is what
+   * those rows are.
+   */
+  productType?: ProductType;
   brandName: string;
-  genericName: string;
+  /**
+   * Active ingredient, strength and form.
+   *
+   * Required on anything dispensed against a prescription and optional
+   * elsewhere — a box of nappies has no generic name, and inventing one to
+   * satisfy a schema puts fabricated clinical data in front of a pharmacist.
+   * `validateMedicine` enforces the conditional half.
+   */
+  genericName?: string;
   manufacturer: string;
-  strength: string;
-  dosageForm: string;
+  strength?: string;
+  dosageForm?: string;
   packSize: string;
   unit: string;
   category: string;

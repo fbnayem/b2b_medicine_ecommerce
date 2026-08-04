@@ -20,6 +20,7 @@ import type { Medicine } from '@medsupply/shared-types';
 export interface DraftLine {
   medicineId: string;
   brandName: string;
+  /** Blank on a shelf line — a shampoo has no strength. Rendered beside the brand. */
   strength: string;
   quantity: number;
   /** The catalogue's own bounds, carried so a typed quantity can be checked against them. */
@@ -55,7 +56,7 @@ export function addLine(
       {
         medicineId: medicine._id,
         brandName: medicine.brandName,
-        strength: medicine.strength,
+        strength: medicine.strength ?? '',
         quantity: medicine.minimumOrderQuantity || 1,
         minimum: medicine.minimumOrderQuantity || 1,
         maximum: medicine.maximumOrderQuantity,

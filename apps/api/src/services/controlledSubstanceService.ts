@@ -103,6 +103,14 @@ export async function controlledSubstanceRegister(input: { from: Date; to: Date 
   }
 
   const rows: RegisterRow[] = medicines.map((medicine) => {
+    /*
+     * Every row here is a controlled substance, so it is a prescription
+     * medicine, so `validateMedicine` has already required both of these. The
+     * fallback is unreachable in practice and exists because the fields are
+     * optional on the catalogue as a whole — a box of nappies has no strength.
+     */
+    const genericName = medicine.genericName ?? '';
+    const strength = medicine.strength ?? '';
     const key = String(medicine._id);
     const byType = movements.get(key) ?? new Map<string, number>();
     const quantityOf = (type: string) => byType.get(type) ?? 0;
@@ -121,8 +129,8 @@ export async function controlledSubstanceRegister(input: { from: Date; to: Date 
       medicineId: key,
       reference: medicine.reference,
       brandName: medicine.brandName,
-      genericName: medicine.genericName,
-      strength: medicine.strength,
+      genericName,
+      strength,
       openingQuantity: opening,
       receivedQuantity: received,
       despatchedQuantity: despatched,

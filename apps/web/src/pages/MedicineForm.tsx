@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MedicineClassification } from '@medsupply/shared-types';
+import { MedicineClassification, ProductType } from '@medsupply/shared-types';
 import { MedicineFieldsSchema } from '@medsupply/validation';
 import { parseMoney } from '@medsupply/utilities';
 import { z } from 'zod';
@@ -70,6 +70,27 @@ const MedicineFormSchema = MedicineFieldsSchema.omit({
         message: 'The trade price cannot be above the MRP.',
       });
     }
+
+    /*
+     * A prescription line has to say what it actually is.
+     *
+     * The clinical fields are optional on the schema now, because a shampoo has
+     * no generic name and inventing one puts fabricated clinical data in the
+     * column a pharmacist reads. The condition is `classification`, not the
+     * shelf — and the server enforces exactly this, so saying it here only
+     * changes *when* somebody finds out, not whether.
+     */
+    if (value.classification === MedicineClassification.PRESCRIPTION) {
+      for (const field of ['genericName', 'strength', 'dosageForm'] as const) {
+        if (!String(value[field] ?? '').trim()) {
+          context.addIssue({
+            code: 'custom',
+            path: [field],
+            message: 'A prescription medicine needs this.',
+          });
+        }
+      }
+    }
   });
 
 type MedicineValues = z.input<typeof MedicineFormSchema>;
@@ -96,6 +117,15 @@ const TEXT_FIELDS: Array<[keyof MedicineOutput & string, string, string]> = [
 
 const OPTIONAL = new Set(['barcode', 'maximumOrderQuantity', 'mrp']);
 
+/**
+ * The three that are required only on a prescription line.
+ *
+ * A static `required` marker would either put an asterisk on a nappy's generic
+ * name or leave it off a controlled drug's, and both read as the form being
+ * wrong about its own rules.
+ */
+const CLINICAL = new Set(['genericName', 'strength', 'dosageForm']);
+
 export function MedicineForm() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
@@ -117,6 +147,7 @@ export function MedicineForm() {
       sellingPrice: '',
       mrp: '',
       minimumOrderQuantity: 1,
+      productType: ProductType.MEDICINE,
       classification: MedicineClassification.PRESCRIPTION,
       coldChain: false,
     } as MedicineValues,
@@ -148,6 +179,7 @@ export function MedicineForm() {
   });
 
   const errors = form.formState.errors as Record<string, { message?: string } | undefined>;
+  const prescription = form.watch('classification') === MedicineClassification.PRESCRIPTION;
 
   return (
     <main>
@@ -165,7 +197,7 @@ export function MedicineForm() {
               <Field
                 key={name}
                 label={t(`medicineForm.${key}`)}
-                required={!OPTIONAL.has(name)}
+                required={!OPTIONAL.has(name) && (!CLINICAL.has(name) || prescription)}
                 error={errors[name]?.message}
               >
                 <Input
@@ -183,6 +215,16 @@ export function MedicineForm() {
                 />
               </Field>
             ))}
+
+            <Field label={t('medicineForm.productType')} error={errors.productType?.message}>
+              <Select {...form.register('productType')}>
+                {Object.values(ProductType).map((value) => (
+                  <option key={value} value={value}>
+                    {t(`productType.${value}`)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
 
             <Field label={t('medicineForm.classification')} error={errors.classification?.message}>
               <Select {...form.register('classification')}>

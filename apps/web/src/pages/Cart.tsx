@@ -68,7 +68,9 @@ export function Cart() {
   const lines: Line[] = items.map(({ medicine, quantity }) => ({
     medicineId: medicine._id,
     brandName: medicine.brandName,
-    strength: medicine.strength,
+    // Blank rather than absent: a line without a strength is a shampoo, and
+    // the display concatenates the two.
+    strength: medicine.strength ?? '',
     unitPriceMinor: medicine.defaultSellingPriceMinor,
     quantity,
     minimum: medicine.minimumOrderQuantity,

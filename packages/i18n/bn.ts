@@ -1522,6 +1522,7 @@ export const bn: Catalogue = {
   } as Record<string, string>,
 
   medicineForm: {
+    productType: 'পণ্যের ধরন',
     title: 'নতুন ওষুধ যোগ করুন',
     subtitle: 'দাম টাকায় লিখুন। বাকি সব প্যাকের বর্ণনা।',
     sku: 'স্টক কোড',
@@ -2244,6 +2245,19 @@ export const bn: Catalogue = {
     administration: 'প্রশাসন',
     account: 'আমার অ্যাকাউন্ট',
   } as Record<string, string>,
+
+  productType: {
+    MEDICINE: 'ওষুধ',
+    SUPPLEMENT: 'সাপ্লিমেন্ট',
+    PERSONAL_CARE: 'ব্যক্তিগত পরিচর্যা',
+    BABY_CARE: 'শিশু ও মায়ের যত্ন',
+    FOOD: 'খাদ্য ও পানীয়',
+    HERBAL: 'ভেষজ',
+    HOMEOPATHY: 'হোমিওপ্যাথি',
+    HOME_CARE: 'গৃহস্থালি',
+    VETERINARY: 'পশুচিকিৎসা',
+    DEVICE: 'যন্ত্র',
+  },
 
   navItem: {
     'order-entry': 'অর্ডার নিন',

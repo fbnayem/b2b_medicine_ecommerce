@@ -189,8 +189,15 @@ export async function traceBatch(batchId: string): Promise<RecallTrace> {
       id: String(medicine._id),
       reference: medicine.reference,
       brandName: medicine.brandName,
-      genericName: medicine.genericName,
-      strength: medicine.strength,
+      /*
+       * A recall trace is read under time pressure, and an empty cell is a
+       * clearer answer than a missing key. Both are now optional on the
+       * catalogue — a shampoo has no generic name — and while a recalled batch
+       * is almost always a drug, the trace must render whatever it is handed
+       * rather than fail on a shelf line somebody stocked.
+       */
+      genericName: medicine.genericName ?? '',
+      strength: medicine.strength ?? '',
       manufacturer: medicine.manufacturer,
     },
     recipients,

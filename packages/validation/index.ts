@@ -10,6 +10,7 @@ import {
   NotificationChannel,
   NotificationEvent,
   PaymentMethod,
+  ProductType,
   PushPlatform,
   ReportGranularity,
   ReturnReason,
@@ -18,6 +19,9 @@ import {
   StockMovementType,
   UserRole,
 } from '@medsupply/shared-types';
+
+type MedicineClassificationValue =
+  (typeof MedicineClassification)[keyof typeof MedicineClassification];
 
 // Bangladesh phone: starts with +880 or 01, then 9 more digits
 const bdPhone = z
@@ -138,16 +142,46 @@ export const MedicineFieldsSchema = z.object({
     .max(50)
     .transform((value) => value.toUpperCase()),
   barcode: z.string().trim().min(6).max(32).optional(),
+  productType: z.nativeEnum(ProductType).default(ProductType.MEDICINE),
   brandName: z.string().trim().min(2).max(120),
-  genericName: z.string().trim().min(2).max(160),
+  /*
+   * The clinical identity, optional here and conditionally required below.
+   *
+   * These were unconditionally required, which is correct for a tablet and
+   * impossible for a box of nappies — so importing anything that is not a drug
+   * meant inventing a generic name, a strength and a dosage form for it. That
+   * is fabricated clinical data sitting in the same column a pharmacist reads
+   * a real one from, which is worse than not stocking the line at all.
+   *
+   * `validateMedicine` requires all three on a `PRESCRIPTION` product, because
+   * nobody can dispense one without knowing its active ingredient and strength.
+   */
+  genericName: z.string().trim().min(2).max(160).optional(),
   manufacturer: z.string().trim().min(2).max(120),
-  strength: z.string().trim().min(1).max(60),
-  dosageForm: z.string().trim().min(2).max(60),
+  strength: z.string().trim().min(1).max(60).optional(),
+  dosageForm: z.string().trim().min(2).max(60).optional(),
   packSize: z.string().trim().min(1).max(60),
   unit: z.string().trim().min(1).max(30),
   category: z.string().trim().min(2).max(80),
   description: z.string().trim().max(2000).optional(),
-  productImageUrl: z.string().url().optional(),
+  /**
+   * Where the picture is — an absolute URL, or a path to a file we hold.
+   *
+   * `z.string().url()` alone rejected the second, which meant a catalogue
+   * imported with its images had exactly one field that no schema had checked,
+   * because the importer had to set it after parsing. A relative path is a
+   * legitimate answer here: the file exists, it simply is not served yet.
+   */
+  productImageUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .refine(
+      (value) =>
+        /^https?:\/\//i.test(value) || /^[\w./-]+\.(webp|jpe?g|png|gif|avif)$/i.test(value),
+      'Must be an http(s) URL or a path to an image file',
+    )
+    .optional(),
   costPriceMinor: moneyMinor,
   defaultSellingPriceMinor: moneyMinor,
   /**
@@ -220,17 +254,61 @@ const validateMedicinePrices = (
   }
 };
 
+/**
+ * A prescription line has to say what it actually is.
+ *
+ * The regulatory line, not a merchandising one: a pharmacist dispensing
+ * against a prescription needs the active ingredient, the strength and the
+ * form, and the controlled-substance register is unreadable without them. An
+ * OTC line — a sunblock, a shampoo, a box of nappies — needs none of the
+ * three, and demanding them is what forced every non-drug product to be
+ * entered with an invented generic name.
+ *
+ * Keyed on `classification` rather than on `productType` deliberately. The
+ * shelf a thing sits on is a merchandising choice and drifts; whether it is
+ * dispensed against a prescription is a fact about the product. Two lines in
+ * the sample that prompted this prove the point — a sunblock and a
+ * dermatological cream, both filed by the source under "Medicine", both
+ * carrying no generic name because neither actually needs one.
+ */
+const validateClinicalIdentity = (
+  value: {
+    classification?: MedicineClassificationValue;
+    genericName?: string;
+    strength?: string;
+    dosageForm?: string;
+  },
+  context: z.RefinementCtx,
+) => {
+  if (value.classification !== MedicineClassification.PRESCRIPTION) return;
+  const required = [
+    ['genericName', value.genericName, 'A prescription medicine must name its active ingredient'],
+    ['strength', value.strength, 'A prescription medicine must state its strength'],
+    ['dosageForm', value.dosageForm, 'A prescription medicine must state its dosage form'],
+  ] as const;
+  for (const [path, present, message] of required) {
+    if (!present || !present.trim()) {
+      context.addIssue({ code: 'custom', path: [path], message });
+    }
+  }
+};
+
 const validateMedicine = (
   value: {
     minimumOrderQuantity?: number;
     maximumOrderQuantity?: number;
     mrpMinor?: number;
     defaultSellingPriceMinor?: number;
+    classification?: MedicineClassificationValue;
+    genericName?: string;
+    strength?: string;
+    dosageForm?: string;
   },
   context: z.RefinementCtx,
 ) => {
   validateMedicineLimits(value, context);
   validateMedicinePrices(value, context);
+  validateClinicalIdentity(value, context);
 };
 
 export const CreateMedicineSchema = MedicineFieldsSchema.superRefine(validateMedicine);

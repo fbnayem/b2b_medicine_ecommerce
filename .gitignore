@@ -22,3 +22,11 @@ test-results/
 playwright-report/
 blob-report/
 .playwright/
+
+# Supplier catalogue exports.
+#
+# Bulk third-party product data, images and a SQLite database — several hundred
+# megabytes at full scale, and not this repository's to redistribute. The
+# importer finds the bundle by name at the repository root; keep it there and
+# out of version control. `apps/api/scripts/importArogga.ts` documents the shape.
+arogga export/

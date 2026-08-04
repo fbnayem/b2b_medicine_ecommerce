@@ -277,3 +277,37 @@ reads a decision rather than guesses at an intention.
   that shop is still in the territory-scoped list the server returns — a
   reassigned territory silently drops it rather than opening the screen on a
   customer every submission would be refused for.
+
+## Importing a supplier catalogue (Arogga, phase 25)
+
+- **A prescription line must name its active ingredient; nothing else must.**
+  The catalogue required a generic name, a strength and a dosage form on every
+  row, which is right for a tablet and impossible for a box of nappies — so
+  stocking anything that is not a drug meant inventing all three. The condition
+  is `classification`, deliberately, and not `productType`: which shelf a thing
+  sits on is a merchandising choice that drifts, whereas whether it is dispensed
+  against a prescription is a fact about the product. The imported sample proved
+  the distinction — a sunblock and a dermatological cream both arrive filed
+  under "Medicine" and neither carries a generic name.
+- **`b2b_price` is the trade price, and `price` is not.** The source carries
+  both; `price` is what a shopper pays on the storefront. Importing that would
+  quote every customer the retail figure and give away the trade margin on the
+  first order.
+- **Cost price is not in the export at all.** Imported rows take the trade price
+  as their cost, so margin reads as **zero** — visibly unknown — rather than as
+  a plausible figure nobody entered. A goods receipt supplies the real one. Cost
+  of zero was rejected as the alternative because it reports a 100% margin,
+  which is a dangerous number to be wrong about.
+- **`externalRef` is the upsert key, not the SKU or the reference.** The
+  reference is allocated by the counter and differs on every run, so re-running
+  keyed on it would duplicate the whole catalogue.
+- **The handoff is wrong about the SQLite copy.** It says to prefer
+  `arogga.sqlite` because "it has the same data"; its `seo_sections` table has
+  no `lang` and no `section` column, so the documented instruction to filter
+  descriptions to English cannot be followed from it. `descriptions.csv` carries
+  the documented shape and is what the importer reads.
+- **Their photography and copy are imported on the operator's authority.** The
+  bundle's image pipeline removes Arogga's watermark and the logo burned into
+  some artwork, and the descriptions are their marketing and monograph text.
+  `--no-images` and `--no-descriptions` turn each off. `meta_title` and
+  `meta_description` name Arogga outright and are never imported.

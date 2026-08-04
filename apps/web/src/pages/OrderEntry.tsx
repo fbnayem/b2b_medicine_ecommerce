@@ -202,7 +202,8 @@ export function OrderEntry() {
       {
         medicineId: pending._id,
         brandName: pending.brandName,
-        strength: pending.strength,
+        // A shelf line has no strength; the row renders brand and strength together.
+        strength: pending.strength ?? '',
         quantity,
       },
     ]);
