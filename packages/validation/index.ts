@@ -78,7 +78,16 @@ export const ChangePasswordSchema = z.object({
 const moneyMinor = z.number().int().min(0);
 const positiveQuantity = z.number().int().positive();
 
-const MedicineFieldsSchema = z.object({
+/**
+ * Exported so a form can reuse the field rules without the money ones.
+ *
+ * The API is sent integer minor units; a form holds what somebody typed, which
+ * is a major-unit string. The web catalogue form therefore omits the two money
+ * fields and validates them through `parseMoney` instead — every other rule
+ * (the length of a brand name, the shape of a barcode) still comes from here,
+ * so it cannot drift from what the server enforces.
+ */
+export const MedicineFieldsSchema = z.object({
   sku: z
     .string()
     .trim()

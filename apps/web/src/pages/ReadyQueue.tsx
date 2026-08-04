@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiClient } from '../api/client';
+import { Card, EmptyState, LinkButton, PageHeader, Resource } from '../components/ui';
+import { useApiCollection } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
-import { Card, EmptyState, ErrorState, LoadingState, PageHeader } from '../components/ui';
 
-type ReadyPackage = {
+interface ReadyPackage {
   _id: string;
   reference: string;
   barcode: string;
@@ -12,7 +12,7 @@ type ReadyPackage = {
   orderId: { _id?: string; reference: string };
   invoiceId: { reference: string; grandTotalMinor: number };
   deliveryId?: string;
-};
+}
 
 /**
  * Packed orders waiting to be handed to a rider.
@@ -23,92 +23,76 @@ type ReadyPackage = {
  * happens on the delivery, so every row now goes there.
  */
 export function ReadyQueue() {
-  const [data, setData] = useState<ReadyPackage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  async function load() {
-    setLoading(true);
-    try {
-      setData((await apiClient.get('/fulfilment/ready')).data.data);
-      setError('');
-    } catch {
-      setError('Unable to load the packages that are ready.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void load();
-  }, []);
+  const { t } = useLanguage();
+  const ready = useApiCollection<ReadyPackage>(['fulfilment-ready'], '/fulfilment/ready');
 
   return (
-    <>
+    <main>
       <PageHeader
         routeId="fulfilment-ready"
-        title="Ready to hand over"
-        description="Packed and invoiced. Open one to hand it to the delivery person."
-        actions={
-          <Link
-            to="/fulfilment"
-            className="flex min-h-11 items-center rounded-md border border-border px-4"
-          >
-            Back to picking
-          </Link>
-        }
+        title={t('fulfilment.readyTitle')}
+        description={t('fulfilment.readySubtitle')}
+        actions={<LinkButton to="/fulfilment">{t('fulfilment.backToPicking')}</LinkButton>}
       />
 
-      {error ? (
-        <ErrorState message={error} onRetry={() => void load()} />
-      ) : loading ? (
-        <LoadingState label="Loading the packages that are ready" />
-      ) : data.length === 0 ? (
-        <EmptyState
-          title="Nothing is waiting to go out"
-          description="Packages appear here once they have been packed and invoiced."
-          action={
-            <Link
-              to="/fulfilment"
-              className="flex min-h-11 items-center rounded-md bg-brand px-4 text-on-brand"
-            >
-              Go to the picking queue
-            </Link>
-          }
-        />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {data.map((item) => (
-            <Card key={item._id} className="p-0">
-              {/*
-                The whole card is the link. `row-<reference>` uses the
-                server-generated package reference, per the test-id contract —
-                never an ObjectId.
-              */}
-              <Link
-                data-test={`row-${item.reference}`}
-                to={
-                  item.deliveryId
-                    ? `/deliveries/${item.deliveryId}`
-                    : `/deliveries?package=${encodeURIComponent(item.reference)}`
-                }
-                className="flex h-full flex-col gap-1 rounded-lg p-4 hover:bg-surface-hover"
-              >
-                <span className="text-sm text-text-muted">{item.reference}</span>
-                <span className="text-lg font-semibold text-text">{item.orderId.reference}</span>
-                <span className="text-text-muted">
-                  {item.invoiceId.reference} · {formatMinor(item.invoiceId.grandTotalMinor)}
-                </span>
-                <span className="text-sm text-text-muted">
-                  {item.packageCount} package{item.packageCount === 1 ? '' : 's'} · barcode{' '}
-                  {item.barcode}
-                </span>
-                <span className="mt-2 font-medium text-brand">Hand over →</span>
-              </Link>
-            </Card>
-          ))}
-        </div>
-      )}
-    </>
+      <Resource
+        query={ready}
+        loadingLabel={t('fulfilment.readyLoading')}
+        errorMessageFallback={t('fulfilment.readyCouldNotLoad')}
+        empty={
+          <EmptyState
+            title={t('fulfilment.readyNone')}
+            description={t('fulfilment.readyNoneBody')}
+            action={
+              <LinkButton variant="primary" to="/fulfilment">
+                {t('fulfilment.goToPicking')}
+              </LinkButton>
+            }
+          />
+        }
+      >
+        {(page) => (
+          <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">
+            {page.items.map((item) => (
+              <li key={item._id}>
+                <Card className="h-full p-0">
+                  {/*
+                    The whole card is the link. `row-<reference>` uses the
+                    server-generated package reference, per the test-id contract
+                    — never an ObjectId.
+                  */}
+                  <Link
+                    data-test={`row-${item.reference}`}
+                    to={
+                      item.deliveryId
+                        ? `/deliveries/${item.deliveryId}`
+                        : `/deliveries?package=${encodeURIComponent(item.reference)}`
+                    }
+                    className="flex h-full flex-col gap-1 rounded-lg p-4 hover:bg-surface-hover"
+                  >
+                    <span className="text-sm text-text-muted">{item.reference}</span>
+                    <span className="text-lg font-semibold text-text">
+                      {item.orderId.reference}
+                    </span>
+                    <span className="text-text-muted">
+                      {item.invoiceId.reference} · {formatMinor(item.invoiceId.grandTotalMinor)}
+                    </span>
+                    <span className="text-sm text-text-muted">
+                      {item.packageCount === 1
+                        ? t('fulfilment.onePackage')
+                        : t('fulfilment.packages', { count: item.packageCount })}{' '}
+                      · {t('fulfilment.barcode', { code: item.barcode })}
+                    </span>
+                    <span className="mt-2 font-medium text-brand">
+                      {t('fulfilment.handOver')} →
+                    </span>
+                  </Link>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Resource>
+    </main>
   );
 }

@@ -45,6 +45,9 @@ describe('the Bangla catalogue', () => {
       // — so translating this placeholder would show somebody a pattern they
       // will never see on a real document.
       'returns.referenceHint',
+      // A paper size and a file format. Neither is a word in either language,
+      // and a storekeeper looking for the A4 button is looking for "A4".
+      'picking.a4Pdf',
     ]);
   });
 

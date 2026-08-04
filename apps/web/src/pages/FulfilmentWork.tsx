@@ -1,29 +1,49 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { UserRole } from '@medsupply/shared-types';
-import { apiClient } from '../api/client';
+import { apiClient, errorMessage } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
-import './inventory.css';
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  Field,
+  Input,
+  LinkButton,
+  PageHeader,
+  Resource,
+  Select,
+  Textarea,
+  requireReason,
+  toast,
+  useAsk,
+  type Column,
+} from '../components/ui';
+import { useApiResource } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
-import { requireReason, useAsk } from '../components/ui';
 
-type PickingItem = {
+interface PickingItem {
   _id: string;
   medicineId: { _id: string; brandName: string; genericName: string; strength: string };
   batchId: string;
   quantity: number;
   pickedQuantity: number;
   packedQuantity: number;
-};
-type Discrepancy = {
+}
+
+interface Discrepancy {
   _id: string;
   type: string;
   quantity: number;
   notes: string;
   status: string;
   resolutionNotes?: string;
-};
-type PickingList = {
+}
+
+interface PickingList {
   _id: string;
   status: string;
   version: number;
@@ -38,8 +58,9 @@ type PickingList = {
   batchNumbers?: Record<string, { batchNumber: string; expiryDate: string }>;
   orderId: { reference: string; shopId: { name: string } };
   discrepancies: Discrepancy[];
-};
-type IssuedResult = {
+}
+
+interface IssuedResult {
   invoice: {
     _id: string;
     reference: string;
@@ -58,11 +79,9 @@ type IssuedResult = {
     totalOutstandingMinor: number;
   };
   package: { reference: string; barcode: string; packageCount: number; weightGrams?: number };
-};
-type ApiFailure = { response?: { data?: { error?: { message?: string } } } };
+}
 
-const money = formatMinor;
-const discrepancyTypes = [
+const DISCREPANCY_TYPES = [
   'MISSING_QUANTITY',
   'DAMAGED_ITEM',
   'WRONG_BATCH',
@@ -70,158 +89,123 @@ const discrepancyTypes = [
   'STOCK_MISMATCH',
   'PRODUCT_UNAVAILABLE',
   'OTHER',
-] as const;
+];
 
 export function FulfilmentWork() {
   const ask = useAsk();
   const { id } = useParams();
+  const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
   const role = useAuthStore((state) => state.user?.role);
   const isStorekeeper = role === UserRole.STOREKEEPER;
-  const resolverRoles: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER];
-  const canResolve = role ? resolverRoles.includes(role) : false;
-  const [list, setList] = useState<PickingList>();
+  const canResolve = role
+    ? ([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER] as UserRole[]).includes(role)
+    : false;
+
+  const query = useApiResource<PickingList>(['picking', id], `/fulfilment/picking/${id}`);
+  const list = query.data;
+
   const [picked, setPicked] = useState<Record<string, number>>({});
   const [packed, setPacked] = useState<Record<string, number>>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [packageCount, setPackageCount] = useState(1);
   const [weight, setWeight] = useState(0);
   const [notes, setNotes] = useState('');
-  const [discrepancyType, setDiscrepancyType] =
-    useState<(typeof discrepancyTypes)[number]>('MISSING_QUANTITY');
+  const [discrepancyType, setDiscrepancyType] = useState(DISCREPANCY_TYPES[0]!);
   const [discrepancyQuantity, setDiscrepancyQuantity] = useState(0);
   const [discrepancyNotes, setDiscrepancyNotes] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [loading, setLoading] = useState(true);
   const [issued, setIssued] = useState<IssuedResult>();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const value: PickingList = (await apiClient.get(`/fulfilment/picking/${id}`)).data.data;
-      setList(value);
-      setPicked(
-        Object.fromEntries(
-          value.items.map((item) => [item._id, item.pickedQuantity || item.quantity]),
-        ),
-      );
-      setPacked(
-        Object.fromEntries(
-          value.items.map((item) => [item._id, item.pickedQuantity || item.quantity]),
-        ),
-      );
-      setError('');
-    } catch {
-      setError('Unable to load picking list.');
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
+  // Seeded from the server, then owned locally — a revalidation must not
+  // overwrite counts a picker is halfway through entering.
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!list) return;
+    const seed = Object.fromEntries(
+      list.items.map((item) => [item._id, item.pickedQuantity || item.quantity]),
+    );
+    setPicked(seed);
+    setPacked(seed);
+  }, [list]);
 
-  function failureMessage(caught: unknown, fallback: string) {
-    return (caught as ApiFailure).response?.data?.error?.message ?? fallback;
-  }
+  const reload = () => queryClient.invalidateQueries({ queryKey: ['picking', id] });
 
-  async function start() {
+  async function post(path: string, body: Record<string, unknown>, done: string, failed: string) {
     if (!list) return;
     try {
-      await apiClient.post(`/fulfilment/picking/${id}/start`, { version: list.version });
-      setSuccess('Picking started. Confirm each allocated batch and quantity.');
-      await load();
-    } catch (caught: unknown) {
-      setError(failureMessage(caught, 'Unable to start picking.'));
+      const response = await apiClient.post(`/fulfilment/picking/${id}/${path}`, {
+        version: list.version,
+        ...body,
+      });
+      await reload();
+      toast.success(done);
+      return response;
+    } catch (caught) {
+      toast.error(errorMessage(caught, language, failed));
+      return undefined;
     }
   }
 
-  async function saveProgress(action: 'SAVE' | 'PAUSE' | 'COMPLETE') {
-    if (!list) return;
-    try {
-      await apiClient.post(`/fulfilment/picking/${id}/progress`, {
-        version: list.version,
+  const saveProgress = (action: 'SAVE' | 'PAUSE' | 'COMPLETE') =>
+    post(
+      'progress',
+      {
         action,
-        items: list.items.map((item) => ({
+        items: (list?.items ?? []).map((item) => ({
           medicineId: item.medicineId._id,
           batchId: item.batchId,
           pickedQuantity: picked[item._id] ?? 0,
         })),
-      });
-      setSuccess(
-        action === 'COMPLETE'
-          ? 'Picking completed and moved to packing.'
-          : action === 'PAUSE'
-            ? 'Picking paused.'
-            : 'Picking progress saved.',
-      );
-      await load();
-    } catch (caught: unknown) {
-      setError(failureMessage(caught, 'Unable to update picking.'));
-    }
-  }
-
-  async function resume() {
-    if (!list) return;
-    try {
-      await apiClient.post(`/fulfilment/picking/${id}/resume`, { version: list.version });
-      setSuccess('Picking resumed.');
-      await load();
-    } catch (caught: unknown) {
-      setError(failureMessage(caught, 'Unable to resume picking.'));
-    }
-  }
+      },
+      action === 'COMPLETE'
+        ? t('picking.completed')
+        : action === 'PAUSE'
+          ? t('picking.paused')
+          : t('picking.saved'),
+      t('picking.updateFailed'),
+    );
 
   async function reportDiscrepancy() {
     if (!list?.items[0] || discrepancyNotes.trim().length < 3) {
-      setError('Enter at least three characters describing the discrepancy.');
+      toast.error(t('picking.needNotes'));
       return;
     }
-    try {
-      await apiClient.post(`/fulfilment/picking/${id}/discrepancies`, {
-        version: list.version,
+    await post(
+      'discrepancies',
+      {
         type: discrepancyType,
         medicineId: list.items[0].medicineId._id,
         batchId: list.items[0].batchId,
         quantity: discrepancyQuantity,
         notes: discrepancyNotes,
-      });
-      setSuccess('Discrepancy reported to management.');
-      await load();
-    } catch (caught: unknown) {
-      setError(failureMessage(caught, 'Unable to report discrepancy.'));
-    }
+      },
+      t('picking.reported'),
+      t('picking.reportFailed'),
+    );
   }
 
   async function resolveDiscrepancy() {
     const resolutionNotes = await ask.prompt({
-      title: 'Resolve this discrepancy',
-      description: 'Say what was actually found and what was done about it.',
-      label: 'What happened?',
+      title: t('picking.resolveTitle'),
+      description: t('picking.resolveBody'),
+      label: t('picking.resolveLabel'),
       multiline: true,
-      confirmLabel: 'Resolve',
+      confirmLabel: t('picking.resolveConfirm'),
       validate: requireReason(),
     });
-    if (!resolutionNotes || !list) return;
-    try {
-      await apiClient.post(`/fulfilment/picking/${id}/discrepancies/resolve`, {
-        version: list.version,
-        resolutionNotes,
-      });
-      setSuccess('Discrepancy resolved and returned to picking.');
-      await load();
-    } catch (caught: unknown) {
-      setError(failureMessage(caught, 'Unable to resolve discrepancy.'));
-    }
+    if (!resolutionNotes) return;
+    await post(
+      'discrepancies/resolve',
+      { resolutionNotes },
+      t('picking.resolved'),
+      t('picking.resolveFailed'),
+    );
   }
 
   async function pack() {
-    if (!list) return;
-    try {
-      const response = await apiClient.post(`/fulfilment/picking/${id}/pack`, {
-        version: list.version,
-        items: list.items.map((item) => ({
+    const response = await post(
+      'pack',
+      {
+        items: (list?.items ?? []).map((item) => ({
           medicineId: item.medicineId._id,
           batchId: item.batchId,
           packedQuantity: packed[item._id] ?? 0,
@@ -231,27 +215,25 @@ export function FulfilmentWork() {
         packageCount,
         weightGrams: weight || undefined,
         notes: notes || undefined,
-      });
-      setIssued(response.data.data);
-      setSuccess('Package and immutable invoice created from packed quantities.');
-      setError('');
-    } catch (caught: unknown) {
-      setError(failureMessage(caught, 'Packing failed.'));
-    }
+      },
+      t('picking.packed'),
+      t('picking.packFailed'),
+    );
+    if (response) setIssued(response.data.data as IssuedResult);
   }
 
-  async function download(layout: 'a4' | 'thermal') {
+  async function openInvoice(layout: 'a4' | 'thermal') {
     if (!issued) return;
     try {
       const response = await apiClient.get(`/fulfilment/invoices/${issued.invoice._id}/pdf`, {
         params: { layout },
         responseType: 'blob',
       });
-      const url = URL.createObjectURL(response.data);
+      const url = URL.createObjectURL(response.data as Blob);
       window.open(url, '_blank', 'noopener,noreferrer');
       window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
     } catch {
-      setError('Unable to download the invoice PDF.');
+      toast.error(t('picking.pdfFailed'));
     }
   }
 
@@ -261,296 +243,353 @@ export function FulfilmentWork() {
     window.setTimeout(() => delete document.body.dataset.invoiceLayout, 500);
   }
 
-  if (loading)
-    return (
-      <main className="inventory-page">
-        <section className="state">Loading picking list...</section>
-      </main>
-    );
-  if (!list)
-    return (
-      <main className="inventory-page">
-        <section className="state error">
-          {error || 'Picking list not found.'}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      </main>
-    );
+  function itemColumns(current: PickingList): ReadonlyArray<Column<PickingItem>> {
+    return [
+      {
+        key: 'medicine',
+        header: t('fields.medicine'),
+        cell: (item) => `${item.medicineId.brandName} ${item.medicineId.strength}`,
+      },
+      {
+        key: 'batch',
+        header: t('fields.batch'),
+        // The number printed on the carton, not the database id.
+        cell: (item) => current.batchNumbers?.[item.batchId]?.batchNumber ?? '—',
+      },
+      {
+        key: 'allocated',
+        header: t('picking.columnAllocated'),
+        numeric: true,
+        cell: (item) => item.quantity,
+      },
+      {
+        key: 'picked',
+        header: t('picking.columnPicked'),
+        numeric: true,
+        cell: (item) =>
+          current.status === 'PICKING' ? (
+            <input
+              aria-label={t('picking.pickedFor', { brand: item.medicineId.brandName })}
+              type="number"
+              min={0}
+              max={item.quantity}
+              value={picked[item._id] ?? 0}
+              onChange={(event) =>
+                setPicked((state) => ({ ...state, [item._id]: Number(event.target.value) }))
+              }
+              className="min-h-11 w-20 rounded-md border border-border bg-surface px-2 text-end tabular-nums text-text"
+            />
+          ) : (
+            item.pickedQuantity
+          ),
+      },
+      {
+        key: 'packed',
+        header: t('picking.columnPacked'),
+        numeric: true,
+        cell: (item) =>
+          current.status === 'PACKING' ? (
+            <input
+              aria-label={t('picking.packedFor', { brand: item.medicineId.brandName })}
+              type="number"
+              min={0}
+              max={item.pickedQuantity}
+              value={packed[item._id] ?? 0}
+              onChange={(event) =>
+                setPacked((state) => ({ ...state, [item._id]: Number(event.target.value) }))
+              }
+              className="min-h-11 w-20 rounded-md border border-border bg-surface px-2 text-end tabular-nums text-text"
+            />
+          ) : (
+            item.packedQuantity
+          ),
+      },
+      {
+        key: 'shortfall',
+        header: t('picking.columnShortfall'),
+        hideWhenStacked: current.status !== 'PACKING',
+        cell: (item) =>
+          current.status === 'PACKING' ? (
+            <input
+              aria-label={t('picking.shortfallFor', { brand: item.medicineId.brandName })}
+              value={reasons[item._id] ?? ''}
+              onChange={(event) =>
+                setReasons((state) => ({ ...state, [item._id]: event.target.value }))
+              }
+              className="min-h-11 w-full rounded-md border border-border bg-surface px-3 text-text"
+            />
+          ) : null,
+      },
+    ];
+  }
 
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">{list.status.replaceAll('_', ' ')}</p>
-          <h1>{list.orderId.reference}</h1>
-          <p>{list.orderId.shopId.name}</p>
-        </div>
-        <Link className="secondary-button" to="/fulfilment">
-          Queue
-        </Link>
-      </header>
-      {error ? <section className="state error">{error}</section> : null}
-      {success ? <section className="state success">{success}</section> : null}
-      {list.discrepancies.length > 0 ? (
-        <section className="panel">
-          <h2>Discrepancies</h2>
-          <ul className="movement-list">
-            {list.discrepancies.map((item) => (
-              <li key={item._id}>
-                <div>
-                  <strong>{item.type.replaceAll('_', ' ')}</strong>
-                  <span>{item.notes}</span>
-                </div>
-                <div>
-                  <span>{item.status}</span>
-                  <small>{item.resolutionNotes}</small>
-                </div>
-              </li>
-            ))}
-          </ul>
-          {list.status === 'BLOCKED_DISCREPANCY' && canResolve ? (
-            <button className="primary-button" onClick={() => void resolveDiscrepancy()}>
-              Resolve and return to picking
-            </button>
-          ) : null}
-        </section>
-      ) : null}
-      {isStorekeeper && ['PICKING', 'PAUSED', 'PACKING'].includes(list.status) ? (
-        <section className="panel data-form">
-          <h2>Report discrepancy</h2>
-          <div className="form-grid">
-            <label>
-              Type
-              <select
-                value={discrepancyType}
-                onChange={(event) =>
-                  setDiscrepancyType(event.target.value as (typeof discrepancyTypes)[number])
-                }
-              >
-                {discrepancyTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type.replaceAll('_', ' ')}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Affected quantity
-              <input
-                type="number"
-                min="0"
-                value={discrepancyQuantity}
-                onChange={(event) => setDiscrepancyQuantity(Number(event.target.value))}
-              />
-            </label>
-            <label className="wide">
-              Notes
-              <textarea
-                value={discrepancyNotes}
-                onChange={(event) => setDiscrepancyNotes(event.target.value)}
-              />
-            </label>
-          </div>
-          <button className="secondary-button" onClick={() => void reportDiscrepancy()}>
-            Report to management
-          </button>
-        </section>
-      ) : null}
-      {issued ? (
-        <section className="detail-grid">
-          <article className="panel invoice-print">
-            <h2>{issued.invoice.reference}</h2>
-            {issued.invoice.items.map((item, index) => (
-              <p key={index}>
-                {item.medicineSnapshot.brandName} / {item.batchNumber} / {item.quantity} /{' '}
-                {money(item.lineTotalMinor)}
-              </p>
-            ))}
-            <dl>
-              <dt>Subtotal</dt>
-              <dd>{money(issued.invoice.subtotalMinor)}</dd>
-              <dt>Order discount</dt>
-              <dd>{money(issued.invoice.orderDiscountMinor)}</dd>
-              <dt>Delivery</dt>
-              <dd>{money(issued.invoice.deliveryChargeMinor)}</dd>
-              <dt>Tax</dt>
-              <dd>{money(issued.invoice.taxMinor)}</dd>
-              <dt>Grand total</dt>
-              <dd>{money(issued.invoice.grandTotalMinor)}</dd>
-              <dt>Previous balance</dt>
-              <dd>{money(issued.invoice.previousBalanceMinor)}</dd>
-              <dt>Total outstanding</dt>
-              <dd>{money(issued.invoice.totalOutstandingMinor)}</dd>
-            </dl>
-            <p className="signature-line">Authorised signature: ____________________</p>
-            <div className="actions no-print">
-              <button className="primary-button" onClick={() => void download('a4')}>
-                A4 PDF
-              </button>
-              <button className="secondary-button" onClick={() => void download('thermal')}>
-                Thermal PDF
-              </button>
-              <button className="secondary-button" onClick={() => print('a4')}>
-                Print A4
-              </button>
-              <button className="secondary-button" onClick={() => print('thermal')}>
-                Print thermal
-              </button>
-            </div>
-          </article>
-          <article className="panel package-label">
-            <h2>Package label</h2>
-            <p className="reference">{issued.package.reference}</p>
-            <p className="barcode-label">{issued.package.barcode}</p>
-            <p>{issued.package.packageCount} package(s)</p>
-            {issued.package.weightGrams ? <p>{issued.package.weightGrams} g</p> : null}
-          </article>
-        </section>
-      ) : (
-        <>
-          <section className="panel">
-            <h2>{list.status === 'PACKING' ? 'Packing confirmation' : 'Allocated FEFO batches'}</h2>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Medicine</th>
-                    <th>Batch</th>
-                    <th>Allocated</th>
-                    <th>Picked</th>
-                    <th>Packed</th>
-                    <th>Shortfall reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.items.map((item) => (
-                    <tr key={item._id}>
-                      <td>
-                        {item.medicineId.brandName} {item.medicineId.strength}
-                      </td>
-                      <td>
-                        {/* The number printed on the carton, not the database id. */}
-                        {list.batchNumbers?.[item.batchId]?.batchNumber ?? '—'}
-                      </td>
-                      <td>{item.quantity}</td>
-                      <td>
-                        {list.status === 'PICKING' ? (
-                          <input
-                            aria-label={`Picked quantity for ${item.medicineId.brandName}`}
-                            type="number"
-                            min="0"
-                            max={item.quantity}
-                            value={picked[item._id] ?? 0}
-                            onChange={(event) =>
-                              setPicked((current) => ({
-                                ...current,
-                                [item._id]: Number(event.target.value),
-                              }))
-                            }
-                          />
-                        ) : (
-                          item.pickedQuantity
+    <main>
+      <Resource
+        query={query}
+        loadingLabel={t('picking.loading')}
+        errorMessageFallback={t('picking.couldNotLoad')}
+      >
+        {(current) => (
+          <>
+            <PageHeader
+              routeId="fulfilment-work"
+              title={current.orderId.reference}
+              description={
+                <span className="flex flex-wrap items-center gap-2">
+                  <Badge tone={current.status === 'BLOCKED_DISCREPANCY' ? 'danger' : 'info'}>
+                    {t(`pickingStatus.${current.status}`)}
+                  </Badge>
+                  {current.orderId.shopId.name}
+                </span>
+              }
+              actions={<LinkButton to="/fulfilment">{t('picking.queue')}</LinkButton>}
+            />
+
+            {current.discrepancies.length > 0 && (
+              <Card className="mb-4">
+                <h2 className="mb-2 text-lg font-semibold text-text">
+                  {t('picking.discrepancies')}
+                </h2>
+                <ul className="m-0 list-none p-0">
+                  {current.discrepancies.map((item) => (
+                    <li
+                      key={item._id}
+                      className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border py-2 last:border-b-0"
+                    >
+                      <div>
+                        <p className="font-medium text-text">{t(`discrepancyType.${item.type}`)}</p>
+                        <p className="text-sm text-text-muted">{item.notes}</p>
+                      </div>
+                      <div className="text-end">
+                        {/* The status of a discrepancy is a server string with
+                            no shared enum, so it is shown as it comes rather
+                            than mapped to words this client made up. */}
+                        <Badge>{item.status.replaceAll('_', ' ').toLowerCase()}</Badge>
+                        {item.resolutionNotes && (
+                          <p className="mt-1 text-sm text-text-muted">{item.resolutionNotes}</p>
                         )}
-                      </td>
-                      <td>
-                        {list.status === 'PACKING' ? (
-                          <input
-                            aria-label={`Packed quantity for ${item.medicineId.brandName}`}
-                            type="number"
-                            min="0"
-                            max={item.pickedQuantity}
-                            value={packed[item._id] ?? 0}
-                            onChange={(event) =>
-                              setPacked((current) => ({
-                                ...current,
-                                [item._id]: Number(event.target.value),
-                              }))
-                            }
-                          />
-                        ) : (
-                          item.packedQuantity
-                        )}
-                      </td>
-                      <td>
-                        {list.status === 'PACKING' ? (
-                          <input
-                            aria-label={`Shortfall reason for ${item.medicineId.brandName}`}
-                            value={reasons[item._id] ?? ''}
-                            onChange={(event) =>
-                              setReasons((current) => ({
-                                ...current,
-                                [item._id]: event.target.value,
-                              }))
-                            }
-                          />
-                        ) : null}
-                      </td>
-                    </tr>
+                      </div>
+                    </li>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-          {list.status === 'PACKING' && isStorekeeper ? (
-            <section className="panel data-form">
-              <div className="form-grid">
-                <label>
-                  Package count
-                  <input
-                    type="number"
-                    min="1"
-                    value={packageCount}
-                    onChange={(event) => setPackageCount(Number(event.target.value))}
-                  />
-                </label>
-                <label>
-                  Weight (grams, optional)
-                  <input
-                    type="number"
-                    min="0"
-                    value={weight}
-                    onChange={(event) => setWeight(Number(event.target.value))}
-                  />
-                </label>
-                <label className="wide">
-                  Packing notes
-                  <textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
-                </label>
+                </ul>
+                {current.status === 'BLOCKED_DISCREPANCY' && canResolve && (
+                  <Button
+                    variant="primary"
+                    className="mt-3"
+                    onClick={() => void resolveDiscrepancy()}
+                  >
+                    {t('picking.resolveAndReturn')}
+                  </Button>
+                )}
+              </Card>
+            )}
+
+            {issued ? (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card className="invoice-print">
+                  <h2 className="mb-2 text-lg font-semibold text-text">
+                    {issued.invoice.reference}
+                  </h2>
+                  <ul className="m-0 list-none p-0">
+                    {issued.invoice.items.map((item, index) => (
+                      <li
+                        key={index}
+                        className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border py-1"
+                      >
+                        <span className="text-text">
+                          {item.medicineSnapshot.brandName} · {item.batchNumber} × {item.quantity}
+                        </span>
+                        <span className="tabular-nums text-text">
+                          {formatMinor(item.lineTotalMinor)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <dl className="m-0 mt-3">
+                    {(
+                      [
+                        ['picking.invoiceSubtotal', issued.invoice.subtotalMinor],
+                        ['picking.invoiceDiscount', issued.invoice.orderDiscountMinor],
+                        ['picking.invoiceDelivery', issued.invoice.deliveryChargeMinor],
+                        ['picking.invoiceTax', issued.invoice.taxMinor],
+                        ['picking.invoiceGrandTotal', issued.invoice.grandTotalMinor],
+                        ['picking.invoicePreviousBalance', issued.invoice.previousBalanceMinor],
+                        ['picking.invoiceOutstanding', issued.invoice.totalOutstandingMinor],
+                      ] as const
+                    ).map(([key, value]) => (
+                      <div key={key} className="flex justify-between gap-4 py-1">
+                        <dt className="text-text-muted">{t(key)}</dt>
+                        <dd className="tabular-nums text-text">{formatMinor(value)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p className="mt-6 text-text-muted">{t('picking.signature')}: ________________</p>
+                  <div className="mt-3 flex flex-wrap gap-2 print:hidden">
+                    <Button variant="primary" onClick={() => void openInvoice('a4')}>
+                      {t('picking.a4Pdf')}
+                    </Button>
+                    <Button onClick={() => void openInvoice('thermal')}>
+                      {t('picking.thermalPdf')}
+                    </Button>
+                    <Button onClick={() => print('a4')}>{t('picking.printA4')}</Button>
+                    <Button onClick={() => print('thermal')}>{t('picking.printThermal')}</Button>
+                  </div>
+                </Card>
+
+                <Card className="package-label">
+                  <h2 className="mb-2 text-lg font-semibold text-text">
+                    {t('picking.packageLabel')}
+                  </h2>
+                  <p className="text-lg text-text">{issued.package.reference}</p>
+                  <p className="font-mono text-2xl tracking-widest text-text">
+                    {issued.package.barcode}
+                  </p>
+                  <p className="text-text-muted">
+                    {issued.package.packageCount === 1
+                      ? t('picking.oneBox')
+                      : t('picking.boxes', { count: issued.package.packageCount })}
+                  </p>
+                  {issued.package.weightGrams ? (
+                    <p className="text-text-muted">
+                      {t('picking.grams', { grams: issued.package.weightGrams })}
+                    </p>
+                  ) : null}
+                </Card>
               </div>
-              <button className="primary-button" onClick={() => void pack()}>
-                Confirm packing and issue invoice
-              </button>
-            </section>
-          ) : null}
-          {isStorekeeper ? (
-            <section className="panel actions">
-              {list.status === 'PENDING' ? (
-                <button className="primary-button" onClick={() => void start()}>
-                  Start picking
-                </button>
-              ) : null}
-              {list.status === 'PICKING' ? (
-                <>
-                  <button className="secondary-button" onClick={() => void saveProgress('SAVE')}>
-                    Save progress
-                  </button>
-                  <button className="secondary-button" onClick={() => void saveProgress('PAUSE')}>
-                    Pause
-                  </button>
-                  <button className="primary-button" onClick={() => void saveProgress('COMPLETE')}>
-                    Complete picking
-                  </button>
-                </>
-              ) : null}
-              {list.status === 'PAUSED' ? (
-                <button className="primary-button" onClick={() => void resume()}>
-                  Resume picking
-                </button>
-              ) : null}
-            </section>
-          ) : null}
-        </>
-      )}
+            ) : (
+              <>
+                <Card className="mb-4">
+                  <h2 className="mb-2 text-lg font-semibold text-text">
+                    {current.status === 'PACKING'
+                      ? t('picking.packingConfirmation')
+                      : t('picking.allocated')}
+                  </h2>
+                  <DataTable
+                    caption={t('picking.allocated')}
+                    columns={itemColumns(current)}
+                    rows={current.items}
+                    rowKey={(item) => item._id}
+                    rowTest={(item) =>
+                      current.batchNumbers?.[item.batchId]?.batchNumber ?? item.medicineId.brandName
+                    }
+                  />
+                </Card>
+
+                {current.status === 'PACKING' && isStorekeeper && (
+                  <Card className="mb-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label={t('picking.packageCount')} required>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={packageCount}
+                          onChange={(event) => setPackageCount(Number(event.target.value))}
+                        />
+                      </Field>
+                      <Field label={t('picking.weight')} hint={t('picking.weightHint')}>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={weight}
+                          onChange={(event) => setWeight(Number(event.target.value))}
+                        />
+                      </Field>
+                    </div>
+                    <Field label={t('picking.packingNotes')} className="mt-3">
+                      <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
+                    </Field>
+                    <div className="mt-3 flex justify-end">
+                      <Button variant="primary" onClick={() => void pack()}>
+                        {t('picking.confirmPacking')}
+                      </Button>
+                    </div>
+                  </Card>
+                )}
+
+                {isStorekeeper && ['PICKING', 'PAUSED', 'PACKING'].includes(current.status) && (
+                  <Card className="mb-4">
+                    <h2 className="mb-2 text-lg font-semibold text-text">
+                      {t('picking.reportTitle')}
+                    </h2>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label={t('picking.reportType')}>
+                        <Select
+                          value={discrepancyType}
+                          onChange={(event) => setDiscrepancyType(event.target.value)}
+                        >
+                          {DISCREPANCY_TYPES.map((type) => (
+                            <option key={type} value={type}>
+                              {t(`discrepancyType.${type}`)}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <Field label={t('picking.affectedQuantity')}>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={discrepancyQuantity}
+                          onChange={(event) => setDiscrepancyQuantity(Number(event.target.value))}
+                        />
+                      </Field>
+                    </div>
+                    <Field label={t('fields.notes')} className="mt-3">
+                      <Textarea
+                        value={discrepancyNotes}
+                        onChange={(event) => setDiscrepancyNotes(event.target.value)}
+                      />
+                    </Field>
+                    <div className="mt-3 flex justify-end">
+                      <Button onClick={() => void reportDiscrepancy()}>
+                        {t('picking.report')}
+                      </Button>
+                    </div>
+                  </Card>
+                )}
+
+                {isStorekeeper && (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {current.status === 'PENDING' && (
+                      <Button
+                        variant="primary"
+                        onClick={() =>
+                          void post('start', {}, t('picking.started'), t('picking.startFailed'))
+                        }
+                      >
+                        {t('picking.startPicking')}
+                      </Button>
+                    )}
+                    {current.status === 'PICKING' && (
+                      <>
+                        <Button onClick={() => void saveProgress('SAVE')}>
+                          {t('picking.saveProgress')}
+                        </Button>
+                        <Button onClick={() => void saveProgress('PAUSE')}>
+                          {t('picking.pause')}
+                        </Button>
+                        <Button variant="primary" onClick={() => void saveProgress('COMPLETE')}>
+                          {t('picking.completePicking')}
+                        </Button>
+                      </>
+                    )}
+                    {current.status === 'PAUSED' && (
+                      <Button
+                        variant="primary"
+                        onClick={() =>
+                          void post('resume', {}, t('picking.resumed'), t('picking.updateFailed'))
+                        }
+                      >
+                        {t('picking.resumePicking')}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </Resource>
     </main>
   );
 }

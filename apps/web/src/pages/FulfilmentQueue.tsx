@@ -1,97 +1,95 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiClient } from '../api/client';
-import './inventory.css';
+import {
+  Badge,
+  Card,
+  EmptyState,
+  FilterTabs,
+  LinkButton,
+  PageHeader,
+  Resource,
+} from '../components/ui';
+import { useApiCollection } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 
-type PickingList = {
+interface PickingList {
   _id: string;
   status: string;
   items: unknown[];
   orderId: { reference: string; shopId: { name: string } };
-};
+}
 
-const queues = [
-  ['', 'All'],
-  ['PENDING', 'Approved & waiting'],
-  ['PICKING', 'Picking'],
-  ['PAUSED', 'Paused'],
-  ['PACKING', 'Packing'],
-  ['BLOCKED_DISCREPANCY', 'Discrepancy'],
-  ['PACKED', 'Packed'],
-] as const;
+/** The order a storekeeper meets the work in, not the order the enum declares it. */
+const QUEUES = ['', 'PENDING', 'PICKING', 'PAUSED', 'PACKING', 'BLOCKED_DISCREPANCY', 'PACKED'];
 
 export function FulfilmentQueue() {
-  const [data, setData] = useState<PickingList[]>([]);
+  const { t } = useLanguage();
   const [status, setStatus] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      setData(
-        (await apiClient.get('/fulfilment/queue', { params: status ? { status } : {} })).data.data,
-      );
-      setError('');
-    } catch {
-      setError('Unable to load fulfilment queue.');
-    } finally {
-      setLoading(false);
-    }
-  }, [status]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const queue = useApiCollection<PickingList>(
+    ['fulfilment-queue', status],
+    `/fulfilment/queue${status ? `?status=${status}` : ''}`,
+  );
 
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Storekeeper</p>
-          <h1>Fulfilment queue</h1>
-          <p>Pick, resolve, pack, and hand off approved orders.</p>
-        </div>
-        <Link className="secondary-button" to="/fulfilment/ready">
-          Ready for delivery
-        </Link>
-      </header>
-      <nav className="filter-tabs" aria-label="Fulfilment status">
-        {queues.map(([value, label]) => (
-          <button
-            key={value}
-            className={status === value ? 'selected' : ''}
-            onClick={() => setStatus(value)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-      {error ? (
-        <section className="state error">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
-      {loading ? (
-        <section className="state">Loading queue...</section>
-      ) : data.length === 0 ? (
-        <section className="state">No fulfilment work in this queue.</section>
-      ) : (
-        <section className="catalogue-grid">
-          {data.map((list) => (
-            <Link className="medicine-card" to={`/fulfilment/${list._id}`} key={list._id}>
-              <span className="reference">{list.orderId.reference}</span>
-              <h2>{list.orderId.shopId.name}</h2>
-              <p>{list.items.length} allocated batch line(s)</p>
-              <div className="card-bottom">
-                <strong>{list.status.replaceAll('_', ' ')}</strong>
-                <span>Open</span>
-              </div>
-            </Link>
-          ))}
-        </section>
-      )}
+    <main>
+      <PageHeader
+        routeId="fulfilment"
+        title={t('fulfilment.title')}
+        description={t('fulfilment.subtitle')}
+        actions={<LinkButton to="/fulfilment/ready">{t('fulfilment.readyLink')}</LinkButton>}
+      />
+
+      <div className="mb-4">
+        <FilterTabs
+          label={t('fulfilment.filter')}
+          options={QUEUES.map((value) => ({
+            value,
+            label: t(`pickingStatus.${value || 'ALL'}`),
+          }))}
+          value={status}
+          onChange={setStatus}
+        />
+      </div>
+
+      <Resource
+        query={queue}
+        loadingLabel={t('fulfilment.loading')}
+        errorMessageFallback={t('fulfilment.couldNotLoad')}
+        empty={<EmptyState title={t('fulfilment.none')} description={t('fulfilment.noneBody')} />}
+      >
+        {(page) => (
+          <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">
+            {page.items.map((list) => (
+              <li key={list._id}>
+                <Card className="h-full p-0">
+                  {/* The whole card is the link, and `row-<reference>` uses the
+                      order reference — never the picking list's ObjectId. */}
+                  <Link
+                    data-test={`row-${list.orderId.reference}`}
+                    to={`/fulfilment/${list._id}`}
+                    className="flex h-full flex-col gap-1 rounded-lg p-4 hover:bg-surface-hover"
+                  >
+                    <span className="text-sm text-text-muted">{list.orderId.reference}</span>
+                    <span className="text-lg font-semibold text-text">
+                      {list.orderId.shopId.name}
+                    </span>
+                    <span className="text-text-muted">
+                      {t('fulfilment.lines', { count: list.items.length })}
+                    </span>
+                    <span className="mt-2 flex items-center justify-between gap-2">
+                      <Badge tone={list.status === 'BLOCKED_DISCREPANCY' ? 'danger' : 'info'}>
+                        {t(`pickingStatus.${list.status}`)}
+                      </Badge>
+                      <span className="font-medium text-brand">{t('fulfilment.open')} →</span>
+                    </span>
+                  </Link>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Resource>
     </main>
   );
 }
