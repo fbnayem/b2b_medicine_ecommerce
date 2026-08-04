@@ -35,7 +35,7 @@ import type { TemplateContext } from './notificationCatalogue';
 import { ActivityVisibility, recordActivity } from './activityService';
 import { emitEntityUpdate } from './realtime';
 import { MANAGEMENT_ROLES, userIdsWithRoles } from './notificationAudience';
-import { businessSettings, financeSettings } from './settingsService';
+import { financeSettings } from './settingsService';
 import { currencySnapshot } from './localisation';
 
 type RecordPaymentInput = {

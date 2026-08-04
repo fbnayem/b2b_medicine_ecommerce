@@ -90,7 +90,17 @@ const MANAGEMENT = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER];
 const ADMINS = [UserRole.SUPER_ADMIN, UserRole.ADMIN];
 const RANGE = ['from', 'to', 'granularity', 'shopId', 'format'];
 
-const OPERATIONS: Operation[] = [
+/**
+ * Exported so the reconciliation test can read the **roles** column.
+ *
+ * `buildOpenApiDocument()` renders the roles into a prose sentence in each
+ * operation's description, which is right for a reader and useless to a check.
+ * The list itself is the thing that has now drifted from the mounted route
+ * twice — order submission stayed documented as `SHOP_OWNER`-only for a phase
+ * after it opened to `SALES`, and `GET /shops` claimed every role while the
+ * router allowed three — so it has to be readable as data.
+ */
+export const OPERATIONS: Operation[] = [
   // ── Health ────────────────────────────────────────────────────────────────
   { method: 'get', path: '/health', summary: 'Liveness probe', tag: 'Health' },
   {
@@ -158,7 +168,7 @@ const OPERATIONS: Operation[] = [
   },
 
   // ── Users and shops ───────────────────────────────────────────────────────
-  { method: 'get', path: '/api/v1/users', summary: 'List users', tag: 'Users', roles: ADMINS },
+  { method: 'get', path: '/api/v1/users', summary: 'List users', tag: 'Users', roles: MANAGEMENT },
   {
     method: 'post',
     path: '/api/v1/users',
@@ -184,7 +194,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/shops',
     summary: 'Register a shop',
     tag: 'Shops',
-    roles: MANAGEMENT,
+    roles: ADMINS,
     body: CreateShopSchema,
   },
 
@@ -194,7 +204,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/inventory/medicines',
     summary: 'Search the medicine catalogue',
     tag: 'Inventory',
-    roles: ALL_ROLES,
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER, UserRole.SHOP_OWNER, UserRole.SALES],
     query: ['search', 'category', 'active', 'page', 'limit'],
   },
   {
@@ -236,7 +246,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/orders',
     summary: 'List orders; a Shop Owner sees only their own',
     tag: 'Orders',
-    roles: ALL_ROLES,
+    roles: [...MANAGEMENT, UserRole.SALES, UserRole.SHOP_OWNER],
     query: ['status', 'page', 'limit'],
   },
   {
@@ -578,7 +588,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/fulfilment/picking/{id}/pack',
     summary: 'Pack actual quantities and generate the final invoice',
     tag: 'Fulfilment',
-    roles: [...MANAGEMENT, UserRole.STOREKEEPER],
+    roles: [UserRole.STOREKEEPER],
     body: PackingSchema,
   },
   {
@@ -586,14 +596,14 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/fulfilment/invoices/{id}',
     summary: 'Read an issued invoice',
     tag: 'Fulfilment',
-    roles: ALL_ROLES,
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER, UserRole.SHOP_OWNER],
   },
   {
     method: 'get',
     path: '/api/v1/fulfilment/invoices/{id}/pdf',
     summary: 'Invoice as A4 or 80 mm thermal PDF',
     tag: 'Fulfilment',
-    roles: ALL_ROLES,
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER, UserRole.SHOP_OWNER],
     query: ['layout'],
     produces: 'application/pdf',
   },
@@ -620,7 +630,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/deliveries/{id}/complete',
     summary: 'Complete a delivery with receiver proof and any collection',
     tag: 'Deliveries',
-    roles: [...MANAGEMENT, UserRole.DELIVERY_PERSON],
+    roles: [UserRole.DELIVERY_PERSON],
     body: DeliveryCompletionSchema,
   },
   {
@@ -628,7 +638,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/deliveries/{id}/fail',
     summary: 'Record a failed delivery attempt',
     tag: 'Deliveries',
-    roles: [...MANAGEMENT, UserRole.DELIVERY_PERSON],
+    roles: [UserRole.DELIVERY_PERSON],
     body: DeliveryFailureSchema,
   },
 
@@ -638,7 +648,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/payments',
     summary: 'Record a payment',
     tag: 'Payments',
-    roles: [...MANAGEMENT, UserRole.DELIVERY_PERSON],
+    roles: MANAGEMENT,
     body: CreatePaymentSchema,
   },
   {
@@ -754,7 +764,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/returns',
     summary: 'List returns, filtered by role',
     tag: 'Returns',
-    roles: ALL_ROLES,
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER, UserRole.SHOP_OWNER, UserRole.DELIVERY_PERSON],
     query: ['status', 'q', 'page', 'limit'],
   },
   {
@@ -796,7 +806,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/reports/overview',
     summary: 'Composed analytics overview',
     tag: 'Reports',
-    roles: ALL_ROLES,
+    roles: MANAGEMENT,
     query: RANGE,
   },
   {
@@ -804,7 +814,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/reports/sales',
     summary: 'Sales summary and time series',
     tag: 'Reports',
-    roles: ALL_ROLES,
+    roles: [...MANAGEMENT, UserRole.SHOP_OWNER],
     query: RANGE,
   },
   {
@@ -812,7 +822,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/reports/sales/breakdown',
     summary: 'Sales by medicine, category, manufacturer, customer or territory',
     tag: 'Reports',
-    roles: MANAGEMENT,
+    roles: [...MANAGEMENT, UserRole.SHOP_OWNER],
     query: [...RANGE, 'dimension', 'limit'],
   },
   {
@@ -820,7 +830,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/reports/orders',
     summary: 'Order funnel with conversion and cycle times',
     tag: 'Reports',
-    roles: MANAGEMENT,
+    roles: [...MANAGEMENT, UserRole.SHOP_OWNER],
     query: RANGE,
   },
   {
@@ -828,7 +838,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/reports/inventory',
     summary: 'Inventory valuation, expiry buckets and dead stock',
     tag: 'Reports',
-    roles: MANAGEMENT,
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER],
     query: ['asOf', 'format'],
   },
   {
@@ -844,7 +854,7 @@ const OPERATIONS: Operation[] = [
     path: '/api/v1/reports/returns',
     summary: 'Returns analytics with return rate and recovery',
     tag: 'Reports',
-    roles: MANAGEMENT,
+    roles: [...MANAGEMENT, UserRole.SHOP_OWNER],
     query: RANGE,
   },
   {

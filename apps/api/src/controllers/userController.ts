@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { UserRole } from '@medsupply/shared-types';
 import { AuthRequest } from '../middlewares/auth';
 import { User } from '../models/User';

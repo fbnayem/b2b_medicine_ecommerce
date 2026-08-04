@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOpenApiDocument } from './openapi';
+import { UserRole } from '@medsupply/shared-types';
+import { OPERATIONS, buildOpenApiDocument } from './openapi';
 import { COVERAGE_FILE, recordedRouteKeys, routeKey, routeTable } from './routeTable';
 import { UNDOCUMENTED_ROUTES, UNTESTED_ROUTES } from './routeCoverage.waivers';
 
@@ -85,6 +86,61 @@ test('every route is documented, or explicitly waived', () => {
     [],
     'These waivers are out of date — the route is now documented, or no longer exists:' +
       describe(stale, 'Delete them from UNDOCUMENTED_ROUTES in routeCoverage.waivers.ts.'),
+  );
+});
+
+/**
+ * The fourth reconciliation, and the one the first three could not make.
+ *
+ * Paths agreeing proves the document names real endpoints. It says nothing
+ * about **who may call them**, which is the column a reader of the
+ * specification most depends on and the one that has now been wrong twice:
+ * order submission stayed documented as `SHOP_OWNER`-only for a whole phase
+ * after the route opened to `SALES`, and `GET /shops` claimed every role while
+ * the router admitted three. Both were found by reading, not by a test.
+ *
+ * A route with no `requireRole` restricts by nothing of its own, so the
+ * document may say `ALL_ROLES` or say nothing — but it must not name a narrower
+ * set than the server enforces, because that is a promise of a refusal that
+ * will not happen.
+ */
+test('the roles in the OpenAPI document are the roles the router enforces', () => {
+  const enforced = new Map(routeTable().map((route) => [routeKey(route), route.roles]));
+  const everyRole = Object.values(UserRole);
+  const sorted = (roles: readonly UserRole[]) => [...roles].sort().join(', ');
+
+  const wrong: string[] = [];
+  for (const operation of OPERATIONS) {
+    const key = `${operation.method} ${toExpressPath(operation.path)}`;
+    // A phantom operation is already reported by the test above; do not report
+    // the same defect twice in different words.
+    if (!enforced.has(key)) continue;
+
+    const guard = enforced.get(key);
+    const documented = operation.roles;
+
+    if (guard) {
+      if (!documented || sorted(documented) !== sorted(guard)) {
+        wrong.push(
+          `${key}\n      document: ${documented ? sorted(documented) : '(none — public)'}` +
+            `\n      router:   ${sorted(guard)}`,
+        );
+      }
+    } else if (documented && documented.length < everyRole.length) {
+      wrong.push(
+        `${key}\n      document: ${sorted(documented)}` +
+          `\n      router:   no role guard, so nobody is refused by role`,
+      );
+    }
+  }
+
+  assert.deepEqual(
+    wrong,
+    [],
+    'The permission column of the specification disagrees with the server. A client ' +
+      'written against it would either expect a refusal that never comes, or be ' +
+      'refused an endpoint the document said was theirs:' +
+      describe(wrong, 'Correct `roles` in openapi.ts, or the requireRole call on the route.'),
   );
 });
 

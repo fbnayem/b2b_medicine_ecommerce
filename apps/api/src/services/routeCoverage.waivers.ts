@@ -149,7 +149,6 @@ export const UNTESTED_ROUTES: readonly string[] = [
   'get /api/v1/fulfilment/queue',
   'get /api/v1/inventory/batches',
   'get /api/v1/inventory/batches/:id',
-  'get /api/v1/inventory/medicines',
   'get /api/v1/inventory/medicines/:id',
   'get /api/v1/inventory/movements',
   'get /api/v1/notifications/:id/deliveries',

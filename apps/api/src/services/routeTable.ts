@@ -1,12 +1,24 @@
 import { appendFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { RequestHandler, Router } from 'express';
+import type { UserRole } from '@medsupply/shared-types';
+import type { RoleGuard } from '../middlewares/role';
 import { API_MOUNTS, HEALTH_ROUTES } from '../routes';
 
 /** One HTTP method at one Express path pattern, with the mount prefix applied. */
 export interface ApiRoute {
   method: string;
   path: string;
+  /**
+   * The roles the mounted `requireRole` guards actually admit, or `undefined`
+   * when the route carries no role guard at all.
+   *
+   * `undefined` is not "nobody": it means the route restricts by nothing beyond
+   * whatever the router applies to every request, so the two cases a reader
+   * cares about — public, and any signed-in user — are indistinguishable here
+   * and the reconciliation treats them together.
+   */
+  roles?: readonly UserRole[];
 }
 
 export function routeKey(route: ApiRoute): string {
@@ -29,9 +41,35 @@ interface RouterLayer {
   route?: {
     path: string | string[];
     methods: Record<string, boolean>;
+    /** The handlers mounted on this route, in order. */
+    stack?: { handle?: unknown }[];
   };
   handle?: { stack?: RouterLayer[] };
   name?: string;
+}
+
+function guardRoles(handle: unknown): readonly UserRole[] | undefined {
+  if (typeof handle !== 'function') return undefined;
+  const roles = (handle as Partial<RoleGuard>).roles;
+  return Array.isArray(roles) ? roles : undefined;
+}
+
+/**
+ * The roles a chain of guards jointly admits.
+ *
+ * Every guard has to pass, so several of them **intersect** rather than
+ * accumulate. `undefined` means no guard restricted by role at all, which is
+ * not the same as an empty list — an empty list would be a route nobody can
+ * call.
+ */
+function admittedBy(guards: readonly (readonly UserRole[])[]): readonly UserRole[] | undefined {
+  if (guards.length === 0) return undefined;
+  return guards
+    .slice(1)
+    .reduce<readonly UserRole[]>(
+      (allowed, next) => allowed.filter((role) => next.includes(role)),
+      guards[0]!,
+    );
 }
 
 function routesOfRouter(router: Router, prefix: string): ApiRoute[] {
@@ -44,6 +82,18 @@ function routesOfRouter(router: Router, prefix: string): ApiRoute[] {
   }
 
   const found: ApiRoute[] = [];
+  /*
+   * Guards applied with `router.use(...)` rather than per route.
+   *
+   * Several routers state the permission once at the top — `approvalRoutes.ts`
+   * is `router.use(requireAuth, requireRole([...MANAGEMENT]))` and then seven
+   * bare routes — so reading only each route's own stack reports "no role
+   * guard" for endpoints that are in fact management-only. The stack is walked
+   * in registration order, which is the order Express applies it, so a `use`
+   * collected here governs every route declared after it.
+   */
+  const routerWide: (readonly UserRole[])[] = [];
+
   for (const layer of stack) {
     if (!layer.route) {
       // A nested router would need its own mount prefix, which Express does not
@@ -54,13 +104,21 @@ function routesOfRouter(router: Router, prefix: string): ApiRoute[] {
             `recover a nested mount path, so add the inner router to API_MOUNTS instead.`,
         );
       }
+      const roles = guardRoles(layer.handle);
+      if (roles) routerWide.push(roles);
       continue;
     }
     const paths = Array.isArray(layer.route.path) ? layer.route.path : [layer.route.path];
+    const roles = admittedBy([
+      ...routerWide,
+      ...(layer.route.stack ?? [])
+        .map((entry) => guardRoles(entry.handle))
+        .filter((entry): entry is readonly UserRole[] => entry !== undefined),
+    ]);
     for (const path of paths) {
       for (const [method, enabled] of Object.entries(layer.route.methods)) {
         if (!enabled || method === '_all') continue;
-        found.push({ method, path: joinPrefix(prefix, path) });
+        found.push({ method, path: joinPrefix(prefix, path), roles });
       }
     }
   }

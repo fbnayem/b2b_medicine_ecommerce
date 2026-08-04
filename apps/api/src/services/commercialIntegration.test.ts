@@ -709,6 +709,41 @@ test('the customer picker offers exactly the shops the rep may order for', async
   assert.equal(placed.status, 200);
 });
 
+test('a rep can search the catalogue, which is the whole of order entry', async () => {
+  /*
+   * `SALES` was absent from `catalogueReaders`, so `GET /inventory/medicines`
+   * answered 403 for the one role the order-entry screens were built for.
+   * Both of them — the web screen and the mobile one — open with a search box
+   * that calls exactly this endpoint, so a rep could choose a customer, type a
+   * brand name, and watch the screen refuse the first thing they did.
+   *
+   * Found by the roles reconciliation in `routeCoverage.test.ts` rather than by
+   * anybody using it, which is the point of that assertion existing: the
+   * document said every role could read the catalogue and the router disagreed.
+   */
+  const searched = await api('GET', '/api/v1/inventory/medicines?limit=20', rep._id);
+  assert.equal(searched.status, 200, 'a rep must be able to search the catalogue they sell from');
+
+  const found = searched.body.data as unknown as Array<{ _id: string }>;
+  assert.ok(
+    found.some((medicine) => String(medicine._id) === String(medicineId)),
+    'and see the medicines they can then quote for',
+  );
+
+  // A rider is still refused: they carry what is on the delivery note and have
+  // no reason to browse what else is for sale.
+  const rider = await User.create({
+    email: 'commercial-rider-catalogue@test.local',
+    passwordHash: 'x',
+    firstName: 'Rider',
+    lastName: 'Test',
+    role: UserRole.DELIVERY_PERSON,
+    status: UserStatus.ACTIVE,
+  });
+  const refused = await api('GET', '/api/v1/inventory/medicines?limit=20', rider._id);
+  assert.equal(refused.status, 403);
+});
+
 test('management is not territorial, so the list is not narrowed for them', async () => {
   // Empty territories means every territory — the restriction applies to the
   // people it was written for and to nobody else.

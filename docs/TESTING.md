@@ -104,18 +104,46 @@ Three defects, none of which any of the 280 existing tests could see:
 
 ### Coverage reconciliation
 
-`routeCoverage.test.ts` reconciles three descriptions of the API that should
-agree: the routes served, the routes documented, and the routes an integration
-test reaches. Route hits are **recorded live** by a middleware under
-`NODE_ENV=test`, so a test that merely mentions a path in a string does not
-count as covering it.
+`routeCoverage.test.ts` reconciles four descriptions of the API that should
+agree: the routes served, the routes documented, **who each one admits**, and
+the routes an integration test reaches. Route hits are **recorded live** by a
+middleware under `NODE_ENV=test`, so a test that merely mentions a path in a
+string does not count as covering it.
 
-At the time of writing: **150 routes, 69 covered, 91 undocumented.** Both gaps
-are written out endpoint by endpoint in `routeCoverage.waivers.ts` rather than
-summarised as a percentage — the endpoint that mattered was `POST /users`,
-whose role bug survived twelve phases because nothing called it, and a
-percentage would have read "88%" and named nothing. A waiver that goes stale
-fails the build, so the lists can only shrink.
+Both gaps are written out endpoint by endpoint in `routeCoverage.waivers.ts`
+rather than summarised as a percentage — the endpoint that mattered was
+`POST /users`, whose role bug survived twelve phases because nothing called it,
+and a percentage would have read "88%" and named nothing. A waiver that goes
+stale fails the build, so the lists can only shrink.
+
+**As of 05 August 2026: 165 routes, 90 undocumented, 75 untested.** No tranche
+of the burn-down has been done yet; what has changed is that the reconciliation
+now covers permissions, which is where the remaining risk actually sits.
+
+#### The roles assertion
+
+Paths agreeing proves the document names real endpoints and says nothing about
+who may call them — the column a reader of the specification most depends on.
+The roles a `requireRole` guard enforces are published on the guard itself and
+reflected off the mounted routers, including guards applied router-wide with
+`router.use`, then compared against the `roles` list in `OPERATIONS`.
+
+Adding it found **seventeen** endpoints whose documented permissions were wrong,
+one of which was not a documentation error at all: `GET /inventory/medicines`
+excluded `SALES`, so both order-entry screens — the web one and the mobile one —
+opened with a search box that answered 403 for the only role they were built
+for. The other sixteen were corrected in the document, because the router is
+what runs.
+
+Two things it deliberately does **not** claim. A route with no role guard may be
+documented as `ALL_ROLES` or as public, since the difference is router-level
+authentication that this reflection does not read; it only fails when the
+document names a _narrower_ set than the server enforces, which is a promise of
+a refusal that will not happen. And it reconciles the document against the
+router, not the router against the navigation package — where those two
+disagree (a storekeeper is offered an Orders tab the API refuses, for instance)
+that is a real gap, and a separate decision about who should read what rather
+than a drift to be silently closed.
 
 The API integration command uses `mongodb-memory-server` as a one-node replica set by default. If `MONGODB_TEST_URI` is supplied, it uses that dedicated external replica-set database instead. The suite drops only the selected integration database before and after execution.
 
