@@ -4,7 +4,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { PushPlatform } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
-import { colour } from '../theme';
+import { semanticLight } from '@medsupply/design-tokens';
 
 export type PushRegistrationOutcome =
   | { status: 'REGISTERED'; token: string }
@@ -22,13 +22,19 @@ export async function ensureAndroidChannel() {
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
     /*
-     * The same green as `app.json`'s channel colour, which is the token.
+     * The same green as `app.json`'s channel colour, because both are now the
+     * token.
      *
-     * This was `#16724A` — the *second* brand green, the one the token package
-     * was created to collapse — while `app.json` declared `#126b45` for the
-     * same Android channel. Two different greens for one notification.
+     * This was hard-coded to the *second* brand green — the one the token
+     * package was created to collapse — while `app.json` declared the first for
+     * the same Android channel. Two different greens for one notification.
+     *
+     * Imported from the token package rather than from `src/theme.ts`: this
+     * module is covered by the vitest suite, and `theme.ts` builds a
+     * `StyleSheet`, which drags in React Native's Flow-typed source that esbuild
+     * cannot parse.
      */
-    lightColor: colour.brand,
+    lightColor: semanticLight['color-brand'],
   });
 }
 

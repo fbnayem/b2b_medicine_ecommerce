@@ -1,11 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { FinanceCard, FinanceState, StatusBadge } from '../../src/finance/components';
-import { apiErrorMessage, getPayment, getPaymentReceipt } from '../../src/finance/api';
+import { errorMessage } from '@medsupply/api-client';
+import { getPayment, getPaymentReceipt } from '../../src/finance/api';
 import { formatFinanceDate } from '../../src/finance/date';
 import { formatMoneyMinor } from '../../src/finance/money';
 import type { FinancePayment, Receipt, ReferenceSnapshot } from '../../src/finance/types';
+import { useLanguage } from '../../src/i18n/useLanguage';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  ListRow,
+  LoadingState,
+  Screen,
+  SectionTitle,
+  StatusPill,
+} from '../../src/components';
+import { colour, layout } from '../../src/theme';
 
 function reference(value?: string | ReferenceSnapshot) {
   return typeof value === 'string' ? value : value?.reference;
@@ -13,6 +27,7 @@ function reference(value?: string | ReferenceSnapshot) {
 
 export default function PaymentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t, language } = useLanguage();
   const [payment, setPayment] = useState<FinancePayment>();
   const [receipt, setReceipt] = useState<Receipt>();
   const [loading, setLoading] = useState(true);
@@ -24,11 +39,11 @@ export default function PaymentDetailScreen() {
       setPayment(await getPayment(id));
       setError('');
     } catch (caught) {
-      setError(apiErrorMessage(caught, 'Unable to load this payment.'));
+      setError(errorMessage(caught, language, t('finance.couldNotLoadPayment')));
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, language, t]);
 
   useEffect(() => {
     void load();
@@ -40,101 +55,117 @@ export default function PaymentDetailScreen() {
       setReceipt(await getPaymentReceipt(id));
       setError('');
     } catch (caught) {
-      setError(apiErrorMessage(caught, 'Unable to load the receipt.'));
+      setError(errorMessage(caught, language, t('finance.receiptFailed')));
     } finally {
       setReceiptLoading(false);
     }
   }
 
-  if (loading || (!payment && error)) {
-    return <FinanceState loading={loading} error={error} onRetry={() => void load()} />;
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState label={t('finance.loadingPayment')} />
+      </Screen>
+    );
   }
-  if (!payment) return <FinanceState empty="Payment not found." />;
+
+  if (!payment) {
+    return (
+      <Screen>
+        {error ? (
+          <ErrorState message={error} onRetry={() => void load()} />
+        ) : (
+          <EmptyState title={t('finance.couldNotLoadPayment')} />
+        )}
+      </Screen>
+    );
+  }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <FinanceCard>
-        <View style={styles.row}>
-          <Text style={styles.reference}>{payment.reference}</Text>
-          <StatusBadge value={payment.status} />
+    <Screen>
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+
+      <Card>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: layout.space[2],
+          }}
+        >
+          <Text style={{ fontSize: layout.fontSize.xl, fontWeight: '700', color: colour.brand }}>
+            {payment.reference}
+          </Text>
+          <StatusPill kind="payment" status={payment.status} />
         </View>
-        <Text style={styles.amount}>{formatMoneyMinor(payment.amountMinor)}</Text>
-        <Detail label="Method" value={payment.method.replaceAll('_', ' ')} />
-        <Detail label="Invoice" value={reference(payment.invoiceId) ?? '—'} />
-        <Detail label="Delivery" value={reference(payment.deliveryId) ?? '—'} />
-        <Detail label="Transaction reference" value={payment.transactionReference ?? '—'} />
-        <Detail label="Collected" value={formatFinanceDate(payment.collectionTime)} />
-        <Detail label="Posted" value={formatFinanceDate(payment.postingTime)} />
-        <Detail label="Receipt" value={payment.receiptReference ?? 'Not issued'} />
-        <Detail
-          label="Collection handover"
-          value={payment.handoverStatus?.replaceAll('_', ' ') ?? 'Not required'}
+        <Text
+          style={{
+            fontSize: layout.fontSize['3xl'],
+            fontWeight: '700',
+            color: colour.text,
+            fontVariant: ['tabular-nums'],
+          }}
+        >
+          {formatMoneyMinor(payment.amountMinor)}
+        </Text>
+
+        <ListRow label={t('finance.method')} value={t(`paymentMethod.${payment.method}`)} />
+        <ListRow label={t('finance.invoice')} value={reference(payment.invoiceId) ?? '—'} />
+        <ListRow label={t('finance.delivery')} value={reference(payment.deliveryId) ?? '—'} />
+        <ListRow
+          label={t('finance.transactionReference')}
+          value={payment.transactionReference ?? '—'}
         />
+        <ListRow
+          label={t('finance.collectedAt')}
+          value={formatFinanceDate(payment.collectionTime)}
+        />
+        <ListRow label={t('finance.postedAt')} value={formatFinanceDate(payment.postingTime)} />
+        <ListRow
+          label={t('finance.receipt')}
+          value={payment.receiptReference ?? t('finance.none')}
+        />
+        <ListRow
+          label={t('finance.handoverLabel')}
+          value={<Badge>{t(`handoverStatus.${payment.handoverStatus ?? 'NOT_REQUIRED'}`)}</Badge>}
+        />
+
         {payment.attachmentFileId ? (
-          <Text style={styles.notice}>Payment proof is attached to this record.</Text>
+          <Text style={{ color: colour.textMuted }}>{t('finance.attachment')}</Text>
         ) : null}
         {payment.reversalReference ? (
-          <Text style={styles.notice}>Reversed by {payment.reversalReference}</Text>
-        ) : null}
-        {payment.notes ? <Text style={styles.notes}>{payment.notes}</Text> : null}
-      </FinanceCard>
-      {payment.status === 'POSTED' ? (
-        <Pressable
-          disabled={receiptLoading}
-          style={styles.action}
-          onPress={() => void loadReceipt()}
-        >
-          <Text style={styles.actionText}>
-            {receiptLoading ? 'Loading receipt…' : 'View receipt'}
+          <Text style={{ color: colour.danger }}>
+            {t('finance.reversedBy', { reference: payment.reversalReference })}
           </Text>
-        </Pressable>
+        ) : null}
+        {payment.notes ? <Text style={{ color: colour.text }}>{payment.notes}</Text> : null}
+      </Card>
+
+      {payment.status === 'POSTED' ? (
+        <Button
+          busy={receiptLoading}
+          label={t('finance.receipt')}
+          onPress={() => void loadReceipt()}
+        />
       ) : null}
+
       {receipt ? (
-        <FinanceCard>
-          <Text style={styles.title}>Payment receipt</Text>
-          <Detail label="Receipt" value={receipt.receiptReference} />
-          <Detail label="Payment" value={receipt.paymentReference} />
-          <Detail label="Shop" value={receipt.shopName} />
-          <Detail label="Invoice" value={receipt.invoiceReference ?? '—'} />
-          <Detail label="Amount" value={formatMoneyMinor(receipt.amountMinor)} />
-          <Detail label="Method" value={receipt.method.replaceAll('_', ' ')} />
-          <Detail label="Posted" value={formatFinanceDate(receipt.postedAt)} />
-        </FinanceCard>
+        <Card>
+          <SectionTitle>{t('finance.receipt')}</SectionTitle>
+          <ListRow label={t('finance.receipt')} value={receipt.receiptReference} />
+          <ListRow label={t('finance.paymentReference')} value={receipt.paymentReference} />
+          <ListRow label={t('finance.shop')} value={receipt.shopName} />
+          <ListRow label={t('finance.invoice')} value={receipt.invoiceReference ?? '—'} />
+          <ListRow
+            label={t('finance.amount')}
+            value={formatMoneyMinor(receipt.amountMinor)}
+            numeric
+          />
+          <ListRow label={t('finance.method')} value={t(`paymentMethod.${receipt.method}`)} />
+          <ListRow label={t('finance.postedAt')} value={formatFinanceDate(receipt.postedAt)} />
+        </Card>
       ) : null}
-    </ScrollView>
+    </Screen>
   );
 }
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detail}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  content: { padding: 14, gap: 12 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  reference: { color: '#126b45', fontWeight: '900', fontSize: 19 },
-  amount: { color: '#173f2e', fontWeight: '900', fontSize: 28, marginVertical: 5 },
-  detail: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 15,
-    paddingVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eef2ef',
-  },
-  label: { color: '#66756d', flex: 1 },
-  value: { color: '#17251e', fontWeight: '700', flex: 1, textAlign: 'right' },
-  notice: { backgroundColor: '#eef6f1', color: '#274b3b', padding: 10, borderRadius: 7 },
-  notes: { backgroundColor: '#f6f7f6', padding: 10, borderRadius: 7 },
-  action: { backgroundColor: '#126b45', borderRadius: 9, padding: 14 },
-  actionText: { color: '#fff', textAlign: 'center', fontWeight: '900' },
-  title: { fontWeight: '900', fontSize: 18 },
-  error: { color: '#8b2525', backgroundColor: '#fff0ee', padding: 10, borderRadius: 8 },
-});
