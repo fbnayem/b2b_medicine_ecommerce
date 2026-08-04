@@ -1,42 +1,35 @@
+import { describeDevice, revocationReason } from '@medsupply/utilities';
+
 /**
  * Presentation helpers for the security centre.
  *
  * Kept out of the component file so that module exports only a component: a
  * file that exports both loses fast refresh, and these are worth testing on
  * their own anyway.
+ *
+ * The user-agent classification and the revocation mapping used to live here
+ * *and* in `apps/mobile/src/security/api.ts`, byte for byte apart from one
+ * regex, and both returned finished English sentences into screens that are
+ * otherwise translated. They now come from `@medsupply/utilities` as data, and
+ * the words come from the catalogue.
  */
+
+type Translate = (path: string, values?: Record<string, string | number>) => string;
 
 /**
  * Describes a session in terms its owner can recognise.
  *
  * A user asked "is this you?" cannot answer from a user-agent string, so the
- * client and platform are named instead.
+ * client and platform are named instead — and when we cannot tell, that is said
+ * in their language rather than in ours.
  */
-export function describeDevice(userAgent: string | null): string {
-  if (!userAgent) return 'Unknown device';
-  const platform = /android/i.test(userAgent)
-    ? 'Android'
-    : /iphone|ipad|ios/i.test(userAgent)
-      ? 'iOS'
-      : /windows/i.test(userAgent)
-        ? 'Windows'
-        : /mac os|macintosh/i.test(userAgent)
-          ? 'macOS'
-          : /linux/i.test(userAgent)
-            ? 'Linux'
-            : 'Unknown platform';
-  const client = /medsupply|expo|okhttp/i.test(userAgent)
-    ? 'MedSupply mobile'
-    : /edg\//i.test(userAgent)
-      ? 'Edge'
-      : /chrome\//i.test(userAgent)
-        ? 'Chrome'
-        : /firefox\//i.test(userAgent)
-          ? 'Firefox'
-          : /safari\//i.test(userAgent)
-            ? 'Safari'
-            : 'Unknown client';
-  return `${client} on ${platform}`;
+export function deviceLabel(t: Translate, userAgent: string | null): string {
+  const { client, platform } = describeDevice(userAgent);
+  if (!client && !platform) return t('security.unknownDevice');
+  return t('security.deviceOn', {
+    client: client ?? t('security.unknownClient'),
+    platform: platform ?? t('security.unknownPlatform'),
+  });
 }
 
 /** Uptime at the resolution an operator actually reads it at. */
@@ -50,17 +43,7 @@ export function formatUptime(seconds: number): string {
 }
 
 /** Why a session ended, in words rather than an enum. */
-export function revocationLabel(reason: string | null): string {
-  switch (reason) {
-    case 'TOKEN_REUSE':
-      return 'Ended for safety';
-    case 'REVOKED_BY_ADMIN':
-      return 'Ended by an administrator';
-    case 'ROLE_CHANGED':
-      return 'Ended after a role change';
-    case 'SIGNED_OUT_EVERYWHERE':
-      return 'Signed out everywhere';
-    default:
-      return 'Signed out';
-  }
+export function endedLabel(t: Translate, reason: string | null): string {
+  const key = revocationReason(reason);
+  return t(`security.ended${key.charAt(0).toUpperCase()}${key.slice(1)}`);
 }

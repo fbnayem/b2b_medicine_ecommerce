@@ -564,3 +564,72 @@ export function toDateTimeInputValue(
   const hour = part('hour') === '24' ? '00' : part('hour');
   return `${part('year')}-${part('month')}-${part('day')}T${hour}:${part('minute')}`;
 }
+
+/**
+ * Which client and which platform a session's user agent names.
+ *
+ * `null` means "we could not tell", which the caller words in its own language
+ * — the whole reason this returns a pair rather than a sentence. Both clients
+ * carried this function verbatim (`apps/web/src/pages/securityLabels.ts` and
+ * `apps/mobile/src/security/api.ts`), already diverging by one regex, and both
+ * returned hard-coded English into a screen that is otherwise translated.
+ *
+ * The names it does return — Chrome, Android, MedSupply mobile — are proper
+ * nouns and stay as they are in every language.
+ */
+export interface DeviceDescription {
+  client: string | null;
+  platform: string | null;
+}
+
+export function describeDevice(userAgent: string | null | undefined): DeviceDescription {
+  if (!userAgent) return { client: null, platform: null };
+  const platform = /android/i.test(userAgent)
+    ? 'Android'
+    : /iphone|ipad|ios|darwin/i.test(userAgent)
+      ? 'iOS'
+      : /windows/i.test(userAgent)
+        ? 'Windows'
+        : /mac os|macintosh/i.test(userAgent)
+          ? 'macOS'
+          : /linux/i.test(userAgent)
+            ? 'Linux'
+            : null;
+  const client = /medsupply|expo|okhttp/i.test(userAgent)
+    ? 'MedSupply mobile'
+    : /edg\//i.test(userAgent)
+      ? 'Edge'
+      : /chrome\//i.test(userAgent)
+        ? 'Chrome'
+        : /firefox\//i.test(userAgent)
+          ? 'Firefox'
+          : /safari\//i.test(userAgent)
+            ? 'Safari'
+            : null;
+  return { client, platform };
+}
+
+/** The four reasons a session can end, plus the ordinary one. */
+export type RevocationReason =
+  'tokenReuse' | 'revokedByAdmin' | 'roleChanged' | 'signedOutEverywhere' | 'signedOut';
+
+/**
+ * The catalogue key suffix for why a session ended.
+ *
+ * The server sends `TOKEN_REUSE`; this maps it to a name the catalogue holds
+ * words for, so neither client has to keep its own switch of English sentences.
+ */
+export function revocationReason(reason: string | null | undefined): RevocationReason {
+  switch (reason) {
+    case 'TOKEN_REUSE':
+      return 'tokenReuse';
+    case 'REVOKED_BY_ADMIN':
+      return 'revokedByAdmin';
+    case 'ROLE_CHANGED':
+      return 'roleChanged';
+    case 'SIGNED_OUT_EVERYWHERE':
+      return 'signedOutEverywhere';
+    default:
+      return 'signedOut';
+  }
+}

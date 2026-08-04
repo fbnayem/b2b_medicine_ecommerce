@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, Text, View, type ViewStyle } from 'react-native';
 import { colour, layout } from '../theme';
+import { useLanguage } from '../i18n/useLanguage';
 
 /**
  * Loading, empty and error, said once — the mobile half.
@@ -16,7 +17,18 @@ import { colour, layout } from '../theme';
  * cheaper to keep than to restore.
  */
 
-export function LoadingState({ label = 'Loading' }: { label?: string }) {
+/**
+ * The three defaults come from the catalogue, not from a literal.
+ *
+ * They were `'Loading'`, `'Something went wrong'` and `'Try again'` typed here,
+ * which meant every screen that took the default — most of them — announced in
+ * English however the app was set. A wait and a failure are exactly the two
+ * moments where somebody needs to read the words, so they are the last place a
+ * default should silently switch language.
+ */
+export function LoadingState({ label }: { label?: string }) {
+  const { t } = useLanguage();
+  const announced = label ?? t('common.loading');
   return (
     <View
       /*
@@ -31,7 +43,7 @@ export function LoadingState({ label = 'Loading' }: { label?: string }) {
        */
       accessible
       accessibilityRole="progressbar"
-      accessibilityLabel={label}
+      accessibilityLabel={announced}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -40,7 +52,7 @@ export function LoadingState({ label = 'Loading' }: { label?: string }) {
       }}
     >
       <ActivityIndicator color={colour.brand} />
-      <Text style={{ fontSize: layout.fontSize.base, color: colour.textMuted }}>{label}…</Text>
+      <Text style={{ fontSize: layout.fontSize.base, color: colour.textMuted }}>{announced}…</Text>
     </View>
   );
 }
@@ -104,13 +116,8 @@ export interface ErrorStateProps {
   style?: ViewStyle;
 }
 
-export function ErrorState({
-  title = 'Something went wrong',
-  message,
-  reference,
-  onRetry,
-  style,
-}: ErrorStateProps) {
+export function ErrorState({ title, message, reference, onRetry, style }: ErrorStateProps) {
+  const { t } = useLanguage();
   return (
     <View
       // See `LoadingState` above: without `accessible`, the alert role on a
@@ -130,15 +137,15 @@ export function ErrorState({
       ]}
     >
       <Text style={{ fontSize: layout.fontSize.base, fontWeight: '600', color: colour.text }}>
-        {title}
+        {title ?? t('common.somethingWentWrong')}
       </Text>
       <Text style={{ fontSize: layout.fontSize.base, color: colour.text }}>{message}</Text>
       {reference ? (
         <Text style={{ fontSize: layout.fontSize.sm, color: colour.textMuted }}>
-          Reference: {reference}
+          {t('common.reference')}: {reference}
         </Text>
       ) : null}
-      {onRetry ? <RetryButton label="Try again" onPress={onRetry} /> : null}
+      {onRetry ? <RetryButton label={t('common.retry')} onPress={onRetry} /> : null}
     </View>
   );
 }

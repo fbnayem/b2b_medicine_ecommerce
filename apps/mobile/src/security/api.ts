@@ -1,3 +1,4 @@
+import { describeDevice, revocationReason } from '@medsupply/utilities';
 import { apiClient } from '../api/client';
 
 /**
@@ -37,51 +38,30 @@ export async function revokeEverySession(): Promise<number> {
   return Number(response.data?.data?.revoked ?? 0);
 }
 
+type Translate = (path: string, values?: Record<string, string | number>) => string;
+
 /**
- * Names a session in terms its owner can recognise. A user asked "is this you?"
- * cannot answer from a user-agent string.
+ * Names a session in terms its owner can recognise, in their own language.
+ *
+ * A user asked "is this you?" cannot answer from a user-agent string. The
+ * classification is `describeDevice` in `@medsupply/utilities` — both clients
+ * held their own copy of it, already one regex apart — and the words around it
+ * come from the catalogue, because "Unknown device" is a sentence and `Chrome`
+ * is a proper noun.
  */
-export function describeDevice(userAgent: string | null): string {
-  if (!userAgent) return 'Unknown device';
-  const platform = /android/i.test(userAgent)
-    ? 'Android'
-    : /iphone|ipad|ios|darwin/i.test(userAgent)
-      ? 'iOS'
-      : /windows/i.test(userAgent)
-        ? 'Windows'
-        : /mac os|macintosh/i.test(userAgent)
-          ? 'macOS'
-          : /linux/i.test(userAgent)
-            ? 'Linux'
-            : 'Unknown platform';
-  const client = /okhttp|expo|medsupply/i.test(userAgent)
-    ? 'MedSupply mobile'
-    : /edg\//i.test(userAgent)
-      ? 'Edge'
-      : /chrome\//i.test(userAgent)
-        ? 'Chrome'
-        : /firefox\//i.test(userAgent)
-          ? 'Firefox'
-          : /safari\//i.test(userAgent)
-            ? 'Safari'
-            : 'Unknown client';
-  return `${client} on ${platform}`;
+export function deviceLabel(t: Translate, userAgent: string | null): string {
+  const { client, platform } = describeDevice(userAgent);
+  if (!client && !platform) return t('security.unknownDevice');
+  return t('security.deviceOn', {
+    client: client ?? t('security.unknownClient'),
+    platform: platform ?? t('security.unknownPlatform'),
+  });
 }
 
 /** Why a session ended, in words rather than an enum. */
-export function revocationLabel(reason: string | null): string {
-  switch (reason) {
-    case 'TOKEN_REUSE':
-      return 'Ended for safety';
-    case 'REVOKED_BY_ADMIN':
-      return 'Ended by an administrator';
-    case 'ROLE_CHANGED':
-      return 'Ended after a role change';
-    case 'SIGNED_OUT_EVERYWHERE':
-      return 'Signed out everywhere';
-    default:
-      return 'Signed out';
-  }
+export function endedLabel(t: Translate, reason: string | null): string {
+  const key = revocationReason(reason);
+  return t(`security.ended${key.charAt(0).toUpperCase()}${key.slice(1)}`);
 }
 
 /**

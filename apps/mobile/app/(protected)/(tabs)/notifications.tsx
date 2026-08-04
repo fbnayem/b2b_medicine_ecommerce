@@ -1,15 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { RealtimeEvent, type NotificationRecord } from '@medsupply/shared-types';
+import { errorMessage } from '@medsupply/api-client';
 import {
   fetchNotifications,
   markAllNotificationsRead,
@@ -18,14 +11,26 @@ import {
 import { onRealtime } from '../../../src/notifications/realtime';
 import { routeForPush } from '../../../src/notifications/push';
 import { formatFinanceDateTime } from '../../../src/finance/date';
+import { useLanguage } from '../../../src/i18n/useLanguage';
+import {
+  Button,
+  CardLink,
+  EmptyState,
+  ErrorState,
+  FilterChips,
+  LoadingState,
+  Screen,
+  toast,
+} from '../../../src/components';
+import { colour, layout } from '../../../src/theme';
 
 export default function NotificationsScreen() {
+  const { t, language } = useLanguage();
   const [items, setItems] = useState<NotificationRecord[]>([]);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState('');
 
   const load = useCallback(
     async (refresh = false) => {
@@ -35,14 +40,14 @@ export default function NotificationsScreen() {
         const page = await fetchNotifications(1, unreadOnly);
         setItems(page.items);
         setError('');
-      } catch {
-        setError('Unable to load notifications.');
+      } catch (caught) {
+        setError(errorMessage(caught, language, t('notifications.couldNotLoad')));
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [unreadOnly],
+    [unreadOnly, language, t],
   );
 
   useEffect(() => {
@@ -67,123 +72,120 @@ export default function NotificationsScreen() {
     }
   };
 
+  /*
+   * "Marking all as read..." was set into a state variable and rendered as a
+   * green line above the list, where it stayed until the next action replaced
+   * it. It is a result, not a state of the screen, and a rider who is not
+   * looking at the top of the list never learned that anything happened.
+   */
   const readAll = async () => {
-    setStatus('Marking all as read...');
     try {
       await markAllNotificationsRead();
       await load(true);
-      setStatus('All notifications marked as read.');
-    } catch {
-      setStatus('');
-      setError('Unable to mark notifications as read.');
+      toast.success(t('notifications.markedRead'));
+    } catch (caught) {
+      toast.error(errorMessage(caught, language, t('notifications.updateFailed')));
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-        <Text style={styles.muted}>Loading notifications...</Text>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.screen}>
-      {error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.error}>{error}</Text>
-          <Pressable style={styles.secondary} onPress={() => void load()}>
-            <Text style={styles.secondaryText}>Retry</Text>
-          </Pressable>
-        </View>
-      ) : null}
-      {status ? <Text style={styles.success}>{status}</Text> : null}
+    <Screen scroll={false}>
+      <FilterChips
+        label={t('notifications.category')}
+        value={unreadOnly ? 'unread' : 'all'}
+        onChange={(next) => setUnreadOnly(next === 'unread')}
+        options={[
+          { value: 'all', label: t('notifications.all') },
+          { value: 'unread', label: t('notifications.unreadOnly') },
+        ]}
+      />
 
-      <View style={styles.toolbar}>
-        <Pressable
-          style={[styles.filter, unreadOnly ? styles.filterActive : null]}
-          onPress={() => setUnreadOnly((value) => !value)}
-        >
-          <Text style={unreadOnly ? styles.filterActiveText : styles.filterText}>Unread only</Text>
-        </Pressable>
-        <Pressable style={styles.secondary} onPress={() => void readAll()}>
-          <Text style={styles.secondaryText}>Mark all read</Text>
-        </Pressable>
-        <Pressable
-          style={styles.secondary}
+      <View style={{ flexDirection: 'row', gap: layout.space[2] }}>
+        <Button
+          variant="secondary"
+          style={{ flex: 1 }}
+          label={t('notifications.markAllRead')}
+          onPress={() => void readAll()}
+        />
+        <Button
+          variant="secondary"
+          style={{ flex: 1 }}
+          label={t('notifications.preferences')}
           onPress={() => router.push('/(protected)/notification-preferences')}
-        >
-          <Text style={styles.secondaryText}>Preferences</Text>
-        </Pressable>
+        />
       </View>
 
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item._id}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />
-        }
-        ListEmptyComponent={
-          <View style={styles.center}>
-            <Text>
-              {unreadOnly ? 'You have read everything.' : 'No notifications have arrived yet.'}
-            </Text>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            style={[styles.card, item.readAt ? null : styles.unread]}
-            onPress={() => void open(item)}
-            accessibilityRole="button"
-            accessibilityLabel={`${item.readAt ? 'Read' : 'Unread'}: ${item.title}`}
-          >
-            <View style={styles.row}>
-              <Text style={styles.title}>{item.title}</Text>
-              {item.readAt ? null : <View style={styles.dot} />}
-            </View>
-            <Text>{item.body}</Text>
-            <Text style={styles.muted}>
-              {item.category} · {formatFinanceDateTime(item.createdAt)}
-            </Text>
-          </Pressable>
-        )}
-      />
-    </View>
+      {loading ? (
+        <LoadingState label={t('notifications.loading')} />
+      ) : (
+        <>
+          {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+          <FlatList
+            data={items}
+            keyExtractor={(item) => item._id}
+            contentContainerStyle={{ gap: layout.space[3], paddingBottom: layout.space[6] }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />
+            }
+            ListEmptyComponent={
+              <EmptyState
+                title={unreadOnly ? t('notifications.allCaughtUp') : t('notifications.none')}
+                description={unreadOnly ? undefined : t('notifications.noneBody')}
+              />
+            }
+            renderItem={({ item }) => (
+              <CardLink
+                /*
+                 * Whether it has been read is said in the label rather than
+                 * only drawn as a dot, which a screen reader cannot see. The
+                 * words come from the catalogue for the same reason the rest
+                 * of the screen's do.
+                 */
+                accessibilityLabel={`${
+                  item.readAt ? t('notifications.read') : t('notifications.unread')
+                }: ${item.title}`}
+                onPress={() => void open(item)}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: layout.space[2],
+                  }}
+                >
+                  <Text
+                    style={{
+                      flexShrink: 1,
+                      fontSize: layout.fontSize.base,
+                      fontWeight: '600',
+                      color: colour.text,
+                    }}
+                  >
+                    {item.title}
+                  </Text>
+                  {item.readAt ? null : (
+                    <View
+                      style={{
+                        width: layout.space[2],
+                        height: layout.space[2],
+                        borderRadius: layout.radius.full,
+                        backgroundColor: colour.brand,
+                      }}
+                    />
+                  )}
+                </View>
+                <Text style={{ color: colour.text }}>{item.body}</Text>
+                <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>
+                  {/* Was the raw enum — a shop owner read `FINANCE`. */}
+                  {t(`notificationCategory.${item.category}`)} ·{' '}
+                  {formatFinanceDateTime(item.createdAt)}
+                </Text>
+              </CardLink>
+            )}
+          />
+        </>
+      )}
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5', padding: 14 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  toolbar: { flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
-  filter: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#d9e3dd',
-  },
-  filterActive: { backgroundColor: '#16724a', borderColor: '#16724a' },
-  filterText: { color: '#17211b', fontWeight: '600' },
-  filterActiveText: { color: '#fff', fontWeight: '700' },
-  secondary: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#d9e3dd',
-  },
-  secondaryText: { color: '#16724a', fontWeight: '700' },
-  card: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 10 },
-  unread: { borderLeftWidth: 4, borderLeftColor: '#16724a' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontWeight: '700', fontSize: 16, flexShrink: 1 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#16724a', marginLeft: 10 },
-  muted: { color: '#718077', marginTop: 6 },
-  errorBox: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 10 },
-  error: { color: '#8b2525', flexShrink: 1 },
-  success: { color: '#16724a', paddingBottom: 10 },
-});

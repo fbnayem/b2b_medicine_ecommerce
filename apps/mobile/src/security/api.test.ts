@@ -4,13 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 // cannot parse. Only the pure presentation and policy helpers are exercised.
 vi.mock('../api/client', () => ({ apiClient: {}, baseURL: '' }));
 
-import {
-  describeDevice,
-  isRevocable,
-  orderSessions,
-  revocationLabel,
-  type SessionSummary,
-} from './api';
+import { translatorFor } from '@medsupply/i18n';
+import { deviceLabel, endedLabel, isRevocable, orderSessions, type SessionSummary } from './api';
+
+const t = translatorFor('en');
 
 const NOW = new Date('2026-08-01T12:00:00.000Z');
 
@@ -31,19 +28,31 @@ function session(overrides: Partial<SessionSummary>): SessionSummary {
 
 describe('describing a device', () => {
   it('names the mobile application rather than its HTTP library', () => {
-    expect(describeDevice('okhttp/4.12.0 Android 14')).toBe('MedSupply mobile on Android');
-    expect(describeDevice('Expo/57 CFNetwork Darwin')).toBe('MedSupply mobile on iOS');
+    expect(deviceLabel(t, 'okhttp/4.12.0 Android 14')).toBe('MedSupply mobile on Android');
+    expect(deviceLabel(t, 'Expo/57 CFNetwork Darwin')).toBe('MedSupply mobile on iOS');
   });
 
   it('names desktop browsers so a user can recognise their own', () => {
-    expect(describeDevice('Mozilla/5.0 (Windows NT 10.0) Chrome/130')).toBe('Chrome on Windows');
-    expect(describeDevice('Mozilla/5.0 (Macintosh) Safari/605')).toBe('Safari on macOS');
-    expect(describeDevice('Mozilla/5.0 (X11; Linux) Firefox/131')).toBe('Firefox on Linux');
+    expect(deviceLabel(t, 'Mozilla/5.0 (Windows NT 10.0) Chrome/130')).toBe('Chrome on Windows');
+    expect(deviceLabel(t, 'Mozilla/5.0 (Macintosh) Safari/605')).toBe('Safari on macOS');
+    expect(deviceLabel(t, 'Mozilla/5.0 (X11; Linux) Firefox/131')).toBe('Firefox on Linux');
   });
 
   it('says so plainly when it cannot tell', () => {
-    expect(describeDevice(null)).toBe('Unknown device');
-    expect(describeDevice('curl/8.0')).toBe('Unknown client on Unknown platform');
+    expect(deviceLabel(t, null)).toBe('Unknown device');
+    // `curl/8.0` names neither, and "Unknown app on Unknown kind of device" —
+    // which is what this said before — is a worse answer than "Unknown device"
+    // to somebody being asked whether they recognise it.
+    expect(deviceLabel(t, 'curl/8.0')).toBe('Unknown device');
+    // One half known is still worth saying.
+    expect(deviceLabel(t, 'curl/8.0 (Windows NT 10.0)')).toBe('Unknown app on Windows');
+  });
+
+  it('answers in the language the rest of the screen is in', () => {
+    // The whole job of this screen is "do you recognise this device?", and it
+    // was answering in English whatever the app was set to.
+    expect(deviceLabel(translatorFor('bn'), null)).toBe('অচেনা ডিভাইস');
+    expect(endedLabel(translatorFor('bn'), 'TOKEN_REUSE')).toBe('নিরাপত্তার জন্য বন্ধ করা হয়েছে');
   });
 });
 
@@ -82,11 +91,11 @@ describe('explaining why a session ended', () => {
   it('distinguishes a safety revocation from an ordinary sign-out', () => {
     // This is the difference between "I signed out" and "somebody replayed a
     // stolen token", and the user is the only person who can tell them apart.
-    expect(revocationLabel('TOKEN_REUSE')).toBe('Ended for safety');
-    expect(revocationLabel('REVOKED_BY_ADMIN')).toBe('Ended by an administrator');
-    expect(revocationLabel('ROLE_CHANGED')).toBe('Ended after a role change');
-    expect(revocationLabel('SIGNED_OUT_EVERYWHERE')).toBe('Signed out everywhere');
-    expect(revocationLabel('SIGNED_OUT')).toBe('Signed out');
-    expect(revocationLabel(null)).toBe('Signed out');
+    expect(endedLabel(t, 'TOKEN_REUSE')).toBe('Ended for safety');
+    expect(endedLabel(t, 'REVOKED_BY_ADMIN')).toBe('Ended by an administrator');
+    expect(endedLabel(t, 'ROLE_CHANGED')).toBe('Ended after a role change');
+    expect(endedLabel(t, 'SIGNED_OUT_EVERYWHERE')).toBe('Signed out everywhere');
+    expect(endedLabel(t, 'SIGNED_OUT')).toBe('Signed out');
+    expect(endedLabel(t, null)).toBe('Signed out');
   });
 });

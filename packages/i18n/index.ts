@@ -87,3 +87,31 @@ export function catalogueKeys(catalogue: object, prefix = ''): string[] {
     return value && typeof value === 'object' ? catalogueKeys(value, path) : [path];
   });
 }
+
+export type Translate = (path: string, values?: Record<string, string | number>) => string;
+
+/**
+ * A translator for one language, with no React in it.
+ *
+ * Both clients wrote the same dotted-path walk beside their provider, and a
+ * test or a plain function that needs a sentence had nowhere to get one — which
+ * is how the security screen's device names ended up hard-coded in English on
+ * both clients while everything around them was translated.
+ *
+ * A missing key returns the path itself rather than throwing or rendering
+ * blank: the caller can then see which key is absent, and `bn: Catalogue` means
+ * the only way to reach that state is a key added to neither catalogue.
+ */
+export function translatorFor(language: Language): Translate {
+  const catalogue = catalogueFor(language);
+  return (path, values) => {
+    const template = path
+      .split('.')
+      .reduce<unknown>(
+        (node, key) =>
+          node && typeof node === 'object' ? (node as Record<string, unknown>)[key] : undefined,
+        catalogue,
+      );
+    return typeof template === 'string' ? interpolate(template, values) : path;
+  };
+}

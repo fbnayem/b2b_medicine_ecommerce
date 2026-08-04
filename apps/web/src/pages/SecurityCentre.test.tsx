@@ -3,11 +3,12 @@ import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UserRole, UserStatus } from '@medsupply/shared-types';
+import { translatorFor } from '@medsupply/i18n';
 import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
 import { renderWithUi } from '../testing/render';
 import { SecurityCentre } from './SecurityCentre';
-import { describeDevice, formatUptime, revocationLabel } from './securityLabels';
+import { deviceLabel, endedLabel, formatUptime } from './securityLabels';
 
 vi.mock('../api/client', async () => {
   const actual = await vi.importActual<typeof import('../api/client')>('../api/client');
@@ -110,10 +111,14 @@ describe('security centre', () => {
     // action it claims to exercise.
   });
 
-  it('names each device in words its owner can recognise', () => {
-    expect(describeDevice('Mozilla/5.0 (Windows NT 10.0) Chrome/130.0')).toBe('Chrome on Windows');
-    expect(describeDevice('okhttp/4.12 Android')).toBe('MedSupply mobile on Android');
-    expect(describeDevice(null)).toBe('Unknown device');
+  it('names each device in words its owner can recognise, in their language', () => {
+    const t = translatorFor('en');
+    expect(deviceLabel(t, 'Mozilla/5.0 (Windows NT 10.0) Chrome/130.0')).toBe('Chrome on Windows');
+    expect(deviceLabel(t, 'okhttp/4.12 Android')).toBe('MedSupply mobile on Android');
+    expect(deviceLabel(t, null)).toBe('Unknown device');
+    // The point of moving these out of a hard-coded switch: the one screen that
+    // asks "do you recognise this?" has to answer in a language they read.
+    expect(deviceLabel(translatorFor('bn'), null)).toBe('অচেনা ডিভাইস');
   });
 
   it('reports uptime and revocation reasons in words', () => {
@@ -122,8 +127,8 @@ describe('security centre', () => {
     expect(formatUptime(200_000)).toBe('2d 7h');
     // A session ended by reuse detection must not read like an ordinary
     // sign-out: the owner is the only person who can tell them apart.
-    expect(revocationLabel('TOKEN_REUSE')).toBe('Ended for safety');
-    expect(revocationLabel(null)).toBe('Signed out');
+    expect(endedLabel(translatorFor('en'), 'TOKEN_REUSE')).toBe('Ended for safety');
+    expect(endedLabel(translatorFor('en'), null)).toBe('Signed out');
   });
 
   it('lists every sign-in and marks the current device', async () => {

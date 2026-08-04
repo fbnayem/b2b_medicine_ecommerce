@@ -81,6 +81,7 @@ export const en = {
     atLeast: 'At least {{minimum}} characters.',
     changeButton: 'Change my password',
     restoringSession: 'Restoring your session',
+    sessionEnded: 'This session has ended. Sign in again.',
   },
 
   /**
@@ -513,6 +514,24 @@ export const en = {
     signedOutOther: 'That device was signed out.',
     signedOutAll: 'Signed out of {{count}} devices.',
     signOutFailed: 'That device could not be signed out.',
+
+    /**
+     * Naming a device, and why one stopped working.
+     *
+     * Both clients held their own copy of these sentences in English, so the
+     * one screen whose whole job is "do you recognise this?" answered in a
+     * language the person might not read. `Chrome`, `Android` and the rest are
+     * proper nouns and are not translated.
+     */
+    deviceOn: '{{client}} on {{platform}}',
+    unknownDevice: 'Unknown device',
+    unknownClient: 'Unknown app',
+    unknownPlatform: 'Unknown kind of device',
+    endedTokenReuse: 'Ended for safety',
+    endedRevokedByAdmin: 'Ended by an administrator',
+    endedRoleChanged: 'Ended after a role change',
+    endedSignedOutEverywhere: 'Signed out everywhere',
+    endedSignedOut: 'Signed out',
     immediate:
       'Signing a device out takes effect at once: it stops working on its next request rather than at the end of its session.',
     deployment: 'This installation',
@@ -1646,6 +1665,7 @@ export const en = {
     markPageRead: 'Mark these as read',
     archive: 'Archive',
     read: 'Read',
+    unread: 'Unread',
     markedRead: 'Marked as read.',
     archived: 'Archived.',
     updateFailed: 'Those notifications could not be updated.',

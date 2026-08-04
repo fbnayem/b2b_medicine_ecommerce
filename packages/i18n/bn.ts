@@ -83,6 +83,7 @@ export const bn: Catalogue = {
     atLeast: 'অন্তত {{minimum}} অক্ষর।',
     changeButton: 'পাসওয়ার্ড বদলান',
     restoringSession: 'আপনার সেশন ফিরিয়ে আনা হচ্ছে',
+    sessionEnded: 'এই সেশন শেষ হয়ে গেছে। আবার সাইন ইন করুন।',
   },
 
   dashboard: {
@@ -482,6 +483,16 @@ export const bn: Catalogue = {
     signedOutOther: 'ওই ডিভাইস সাইন আউট হয়েছে।',
     signedOutAll: '{{count}}টি ডিভাইস সাইন আউট হয়েছে।',
     signOutFailed: 'ডিভাইসটি সাইন আউট করা যায়নি।',
+
+    deviceOn: '{{platform}}-এ {{client}}',
+    unknownDevice: 'অচেনা ডিভাইস',
+    unknownClient: 'অচেনা অ্যাপ',
+    unknownPlatform: 'অচেনা ধরনের ডিভাইস',
+    endedTokenReuse: 'নিরাপত্তার জন্য বন্ধ করা হয়েছে',
+    endedRevokedByAdmin: 'প্রশাসক বন্ধ করেছেন',
+    endedRoleChanged: 'ভূমিকা বদলানোর পর বন্ধ হয়েছে',
+    endedSignedOutEverywhere: 'সব জায়গা থেকে সাইন আউট',
+    endedSignedOut: 'সাইন আউট',
     immediate:
       'সাইন আউট সঙ্গে সঙ্গে কার্যকর হয়: সেশন শেষ হওয়ার অপেক্ষা না করে পরের অনুরোধেই বন্ধ হয়ে যায়।',
     deployment: 'এই ইনস্টলেশন',
@@ -1601,6 +1612,7 @@ export const bn: Catalogue = {
     markPageRead: 'এগুলি পড়া হিসেবে চিহ্নিত করুন',
     archive: 'সরিয়ে রাখুন',
     read: 'পড়া হয়েছে',
+    unread: 'পড়া হয়নি',
     markedRead: 'পড়া হিসেবে চিহ্নিত হয়েছে।',
     archived: 'সরিয়ে রাখা হয়েছে।',
     updateFailed: 'বিজ্ঞপ্তিগুলি হালনাগাদ করা যায়নি।',

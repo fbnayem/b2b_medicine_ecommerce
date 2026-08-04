@@ -18,7 +18,7 @@ import {
 import { useApiCollection, useApiResource } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate } from '../lib/finance';
-import { describeDevice, formatUptime, revocationLabel } from './securityLabels';
+import { deviceLabel, endedLabel, formatUptime } from './securityLabels';
 
 export interface SessionRow {
   _id: string;
@@ -137,7 +137,7 @@ export function SecurityCentre() {
       header: t('security.device'),
       cell: (session) => (
         <div>
-          <p className="text-text">{describeDevice(session.userAgent)}</p>
+          <p className="text-text">{deviceLabel(t, session.userAgent)}</p>
           {session.current && <p className="text-sm text-text-muted">{t('security.thisDevice')}</p>}
         </div>
       ),
@@ -158,7 +158,7 @@ export function SecurityCentre() {
       header: t('security.state'),
       cell: (session) =>
         session.revokedAt ? (
-          <Badge tone="danger">{revocationLabel(session.revokedReason)}</Badge>
+          <Badge tone="danger">{endedLabel(t, session.revokedReason)}</Badge>
         ) : (
           <Badge tone="success">{t('security.active')}</Badge>
         ),
