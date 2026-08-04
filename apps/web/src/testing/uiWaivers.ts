@@ -19,20 +19,19 @@
  *   - Removing one is forced: the moment a page complies, the test fails on the
  *     stale waiver until it is struck off. **The lists can only shrink.**
  *
- * At the time of writing: 43 pages, of which 36 import the legacy stylesheet,
- * 20 build a raw table, 29 hand-roll a loading string, 40 render no page
- * header, and 43 are untranslated.
+ * **Every list is now empty, and that is the finished state rather than a
+ * starting one.** They were seeded at 36, 20, 29, 40 and 43 entries; phase 21
+ * converted all forty-three pages and struck each one off as it complied.
+ * `inventory.css` was deleted when the first list reached zero.
+ *
+ * The lists stay because the rules need them: an empty allow-list is what
+ * makes the forty-fourth page fail rather than quietly joining the old world.
+ * Adding an entry here is now a deliberate exception to a rule the whole
+ * application keeps, and should be argued for in review.
  */
 
 /** Still importing the 1,104-line legacy stylesheet. Deleted when this empties. */
-export const LEGACY_STYLESHEET: readonly string[] = [
-  'AuditLogViewer.tsx',
-  'SecurityCentre.tsx',
-  'ShopDetail.tsx',
-  'SystemSettings.tsx',
-  'Unauthorized.tsx',
-  'UserAdministration.tsx',
-];
+export const LEGACY_STYLESHEET: readonly string[] = [];
 
 /**
  * Building a table by hand.
@@ -42,7 +41,7 @@ export const LEGACY_STYLESHEET: readonly string[] = [
  * strip to be dragged sideways, and delivery riders read these on phones.
  * `DataTable` stacks each row into a labelled block instead.
  */
-export const RAW_TABLE: readonly string[] = ['SecurityCentre.tsx', 'ShopList.tsx'];
+export const RAW_TABLE: readonly string[] = [];
 
 /**
  * Hand-rolling a wait.
@@ -51,12 +50,7 @@ export const RAW_TABLE: readonly string[] = ['SecurityCentre.tsx', 'ShopList.tsx
  * screen reader, and a failure that offers no way to try again. `Resource`
  * renders all three states from one place.
  */
-export const HAND_ROLLED_STATE: readonly string[] = [
-  'AuditLogViewer.tsx',
-  'SecurityCentre.tsx',
-  'SystemSettings.tsx',
-  'UserAdministration.tsx',
-];
+export const HAND_ROLLED_STATE: readonly string[] = [];
 
 /**
  * Rendering no `PageHeader`, so no `data-test="page-<routeId>"`.
@@ -65,18 +59,7 @@ export const HAND_ROLLED_STATE: readonly string[] = [
  * construction — but only three pages render one, so the browser specs fall
  * back to `getByRole` and are more brittle than the document describes.
  */
-export const NO_PAGE_HEADER: readonly string[] = [
-  'AuditLogViewer.tsx',
-  'Login.tsx',
-  'NotFound.tsx',
-  'SecurityCentre.tsx',
-  'ShopDetail.tsx',
-  'ShopForm.tsx',
-  'ShopList.tsx',
-  'SystemSettings.tsx',
-  'Unauthorized.tsx',
-  'UserAdministration.tsx',
-];
+export const NO_PAGE_HEADER: readonly string[] = [];
 
 /**
  * Not wired to the catalogue at all.
@@ -89,17 +72,4 @@ export const NO_PAGE_HEADER: readonly string[] = [
  * never call `t()` at all, behind a language switch that changes the frame and
  * nothing inside it.
  */
-export const UNTRANSLATED: readonly string[] = [
-  'AuditLogViewer.tsx',
-  'ChangePassword.tsx',
-  'Dashboard.tsx',
-  'Login.tsx',
-  'NotFound.tsx',
-  'SecurityCentre.tsx',
-  'ShopDetail.tsx',
-  'ShopForm.tsx',
-  'ShopList.tsx',
-  'SystemSettings.tsx',
-  'Unauthorized.tsx',
-  'UserAdministration.tsx',
-];
+export const UNTRANSLATED: readonly string[] = [];

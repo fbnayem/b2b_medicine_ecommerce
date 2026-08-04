@@ -128,7 +128,14 @@ export function errorMessage(
       : 'Could not reach the server. Check the connection and try again.';
   }
 
-  return catalogue[failure.code] ?? failure.message ?? fallback ?? catalogue.UNKNOWN;
+  /*
+   * The catalogue wins for a code it knows. `UNKNOWN` is not one of those: it
+   * means the server sent an explanation without a code we recognise, and
+   * "Something went wrong" is strictly less useful than what it actually said —
+   * "Only a Super Admin may grant the Admin role", for instance.
+   */
+  if (failure.code !== 'UNKNOWN' && catalogue[failure.code]) return catalogue[failure.code];
+  return failure.message ?? fallback ?? catalogue.UNKNOWN;
 }
 
 // ─── Refresh policy ──────────────────────────────────────────────────────────

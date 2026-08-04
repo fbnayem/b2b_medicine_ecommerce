@@ -1,8 +1,23 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { SettingSource, SettingsGroup } from '@medsupply/shared-types';
-import { apiClient } from '../api/client';
-import './inventory.css';
-import { requireReason, useAsk } from '../components/ui';
+import { apiClient, errorMessage } from '../api/client';
+import {
+  Badge,
+  Button,
+  Card,
+  Field,
+  FilterTabs,
+  Input,
+  PageHeader,
+  Resource,
+  Select,
+  requireReason,
+  toast,
+  useAsk,
+} from '../components/ui';
+import { useApiResource } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 
 type GroupValues = Record<string, unknown>;
 
@@ -14,196 +29,139 @@ interface SettingsPayload {
   fallbacks: Record<string, GroupValues>;
 }
 
-const GROUP_LABELS: Record<string, string> = {
-  business: 'Business identity',
-  finance: 'Finance and credit',
-  inventory: 'Inventory thresholds',
-  delivery: 'Delivery proof',
-  notifications: 'Notification defaults',
-  localisation: 'Localisation',
-  security: 'Security policy',
-};
-
-const FIELD_LABELS: Record<string, string> = {
-  name: 'Display name',
-  legalName: 'Legal name',
-  logoUrl: 'Logo URL',
-  address: 'Address',
-  phone: 'Phone',
-  email: 'Email',
-  website: 'Website',
-  tradeLicenceNumber: 'Trade licence number',
-  drugLicenceNumber: 'Drug licence number',
-  invoiceFooter: 'Invoice footer',
-  taxBasisPoints: 'Tax (basis points, 750 = 7.50%)',
-  defaultPaymentTermsDays: 'Default payment terms (days)',
-  creditBlockOnLimitExceeded: 'Block ordering when the credit limit is exceeded',
-  creditBlockOverdueThresholdMinor: 'Overdue block threshold (poisha)',
-  creditOverdueGraceDays: 'Overdue grace period (days)',
-  customerAdvanceEnabled: 'Allow customer advances',
-  deliveryCollectionRequiresVerification: 'Delivery collections require verification',
-  nearExpiryDays: 'Near-expiry window (days)',
-  lowStockThreshold: 'Low-stock threshold (units)',
-  requiredProofs: 'Required delivery proofs',
-  otpExpiryMinutes: 'Receiver OTP lifetime (minutes)',
-  overdueDigestEnabled: 'Send the daily overdue digest',
-  nearExpiryDigestEnabled: 'Send the daily near-expiry digest',
-  timezone: 'Time zone (IANA)',
-  locale: 'Locale',
-  dateFormat: 'Date format',
-  currencyCode: 'Currency code',
-  currencySymbol: 'Currency symbol',
-  passwordMinLength: 'Minimum password length',
-  maxLoginAttempts: 'Failed sign-ins before lockout',
-  lockoutMinutes: 'Lockout duration (minutes)',
-  forcePasswordChangeOnCreate: 'Force a password change on first sign-in',
-};
+const GROUPS = [
+  'business',
+  'finance',
+  'inventory',
+  'delivery',
+  'notifications',
+  'localisation',
+  'security',
+];
 
 const PROOF_OPTIONS = ['OTP', 'SIGNATURE', 'PHOTOGRAPH', 'GPS'];
 const LOCALE_OPTIONS = ['en', 'bn'];
 const DATE_FORMAT_OPTIONS = ['DD MMM YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'];
 
-const SOURCE_LABELS: Record<string, string> = {
-  PERSISTED: 'Saved here',
-  ENVIRONMENT: 'From the environment',
-  DEFAULT: 'Built-in default',
-};
+/** `taxBasisPoints` → `settings.fieldTaxBasisPoints`. */
+const fieldKey = (field: string) =>
+  `settings.field${field.charAt(0).toUpperCase()}${field.slice(1)}`;
+const groupKey = (group: string) =>
+  `settings.group${group.charAt(0).toUpperCase()}${group.slice(1)}`;
 
 export function SystemSettings() {
+  const { t, language } = useLanguage();
   const ask = useAsk();
-  const [payload, setPayload] = useState<SettingsPayload | null>(null);
-  const [draft, setDraft] = useState<Record<string, GroupValues>>({});
+  const queryClient = useQueryClient();
+
+  const query = useApiResource<SettingsPayload>(['settings'], '/settings');
+  const payload = query.data;
+
   const [activeGroup, setActiveGroup] = useState<string>(SettingsGroup.BUSINESS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [status, setStatus] = useState('');
+  const [draft, setDraft] = useState<Record<string, GroupValues>>({});
+  const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.get('/settings');
-      setPayload(response.data.data);
-      setDraft(structuredClone(response.data.data.settings));
-      setError('');
-    } catch (caught) {
-      const failure = caught as { response?: { status?: number } };
-      setError(
-        failure.response?.status === 403
-          ? 'Your role cannot view system settings.'
-          : 'Unable to load system settings.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // The server's answer seeds a local copy; every field edits that until
+  // "Save" is pressed, and "Undo my changes" is this effect running again.
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (payload) setDraft(structuredClone(payload.settings));
+  }, [payload]);
 
-  const setField = (group: string, field: string, value: unknown) => {
+  const reload = () => queryClient.invalidateQueries({ queryKey: ['settings'] });
+
+  function setField(group: string, field: string, value: unknown) {
     setDraft((current) => ({ ...current, [group]: { ...current[group], [field]: value } }));
-    setStatus('');
-  };
+  }
 
-  const save = async (group: string) => {
+  async function save(group: string) {
     if (!payload) return;
-    setStatus('Saving...');
+    setBusy(true);
     try {
       await apiClient.put(`/settings/${group}`, {
         values: draft[group],
         version: payload.versions[group],
       });
-      setStatus(`${GROUP_LABELS[group]} saved.`);
-      setError('');
-      await load();
+      await reload();
+      toast.success(t('settings.saved', { group: t(groupKey(group)) }));
     } catch (caught) {
-      setStatus('');
-      const failure = caught as {
-        response?: { data?: { error?: { code?: string; message?: string } } };
-      };
-      const stale = failure.response?.data?.error?.code === 'STALE_SETTINGS';
-      // Reload first: `load` clears the error on success, so setting the
-      // message afterwards is what keeps the explanation on screen.
-      if (stale) await load();
-      setError(
-        stale
-          ? 'Someone else changed these settings. The latest values have been reloaded.'
-          : (failure.response?.data?.error?.message ?? 'Unable to save these settings.'),
-      );
+      // A stale version means somebody else saved first. Reload before saying
+      // so, or the message is read against values already out of date.
+      await reload();
+      toast.error(errorMessage(caught, language, t('settings.saveFailed')));
+    } finally {
+      setBusy(false);
     }
-  };
+  }
 
-  const reset = async (group: string) => {
+  async function reset(group: string) {
     if (!payload) return;
     const reason = await ask.prompt({
-      title: `Reset ${GROUP_LABELS[group]}?`,
-      description:
-        'The saved values are discarded and the built-in or environment values take over. The ' +
-        'discarded values stay in the audit log.',
-      label: 'Why is this being reset?',
+      title: t('settings.resetTitle', { group: t(groupKey(group)) }),
+      description: t('settings.resetBody'),
+      label: t('settings.resetLabel'),
       multiline: true,
-      confirmLabel: 'Reset these settings',
+      confirmLabel: t('settings.resetConfirm'),
       danger: true,
       validate: requireReason(),
     });
     if (!reason) return;
-    setStatus('Resetting...');
+
+    setBusy(true);
     try {
       await apiClient.post(`/settings/${group}/reset`, {
         version: payload.versions[group],
         reason,
       });
-      setStatus(`${GROUP_LABELS[group]} reset to its fallback values.`);
-      setError('');
-      await load();
+      await reload();
+      toast.success(t('settings.resetDone', { group: t(groupKey(group)) }));
     } catch (caught) {
-      setStatus('');
-      const failure = caught as { response?: { data?: { error?: { message?: string } } } };
-      setError(failure.response?.data?.error?.message ?? 'Unable to reset these settings.');
+      toast.error(errorMessage(caught, language, t('settings.resetFailed')));
+    } finally {
+      setBusy(false);
     }
-  };
+  }
 
-  const renderField = (group: string, field: string, value: unknown) => {
-    const label = FIELD_LABELS[field] ?? field;
-    const id = `${group}-${field}`;
+  function renderField(group: string, field: string, value: unknown) {
+    const label = t(fieldKey(field));
 
     if (typeof value === 'boolean') {
       return (
-        <label key={field} className="settings-field checkbox">
+        <label key={field} className="flex min-h-11 items-center gap-2 text-text">
           <input
-            id={id}
             type="checkbox"
             checked={value}
             onChange={(event) => setField(group, field, event.target.checked)}
           />
-          <span>{label}</span>
+          {label}
         </label>
       );
     }
 
     if (field === 'requiredProofs' && Array.isArray(value)) {
+      const chosen = value as string[];
       return (
-        <fieldset key={field} className="settings-field">
-          <legend>{label}</legend>
-          {PROOF_OPTIONS.map((proof) => (
-            <label key={proof} className="checkbox">
-              <input
-                type="checkbox"
-                checked={(value as string[]).includes(proof)}
-                onChange={(event) =>
-                  setField(
-                    group,
-                    field,
-                    event.target.checked
-                      ? [...(value as string[]), proof]
-                      : (value as string[]).filter((entry) => entry !== proof),
-                  )
-                }
-              />
-              <span>{proof}</span>
-            </label>
-          ))}
+        <fieldset key={field} className="m-0 border-0 p-0">
+          <legend className="text-sm font-medium text-text">{label}</legend>
+          <div className="flex flex-wrap gap-4">
+            {PROOF_OPTIONS.map((proof) => (
+              <label key={proof} className="flex min-h-11 items-center gap-2 text-text">
+                <input
+                  type="checkbox"
+                  checked={chosen.includes(proof)}
+                  onChange={(event) =>
+                    setField(
+                      group,
+                      field,
+                      event.target.checked
+                        ? [...chosen, proof]
+                        : chosen.filter((entry) => entry !== proof),
+                    )
+                  }
+                />
+                {proof}
+              </label>
+            ))}
+          </div>
         </fieldset>
       );
     }
@@ -211,9 +169,9 @@ export function SystemSettings() {
     if (field === 'defaultQuietHours' && value && typeof value === 'object') {
       const quiet = value as { enabled: boolean; start: string; end: string };
       return (
-        <fieldset key={field} className="settings-field">
-          <legend>Default quiet hours</legend>
-          <label className="checkbox">
+        <fieldset key={field} className="m-0 border-0 p-0">
+          <legend className="text-sm font-medium text-text">{t('settings.quietHours')}</legend>
+          <label className="flex min-h-11 items-center gap-2 text-text">
             <input
               type="checkbox"
               checked={quiet.enabled}
@@ -221,22 +179,26 @@ export function SystemSettings() {
                 setField(group, field, { ...quiet, enabled: event.target.checked })
               }
             />
-            <span>Enabled for users who have saved none</span>
+            {t('settings.quietEnabled')}
           </label>
-          <label htmlFor={`${id}-start`}>From</label>
-          <input
-            id={`${id}-start`}
-            type="time"
-            value={quiet.start}
-            onChange={(event) => setField(group, field, { ...quiet, start: event.target.value })}
-          />
-          <label htmlFor={`${id}-end`}>To</label>
-          <input
-            id={`${id}-end`}
-            type="time"
-            value={quiet.end}
-            onChange={(event) => setField(group, field, { ...quiet, end: event.target.value })}
-          />
+          <div className="mt-2 flex flex-wrap gap-3">
+            <Field label={t('settings.from')} className="w-40">
+              <Input
+                type="time"
+                value={quiet.start}
+                onChange={(event) =>
+                  setField(group, field, { ...quiet, start: event.target.value })
+                }
+              />
+            </Field>
+            <Field label={t('settings.to')} className="w-40">
+              <Input
+                type="time"
+                value={quiet.end}
+                onChange={(event) => setField(group, field, { ...quiet, end: event.target.value })}
+              />
+            </Field>
+          </div>
         </fieldset>
       );
     }
@@ -244,128 +206,103 @@ export function SystemSettings() {
     if (field === 'locale' || field === 'dateFormat') {
       const options = field === 'locale' ? LOCALE_OPTIONS : DATE_FORMAT_OPTIONS;
       return (
-        <div key={field} className="settings-field">
-          <label htmlFor={id}>{label}</label>
-          <select
-            id={id}
+        <Field key={field} label={label}>
+          <Select
             value={String(value ?? '')}
             onChange={(event) => setField(group, field, event.target.value)}
           >
             {options.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {/* A language is named in its own language; a date pattern is
+                    a pattern and is shown as written. */}
+                {field === 'locale' ? (option === 'bn' ? 'বাংলা' : 'English') : option}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </Field>
       );
     }
 
     if (typeof value === 'number') {
       return (
-        <div key={field} className="settings-field">
-          <label htmlFor={id}>{label}</label>
-          <input
-            id={id}
+        <Field key={field} label={label}>
+          <Input
             type="number"
             value={value}
             onChange={(event) => setField(group, field, Number(event.target.value))}
           />
-        </div>
+        </Field>
       );
     }
 
     return (
-      <div key={field} className="settings-field">
-        <label htmlFor={id}>{label}</label>
-        <input
-          id={id}
-          type="text"
+      <Field key={field} label={label}>
+        <Input
           value={String(value ?? '')}
           onChange={(event) => setField(group, field, event.target.value)}
         />
-      </div>
+      </Field>
     );
-  };
+  }
 
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Administration</p>
-          <h1>System settings</h1>
-          <p>
-            Saved values take effect immediately. Documents already issued keep the snapshot taken
-            when they were created.
-          </p>
-        </div>
-        <button className="secondary-button" onClick={() => void load()}>
-          Reload
-        </button>
-      </header>
+    <main>
+      <PageHeader
+        routeId="settings"
+        title={t('settings.title')}
+        description={t('settings.subtitle')}
+        actions={<Button onClick={() => void query.refetch()}>{t('settings.reload')}</Button>}
+      />
 
-      {error ? (
-        <section className="state error">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
-      {status ? <p className="state success">{status}</p> : null}
+      <Resource
+        query={query}
+        loadingLabel={t('settings.loading')}
+        errorMessageFallback={t('settings.couldNotLoad')}
+      >
+        {(data) => (
+          <>
+            <div className="mb-4">
+              <FilterTabs
+                label={t('settings.groupLabel')}
+                options={GROUPS.map((group) => ({ value: group, label: t(groupKey(group)) }))}
+                value={activeGroup}
+                onChange={setActiveGroup}
+              />
+            </div>
 
-      {loading ? (
-        <section className="state">Loading system settings...</section>
-      ) : !payload ? (
-        <section className="state">System settings are unavailable.</section>
-      ) : (
-        <>
-          <nav className="filter-tabs" aria-label="Settings group">
-            {Object.keys(GROUP_LABELS).map((group) => (
-              <button
-                key={group}
-                className={activeGroup === group ? 'selected' : ''}
-                onClick={() => setActiveGroup(group)}
-              >
-                {GROUP_LABELS[group]}
-              </button>
-            ))}
-          </nav>
-
-          <section className="preference-block">
-            <header className="settings-group-heading">
-              <div>
-                <h2>{GROUP_LABELS[activeGroup]}</h2>
-                <p>{payload.descriptions[activeGroup]}</p>
+            <Card>
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-text">{t(groupKey(activeGroup))}</h2>
+                  <p className="max-w-prose text-text-muted">{data.descriptions[activeGroup]}</p>
+                </div>
+                <Badge>
+                  {t('settings.sourceLabel')}: {t(`settings.source${data.sources[activeGroup]}`)}
+                </Badge>
               </div>
-              <span className="status" title="Where the effective values come from">
-                {SOURCE_LABELS[payload.sources[activeGroup]] ?? payload.sources[activeGroup]}
-              </span>
-            </header>
 
-            <div className="settings-grid">
-              {Object.entries(draft[activeGroup] ?? {}).map(([field, value]) =>
-                renderField(activeGroup, field, value),
-              )}
-            </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {Object.entries(draft[activeGroup] ?? {}).map(([field, value]) =>
+                  renderField(activeGroup, field, value),
+                )}
+              </div>
 
-            <div className="preference-actions">
-              <button type="button" onClick={() => void save(activeGroup)}>
-                Save {GROUP_LABELS[activeGroup]}
-              </button>
-              <button
-                type="button"
-                className="secondary-button"
-                disabled={payload.sources[activeGroup] !== SettingSource.PERSISTED}
-                onClick={() => void reset(activeGroup)}
-              >
-                Reset to fallback
-              </button>
-              <button type="button" className="secondary-button" onClick={() => void load()}>
-                Discard changes
-              </button>
-            </div>
-          </section>
-        </>
-      )}
+              <div className="mt-4 flex flex-wrap justify-end gap-2">
+                <Button onClick={() => void query.refetch()}>{t('settings.discard')}</Button>
+                <Button
+                  disabled={data.sources[activeGroup] !== SettingSource.PERSISTED || busy}
+                  onClick={() => void reset(activeGroup)}
+                >
+                  {t('settings.resetToFallback')}
+                </Button>
+                <Button variant="primary" busy={busy} onClick={() => void save(activeGroup)}>
+                  {t('settings.save')}
+                </Button>
+              </div>
+            </Card>
+          </>
+        )}
+      </Resource>
     </main>
   );
 }

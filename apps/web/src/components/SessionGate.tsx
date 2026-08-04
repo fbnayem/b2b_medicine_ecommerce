@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { restoreSession } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
+import { LoadingState } from './ui';
 
 /**
  * Holds the application back until it knows whether the browser is holding a
@@ -20,11 +21,14 @@ export function SessionGate({ children }: { children: ReactNode }) {
   }, []);
 
   if (status === 'restoring') {
+    /*
+     * Deliberately not translated: this renders *above* the language provider,
+     * which cannot resolve a language until the session it is waiting on has
+     * been restored. `LoadingState` supplies the live region either way.
+     */
     return (
-      <main className="inventory-page">
-        <section className="state" role="status" aria-live="polite">
-          Restoring your session…
-        </section>
+      <main className="mx-auto max-w-xl p-6">
+        <LoadingState label="Restoring your session" />
       </main>
     );
   }

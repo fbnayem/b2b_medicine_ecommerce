@@ -1,16 +1,18 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UserRole, UserStatus } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
+import { renderWithUi } from '../testing/render';
 import { SecurityCentre } from './SecurityCentre';
 import { describeDevice, formatUptime, revocationLabel } from './securityLabels';
 
-vi.mock('../api/client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn(), delete: vi.fn() },
-}));
+vi.mock('../api/client', async () => {
+  const actual = await vi.importActual<typeof import('../api/client')>('../api/client');
+  return { ...actual, apiClient: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } };
+});
 
 const get = vi.mocked(apiClient.get);
 const del = vi.mocked(apiClient.delete);
@@ -103,7 +105,9 @@ describe('security centre', () => {
   beforeEach(() => {
     cleanup();
     vi.clearAllMocks();
-    vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
+    // No `window.confirm` spy: the page asks through the real dialog now, and
+    // stubbing the native one would let a test pass while cancelling the very
+    // action it claims to exercise.
   });
 
   it('names each device in words its owner can recognise', () => {
@@ -125,7 +129,7 @@ describe('security centre', () => {
   it('lists every sign-in and marks the current device', async () => {
     signIn(UserRole.SHOP_OWNER);
     mockRequests();
-    render(
+    renderWithUi(
       <MemoryRouter>
         <SecurityCentre />
       </MemoryRouter>,
@@ -137,31 +141,31 @@ describe('security centre', () => {
     expect(screen.getByText('203.0.113.4')).toBeTruthy();
     // A Shop Owner must not be shown the deployment panel at all.
     expect(get).not.toHaveBeenCalledWith('/admin/runtime');
-    expect(screen.queryByText('Deployment')).toBeNull();
+    expect(screen.queryByText('This installation')).toBeNull();
   });
 
   it('confirms before signing a device out and reloads afterwards', async () => {
     signIn(UserRole.MANAGER);
     mockRequests();
     del.mockResolvedValue({ data: { data: { success: true } } });
-    render(
+    renderWithUi(
       <MemoryRouter>
         <SecurityCentre />
       </MemoryRouter>,
     );
 
     await screen.findByText('MedSupply mobile on Android');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Sign out' })[1]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Sign out' })[1]!);
+    fireEvent.click(await screen.findByTestId('dialog-confirm'));
 
     await waitFor(() => expect(del).toHaveBeenCalledWith('/auth/sessions/s2'));
-    expect(globalThis.confirm).toHaveBeenCalled();
     expect(await screen.findByText('That device was signed out.')).toBeTruthy();
   });
 
   it('offers signing out everywhere only when more than one session is live', async () => {
     signIn(UserRole.MANAGER);
     mockRequests({ rows: [sessions[0]] });
-    render(
+    renderWithUi(
       <MemoryRouter>
         <SecurityCentre />
       </MemoryRouter>,
@@ -173,27 +177,28 @@ describe('security centre', () => {
     cleanup();
     mockRequests();
     post.mockResolvedValue({ data: { data: { success: true, revoked: 2 } } });
-    render(
+    renderWithUi(
       <MemoryRouter>
         <SecurityCentre />
       </MemoryRouter>,
     );
 
     fireEvent.click(await screen.findByRole('button', { name: 'Sign out everywhere' }));
+    fireEvent.click(await screen.findByTestId('dialog-confirm'));
     await waitFor(() => expect(post).toHaveBeenCalledWith('/auth/logout-all'));
-    expect(await screen.findByText('Signed out of 2 device(s).')).toBeTruthy();
+    expect(await screen.findByText('Signed out of 2 devices.')).toBeTruthy();
   });
 
   it('shows an administrator the deployment posture without any secret', async () => {
     signIn(UserRole.ADMIN);
     mockRequests();
-    render(
+    renderWithUi(
       <MemoryRouter>
         <SecurityCentre />
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('Deployment')).toBeTruthy();
+    expect(await screen.findByText('This installation')).toBeTruthy();
     expect(screen.getByText('1.2.3 (abcdef123456)')).toBeTruthy();
     expect(screen.getByText('15 minutes')).toBeTruthy();
     expect(screen.getByText('shared · 60s window')).toBeTruthy();
@@ -203,7 +208,7 @@ describe('security centre', () => {
   it('keeps the session list usable when the deployment panel cannot be read', async () => {
     signIn(UserRole.ADMIN);
     mockRequests({ runtime: false });
-    render(
+    renderWithUi(
       <MemoryRouter>
         <SecurityCentre />
       </MemoryRouter>,
@@ -212,23 +217,20 @@ describe('security centre', () => {
     // The failure of a supplementary panel must not take the primary one down.
     expect(await screen.findByText('Chrome on Windows')).toBeTruthy();
     expect(
-      screen.getByText(
-        'The deployment status could not be read. Your sign-ins above are unaffected.',
-      ),
+      screen.getByText('The installation details could not be read. Your sign-ins are unaffected.'),
     ).toBeTruthy();
   });
 
   it('reports a failure with a retry rather than an empty screen', async () => {
     signIn(UserRole.MANAGER);
     get.mockRejectedValue({ response: { status: 500 } });
-    render(
+    renderWithUi(
       <MemoryRouter>
         <SecurityCentre />
       </MemoryRouter>,
     );
 
     expect(await screen.findByRole('alert')).toBeTruthy();
-    expect(screen.getByText('Unable to load your sign-ins.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
   });
 });

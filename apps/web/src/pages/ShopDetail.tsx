@@ -1,198 +1,235 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
-import { apiClient } from '../api/client';
+import type { ReactNode } from 'react';
+import { useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { ShopStatus } from '@medsupply/shared-types';
 import type { Shop } from '@medsupply/shared-types';
-import './inventory.css';
+import { apiClient, errorMessage } from '../api/client';
+import {
+  Badge,
+  Button,
+  Card,
+  LinkButton,
+  PageHeader,
+  Resource,
+  StatusPill,
+  requireReason,
+  toast,
+  useAsk,
+} from '../components/ui';
+import { useApiResource } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
 
-export const ShopDetail: React.FC = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [shop, setShop] = useState<Shop | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [statusMessage, setStatusMessage] = useState('');
+const NINETY_DAYS = 90 * 24 * 60 * 60 * 1000;
 
-  useEffect(() => {
-    apiClient
-      .get(`/shops/${id}`)
-      .then((r) => setShop(r.data.data))
-      .catch((e) => setError(e.response?.data?.error?.message || 'Failed to load shop'))
-      .finally(() => setLoading(false));
-  }, [id]);
+interface DeliveryAddress {
+  label: string;
+  line1: string;
+  city: string;
+  district: string;
+  isDefault?: boolean;
+}
 
-  const handleStatusChange = async (status: ShopStatus, reason?: string) => {
-    try {
-      const res = await apiClient.patch(`/shops/${id}/status`, { status, reason });
-      setShop(res.data.data);
-      setStatusMessage(`Status updated to ${status}`);
-    } catch (e: any) {
-      setError(e.response?.data?.error?.message || 'Failed to update status');
-    }
-  };
-
-  if (loading)
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-      </div>
-    );
-  if (error) return <div className="p-8 text-red-600">{error}</div>;
-  if (!shop) return <div className="p-8 text-gray-500">Shop not found.</div>;
-
-  const licenceExpirySoon =
-    shop.drugLicenceExpiryDate &&
-    new Date(shop.drugLicenceExpiryDate).getTime() - Date.now() < 90 * 24 * 60 * 60 * 1000;
-
+function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <button
-        onClick={() => navigate('/shops')}
-        className="text-blue-600 hover:underline mb-6 inline-block text-sm"
-      >
-        ← Back to Shops
-      </button>
-      <div className="actions finance-shop-actions">
-        <Link className="secondary-button" to={`/shops/${id}/ledger`}>
-          Customer ledger
-        </Link>
-        <Link className="secondary-button" to={`/shops/${id}/statement`}>
-          Statement
-        </Link>
-        <Link className="primary-button" to={`/payments/new?shopId=${id}`}>
-          Record payment
-        </Link>
-      </div>
-
-      {statusMessage && (
-        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-lg border border-green-200">
-          {statusMessage}
-        </div>
-      )}
-      {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">{error}</div>}
-
-      {/* Licence Warning */}
-      {licenceExpirySoon && (
-        <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-700">
-          ⚠️ Drug licence expires on {formatFinanceDate(shop.drugLicenceExpiryDate!)}
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{shop.name}</h1>
-            <p className="text-sm text-blue-600 font-mono mt-1">{shop.reference}</p>
-          </div>
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-semibold ${
-              shop.status === ShopStatus.ACTIVE
-                ? 'bg-green-100 text-green-800'
-                : shop.status === ShopStatus.SUSPENDED
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-gray-100 text-gray-700'
-            }`}
-          >
-            {shop.status.replace('_', ' ')}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-6 mb-6">
-          <div>
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
-              Primary Phone
-            </p>
-            <p className="text-gray-900">{shop.primaryPhone}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Email</p>
-            <p className="text-gray-900">{shop.email || '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
-              Credit Limit
-            </p>
-            <p className="text-gray-900 font-semibold">{formatMinor(shop.creditLimit)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
-              Outstanding Balance
-            </p>
-            <p className="text-gray-900 font-semibold">{formatMinor(shop.outstandingBalance)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
-              Drug Licence
-            </p>
-            <p className="text-gray-900">{shop.drugLicenceNumber || '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">
-              Payment Terms
-            </p>
-            <p className="text-gray-900">{shop.paymentTermsDays} days</p>
-          </div>
-        </div>
-
-        {/* Delivery Addresses */}
-        {shop.deliveryAddresses && shop.deliveryAddresses.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Delivery Addresses</h3>
-            <div className="space-y-2">
-              {shop.deliveryAddresses.map((addr: any, i: number) => (
-                <div key={i} className="p-3 bg-gray-50 rounded-lg text-sm text-gray-700">
-                  <span className="font-medium">{addr.label}</span>: {addr.line1}, {addr.city},{' '}
-                  {addr.district}
-                  {addr.isDefault && (
-                    <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                      Default
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Status Controls */}
-        <div className="border-t pt-4 mt-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Status Management</h3>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => handleStatusChange(ShopStatus.ACTIVE)}
-              className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Activate
-            </button>
-            <button
-              onClick={() => handleStatusChange(ShopStatus.SUSPENDED, 'Suspended by admin')}
-              className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Suspend
-            </button>
-            <button
-              onClick={() => handleStatusChange(ShopStatus.CREDIT_BLOCKED, 'Credit limit exceeded')}
-              className="px-3 py-1.5 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 transition-colors"
-            >
-              Block Credit
-            </button>
-            <button
-              onClick={() => handleStatusChange(ShopStatus.INACTIVE)}
-              className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Deactivate
-            </button>
-          </div>
-        </div>
-
-        {shop.notes && (
-          <div className="border-t pt-4 mt-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">Internal Notes</h3>
-            <p className="text-sm text-gray-600">{shop.notes}</p>
-          </div>
-        )}
-      </div>
+    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border py-2 last:border-b-0">
+      <dt className="text-sm text-text-muted">{label}</dt>
+      <dd className="text-text">{children}</dd>
     </div>
   );
-};
+}
+
+export function ShopDetail() {
+  const { id } = useParams();
+  const { t, language } = useLanguage();
+  const ask = useAsk();
+  const queryClient = useQueryClient();
+
+  const query = useApiResource<Shop>(['shop', id], `/shops/${id}`);
+
+  /**
+   * Every status change is confirmed, and the two that stop a customer trading
+   * ask for a reason.
+   *
+   * Suspension and a credit block used to fire on a single click with a
+   * hard-coded reason — "Suspended by admin" — so the audit record said who
+   * but never why, on exactly the two actions where why is the whole question.
+   */
+  async function changeStatus(status: ShopStatus) {
+    const needsReason = status === ShopStatus.SUSPENDED || status === ShopStatus.CREDIT_BLOCKED;
+    const key = {
+      [ShopStatus.ACTIVE]: 'activate',
+      [ShopStatus.SUSPENDED]: 'suspend',
+      [ShopStatus.CREDIT_BLOCKED]: 'blockCredit',
+      [ShopStatus.INACTIVE]: 'deactivate',
+    }[status as string] as string;
+
+    let reason: string | undefined;
+    if (needsReason) {
+      const answer = await ask.prompt({
+        title: t(`shops.${key}Title`),
+        description: t(`shops.${key}Body`),
+        label: t('actions.reason'),
+        multiline: true,
+        confirmLabel: t(`shops.${key}`),
+        danger: true,
+        validate: requireReason(),
+      });
+      if (!answer) return;
+      reason = answer;
+    } else {
+      const agreed = await ask.confirm({
+        title: t(`shops.${key}Title`),
+        description: t(`shops.${key}Body`),
+        confirmLabel: t(`shops.${key}`),
+      });
+      if (!agreed) return;
+    }
+
+    try {
+      await apiClient.patch(`/shops/${id}/status`, { status, reason });
+      await queryClient.invalidateQueries({ queryKey: ['shop', id] });
+      toast.success(t('shops.statusChanged', { status: t(`shopStatus.${status}`) }));
+    } catch (caught) {
+      toast.error(errorMessage(caught, language, t('shops.statusFailed')));
+    }
+  }
+
+  return (
+    <main>
+      <Resource
+        query={query}
+        loadingLabel={t('shops.loadingOne')}
+        errorMessageFallback={t('shops.couldNotLoadOne')}
+      >
+        {(shop) => {
+          const addresses = (shop.deliveryAddresses ?? []) as unknown as DeliveryAddress[];
+          const licenceSoon =
+            shop.drugLicenceExpiryDate &&
+            new Date(shop.drugLicenceExpiryDate).getTime() - Date.now() < NINETY_DAYS;
+
+          return (
+            <>
+              <PageHeader
+                routeId="shop-detail"
+                title={shop.name}
+                description={
+                  <span className="flex flex-wrap items-center gap-2">
+                    <StatusPill kind="shop" status={shop.status} />
+                    {shop.reference}
+                  </span>
+                }
+                actions={
+                  <>
+                    <LinkButton to="/shops">{t('shops.back')}</LinkButton>
+                    <LinkButton to={`/shops/${id}/ledger`}>{t('shops.ledger')}</LinkButton>
+                    <LinkButton to={`/shops/${id}/statement`}>{t('shops.statement')}</LinkButton>
+                    <LinkButton variant="primary" to={`/payments/new?shopId=${id}`}>
+                      {t('finance.recordPayment')}
+                    </LinkButton>
+                  </>
+                }
+              />
+
+              {licenceSoon && (
+                <p className="mb-4 rounded-lg border border-warning bg-warning-subtle px-4 py-3 text-text">
+                  {t('shops.licenceWarning', {
+                    date: formatFinanceDate(shop.drugLicenceExpiryDate),
+                  })}
+                </p>
+              )}
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card>
+                  <h2 className="mb-2 text-lg font-semibold text-text">{t('shops.contact')}</h2>
+                  <dl className="m-0">
+                    <Detail label={t('shops.primaryPhone')}>
+                      <a className="text-brand underline" href={`tel:${shop.primaryPhone}`}>
+                        {shop.primaryPhone}
+                      </a>
+                    </Detail>
+                    <Detail label={t('fields.email')}>{shop.email || '—'}</Detail>
+                    <Detail label={t('shops.territory')}>{shop.territory || '—'}</Detail>
+                    <Detail label={t('shops.licence')}>
+                      {shop.drugLicenceNumber || t('shops.noLicence')}
+                    </Detail>
+                  </dl>
+                </Card>
+
+                <Card>
+                  <h2 className="mb-2 text-lg font-semibold text-text">{t('shops.trading')}</h2>
+                  <dl className="m-0">
+                    <Detail label={t('shops.creditLimit')}>{formatMinor(shop.creditLimit)}</Detail>
+                    <Detail label={t('shops.outstanding')}>
+                      {formatMinor(shop.outstandingBalance)}
+                    </Detail>
+                    <Detail label={t('shops.paymentTerms')}>
+                      {t('approvals.days', { days: shop.paymentTermsDays })}
+                    </Detail>
+                  </dl>
+                </Card>
+
+                <Card>
+                  <h2 className="mb-2 text-lg font-semibold text-text">{t('shops.addresses')}</h2>
+                  {addresses.length === 0 ? (
+                    <p className="text-text-muted">{t('shops.noAddresses')}</p>
+                  ) : (
+                    <ul className="m-0 list-none p-0">
+                      {addresses.map((address, index) => (
+                        <li
+                          key={`${address.label}-${index}`}
+                          className="border-b border-border py-2 last:border-b-0"
+                        >
+                          <p className="text-text">
+                            <strong>{address.label}</strong>: {address.line1}, {address.city},{' '}
+                            {address.district}
+                            {address.isDefault && (
+                              <Badge className="ms-2" tone="brand">
+                                {t('shops.defaultAddress')}
+                              </Badge>
+                            )}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Card>
+
+                <Card>
+                  <h2 className="mb-2 text-lg font-semibold text-text">
+                    {t('shops.statusControls')}
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="primary" onClick={() => void changeStatus(ShopStatus.ACTIVE)}>
+                      {t('shops.activate')}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onClick={() => void changeStatus(ShopStatus.SUSPENDED)}
+                    >
+                      {t('shops.suspend')}
+                    </Button>
+                    <Button onClick={() => void changeStatus(ShopStatus.CREDIT_BLOCKED)}>
+                      {t('shops.blockCredit')}
+                    </Button>
+                    <Button onClick={() => void changeStatus(ShopStatus.INACTIVE)}>
+                      {t('shops.deactivate')}
+                    </Button>
+                  </div>
+                  {shop.notes && (
+                    <>
+                      <h3 className="mt-4 text-sm font-semibold text-text">
+                        {t('shops.internalNotes')}
+                      </h3>
+                      <p className="text-text-muted">{shop.notes}</p>
+                    </>
+                  )}
+                </Card>
+              </div>
+            </>
+          );
+        }}
+      </Resource>
+    </main>
+  );
+}

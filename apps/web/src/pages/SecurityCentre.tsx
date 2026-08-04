@@ -1,10 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { UserRole } from '@medsupply/shared-types';
-import { apiClient } from '../api/client';
+import { apiClient, errorMessage } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  EmptyState,
+  PageHeader,
+  Resource,
+  toast,
+  useAsk,
+  type Column,
+} from '../components/ui';
+import { useApiCollection, useApiResource } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate } from '../lib/finance';
 import { describeDevice, formatUptime, revocationLabel } from './securityLabels';
-import './inventory.css';
 
 export interface SessionRow {
   _id: string;
@@ -34,290 +48,268 @@ interface RuntimeStatus {
     write: number;
     report: number;
   };
-  tokens: {
-    accessTokenMinutes: number;
-    refreshTokenDays: number;
-    dedicatedRefreshSecret: boolean;
-  };
+  tokens: { accessTokenMinutes: number; refreshTokenDays: number; dedicatedRefreshSecret: boolean };
   request: { trustProxyHops: number; jsonBodyLimit: string; uploadBodyLimit: string };
 }
 
-function failureMessage(caught: unknown, fallback: string) {
-  const failure = caught as { response?: { data?: { error?: { message?: string } } } };
-  return failure.response?.data?.error?.message ?? fallback;
+function Stat({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border py-2 last:border-b-0">
+      <dt className="text-text-muted">{label}</dt>
+      <dd className="text-text">{value}</dd>
+    </div>
+  );
 }
 
 export function SecurityCentre() {
+  const { t, language } = useLanguage();
+  const ask = useAsk();
+  const queryClient = useQueryClient();
   const currentUser = useAuthStore((state) => state.user);
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [runtime, setRuntime] = useState<RuntimeStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [feedback, setFeedback] = useState('');
   const [busyId, setBusyId] = useState('');
 
   const isAdministrator =
     currentUser?.role === UserRole.SUPER_ADMIN || currentUser?.role === UserRole.ADMIN;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.get('/auth/sessions');
-      setSessions(Array.isArray(response.data.data) ? response.data.data : []);
-      setError('');
-    } catch (caught) {
-      setError(failureMessage(caught, 'Unable to load your sign-ins.'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const sessions = useApiCollection<SessionRow>(['sessions'], '/auth/sessions');
+  const runtime = useApiResource<RuntimeStatus>(['runtime'], '/admin/runtime', {
+    // Supplementary. Failing to read it must not hide the session list, which
+    // is the part every role depends on.
+    enabled: isAdministrator,
+    retry: false,
+  });
 
-  const loadRuntime = useCallback(async () => {
-    if (!isAdministrator) return;
-    try {
-      const response = await apiClient.get('/admin/runtime');
-      setRuntime(response.data.data as RuntimeStatus);
-    } catch {
-      // The deployment panel is supplementary. Failing to read it must not hide
-      // the session list, which is the part every role depends on.
-      setRuntime(null);
-    }
-  }, [isAdministrator]);
-
-  useEffect(() => {
-    void load();
-    void loadRuntime();
-  }, [load, loadRuntime]);
+  const reload = () => queryClient.invalidateQueries({ queryKey: ['sessions'] });
 
   async function revoke(session: SessionRow) {
-    const question = session.current
-      ? 'Sign out of this device? You will need to sign in again.'
-      : 'Sign out of that device?';
-    if (!globalThis.confirm(question)) return;
+    /*
+     * `window.confirm` again, on the one screen where signing yourself out is a
+     * click away from signing out the device you are reading this on. Playwright
+     * and jsdom both dismiss the native dialog silently, so a test could have
+     * claimed to cover this while cancelling it.
+     */
+    const agreed = await ask.confirm({
+      title: session.current ? t('security.signOutThisTitle') : t('security.signOutOtherTitle'),
+      description: session.current ? t('security.signOutThisBody') : t('security.signOutOtherBody'),
+      confirmLabel: t('security.signOut'),
+      danger: true,
+    });
+    if (!agreed) return;
+
     setBusyId(session._id);
     try {
       await apiClient.delete(`/auth/sessions/${session._id}`);
-      setFeedback(session.current ? 'This device was signed out.' : 'That device was signed out.');
-      await load();
+      await reload();
+      toast.success(session.current ? t('security.signedOutThis') : t('security.signedOutOther'));
     } catch (caught) {
-      setError(failureMessage(caught, 'Unable to sign that device out.'));
+      toast.error(errorMessage(caught, language, t('security.signOutFailed')));
     } finally {
       setBusyId('');
     }
   }
 
   async function revokeAll() {
-    if (!globalThis.confirm('Sign out of every device, including this one?')) return;
+    const agreed = await ask.confirm({
+      title: t('security.signOutAllTitle'),
+      description: t('security.signOutAllBody'),
+      confirmLabel: t('security.signOutEverywhere'),
+      danger: true,
+    });
+    if (!agreed) return;
+
     setBusyId('all');
     try {
       const response = await apiClient.post('/auth/logout-all');
-      setFeedback(`Signed out of ${response.data.data.revoked ?? 0} device(s).`);
-      await load();
+      await reload();
+      toast.success(
+        t('security.signedOutAll', { count: (response.data.data.revoked as number) ?? 0 }),
+      );
     } catch (caught) {
-      setError(failureMessage(caught, 'Unable to sign out everywhere.'));
+      toast.error(errorMessage(caught, language, t('security.signOutFailed')));
     } finally {
       setBusyId('');
     }
   }
 
-  const active = sessions.filter((session) => !session.revokedAt);
+  const columns: ReadonlyArray<Column<SessionRow>> = [
+    {
+      key: 'device',
+      header: t('security.device'),
+      cell: (session) => (
+        <div>
+          <p className="text-text">{describeDevice(session.userAgent)}</p>
+          {session.current && <p className="text-sm text-text-muted">{t('security.thisDevice')}</p>}
+        </div>
+      ),
+    },
+    { key: 'ip', header: t('security.ipAddress'), cell: (session) => session.ipAddress ?? '—' },
+    {
+      key: 'created',
+      header: t('security.signedIn'),
+      cell: (session) => formatFinanceDate(session.createdAt),
+    },
+    {
+      key: 'used',
+      header: t('security.lastUsed'),
+      cell: (session) => (session.lastUsedAt ? formatFinanceDate(session.lastUsedAt) : '—'),
+    },
+    {
+      key: 'state',
+      header: t('security.state'),
+      cell: (session) =>
+        session.revokedAt ? (
+          <Badge tone="danger">{revocationLabel(session.revokedReason)}</Badge>
+        ) : (
+          <Badge tone="success">{t('security.active')}</Badge>
+        ),
+    },
+    {
+      key: 'action',
+      header: '',
+      label: '',
+      cell: (session) =>
+        session.revokedAt ? (
+          '—'
+        ) : (
+          <Button
+            size="sm"
+            busy={busyId === session._id}
+            disabled={busyId !== ''}
+            onClick={() => void revoke(session)}
+          >
+            {t('security.signOut')}
+          </Button>
+        ),
+    },
+  ];
+
+  const active = (sessions.data?.items ?? []).filter((session) => !session.revokedAt);
 
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Account security</p>
-          <h1>Security centre</h1>
-          <p>
-            Every device signed in to your account. Sign one out if you do not recognise it, or if
-            you have lost it.
-          </p>
-        </div>
-        {active.length > 1 ? (
-          <button
-            className="secondary-button"
-            disabled={busyId !== ''}
-            onClick={() => void revokeAll()}
-          >
-            {busyId === 'all' ? 'Signing out...' : 'Sign out everywhere'}
-          </button>
-        ) : null}
-      </header>
+    <main>
+      <PageHeader
+        routeId="security"
+        title={t('security.title')}
+        description={t('security.subtitle')}
+        actions={
+          active.length > 1 && (
+            <Button
+              busy={busyId === 'all'}
+              disabled={busyId !== ''}
+              onClick={() => void revokeAll()}
+            >
+              {t('security.signOutEverywhere')}
+            </Button>
+          )
+        }
+      />
 
-      {error ? (
-        <section className="state error" role="alert">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
+      <Resource
+        query={sessions}
+        loadingLabel={t('security.loading')}
+        errorMessageFallback={t('security.couldNotLoad')}
+        empty={<EmptyState title={t('security.none')} description={t('security.noneBody')} />}
+      >
+        {(page) => (
+          <Card className="mb-4">
+            <h2 className="mb-2 text-lg font-semibold text-text">{t('security.whereSignedIn')}</h2>
+            <DataTable
+              caption={t('security.whereSignedIn')}
+              columns={columns}
+              rows={page.items}
+              rowKey={(session) => session._id}
+            />
+            <p className="mt-3 max-w-prose text-sm text-text-muted">{t('security.immediate')}</p>
+          </Card>
+        )}
+      </Resource>
 
-      {feedback ? (
-        <section className="state success" role="status">
-          {feedback}
-        </section>
-      ) : null}
-
-      {loading ? (
-        <section className="state">Loading your sign-ins...</section>
-      ) : sessions.length === 0 ? (
-        <section className="state">There are no recorded sign-ins for this account.</section>
-      ) : (
-        <section className="panel">
-          <h2>Where you are signed in</h2>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Device</th>
-                  <th>Address</th>
-                  <th>Signed in</th>
-                  <th>Last used</th>
-                  <th>State</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sessions.map((session) => (
-                  <tr key={session._id}>
-                    <td>
-                      {describeDevice(session.userAgent)}
-                      {session.current ? <small>This device</small> : null}
-                    </td>
-                    <td>{session.ipAddress ?? '—'}</td>
-                    <td>{formatFinanceDate(session.createdAt)}</td>
-                    <td>{session.lastUsedAt ? formatFinanceDate(session.lastUsedAt) : '—'}</td>
-                    <td>
-                      {session.revokedAt ? (
-                        <span className="return-status rejected">
-                          {revocationLabel(session.revokedReason)}
-                        </span>
-                      ) : (
-                        <span className="return-status approved">Active</span>
-                      )}
-                    </td>
-                    <td>
-                      {session.revokedAt ? (
-                        '—'
-                      ) : (
-                        <button
-                          className="link-button"
-                          disabled={busyId !== ''}
-                          onClick={() => void revoke(session)}
-                        >
-                          {busyId === session._id ? 'Signing out...' : 'Sign out'}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="muted">
-            Signing a device out takes effect immediately: its access token stops working on the
-            next request rather than at the end of its lifetime.
-          </p>
-        </section>
-      )}
-
-      {isAdministrator ? (
-        runtime ? (
-          <section className="panel">
-            <h2>Deployment</h2>
-            <p className="muted">
-              What this instance is running and how its protections are configured. Read-only, and
-              no secret is shown — only whether one is set.
-            </p>
-            <div className="analytics-columns">
-              <dl className="stat-list">
-                <div>
-                  <dt>Version</dt>
-                  <dd>
-                    {runtime.version} ({runtime.commit.slice(0, 12)})
-                  </dd>
-                </div>
-                <div>
-                  <dt>Environment</dt>
-                  <dd>{runtime.environment}</dd>
-                </div>
-                <div>
-                  <dt>Uptime</dt>
-                  <dd>{formatUptime(runtime.uptimeSeconds)}</dd>
-                </div>
-                <div>
-                  <dt>Database</dt>
-                  <dd>
-                    {runtime.database.state} · pool {runtime.database.maxPoolSize}
-                  </dd>
-                </div>
+      {isAdministrator &&
+        (runtime.data ? (
+          <Card>
+            <h2 className="mb-1 text-lg font-semibold text-text">{t('security.deployment')}</h2>
+            <p className="mb-3 max-w-prose text-text-muted">{t('security.deploymentBody')}</p>
+            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+              <dl className="m-0">
+                <Stat
+                  label={t('security.version')}
+                  value={`${runtime.data.version} (${runtime.data.commit.slice(0, 12)})`}
+                />
+                <Stat label={t('security.environment')} value={runtime.data.environment} />
+                <Stat
+                  label={t('security.uptime')}
+                  value={formatUptime(runtime.data.uptimeSeconds)}
+                />
+                <Stat
+                  label={t('security.database')}
+                  value={`${runtime.data.database.state} · ${t('security.pool', {
+                    size: runtime.data.database.maxPoolSize,
+                  })}`}
+                />
               </dl>
-              <dl className="stat-list">
-                <div>
-                  <dt>Rate limiting</dt>
-                  <dd>
-                    {runtime.rateLimit.driver === 'redis' ? 'shared' : 'per instance'} ·{' '}
-                    {runtime.rateLimit.windowSeconds}s window
-                  </dd>
-                </div>
-                <div>
-                  <dt>Sign-in budget</dt>
-                  <dd>{runtime.rateLimit.auth} per window</dd>
-                </div>
-                <div>
-                  <dt>Write budget</dt>
-                  <dd>{runtime.rateLimit.write} per window</dd>
-                </div>
-                <div>
-                  <dt>Report budget</dt>
-                  <dd>{runtime.rateLimit.report} per window</dd>
-                </div>
+              <dl className="m-0">
+                <Stat
+                  label={t('security.rateLimiting')}
+                  value={`${
+                    runtime.data.rateLimit.driver === 'redis'
+                      ? t('security.shared')
+                      : t('security.perInstance')
+                  } · ${t('security.window', { seconds: runtime.data.rateLimit.windowSeconds })}`}
+                />
+                <Stat
+                  label={t('security.signInBudget')}
+                  value={t('security.perWindow', { count: runtime.data.rateLimit.auth })}
+                />
+                <Stat
+                  label={t('security.writeBudget')}
+                  value={t('security.perWindow', { count: runtime.data.rateLimit.write })}
+                />
+                <Stat
+                  label={t('security.reportBudget')}
+                  value={t('security.perWindow', { count: runtime.data.rateLimit.report })}
+                />
               </dl>
-              <dl className="stat-list">
-                <div>
-                  <dt>Access token</dt>
-                  <dd>{runtime.tokens.accessTokenMinutes} minutes</dd>
-                </div>
-                <div>
-                  <dt>Refresh token</dt>
-                  <dd>{runtime.tokens.refreshTokenDays} days</dd>
-                </div>
-                <div>
-                  <dt>Separate refresh secret</dt>
-                  <dd>
-                    {runtime.tokens.dedicatedRefreshSecret ? 'Yes' : 'Derived from JWT secret'}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Trusted proxies</dt>
-                  <dd>{runtime.request.trustProxyHops}</dd>
-                </div>
+              <dl className="m-0">
+                <Stat
+                  label={t('security.accessToken')}
+                  value={t('security.minutes', { count: runtime.data.tokens.accessTokenMinutes })}
+                />
+                <Stat
+                  label={t('security.refreshToken')}
+                  value={t('security.days', { count: runtime.data.tokens.refreshTokenDays })}
+                />
+                <Stat
+                  label={t('security.separateSecret')}
+                  value={
+                    runtime.data.tokens.dedicatedRefreshSecret
+                      ? t('catalogue.yes')
+                      : t('security.derived')
+                  }
+                />
+                <Stat
+                  label={t('security.trustedProxies')}
+                  value={runtime.data.request.trustProxyHops}
+                />
               </dl>
-              <dl className="stat-list">
-                <div>
-                  <dt>Realtime</dt>
-                  <dd>{runtime.realtime.driver}</dd>
-                </div>
-                <div>
-                  <dt>Notification queue</dt>
-                  <dd>{runtime.notifications.driver}</dd>
-                </div>
-                <div>
-                  <dt>Request body limit</dt>
-                  <dd>{runtime.request.jsonBodyLimit}</dd>
-                </div>
-                <div>
-                  <dt>Upload body limit</dt>
-                  <dd>{runtime.request.uploadBodyLimit}</dd>
-                </div>
+              <dl className="m-0">
+                <Stat label={t('security.realtime')} value={runtime.data.realtime.driver} />
+                <Stat
+                  label={t('security.notificationQueue')}
+                  value={runtime.data.notifications.driver}
+                />
+                <Stat label={t('security.bodyLimit')} value={runtime.data.request.jsonBodyLimit} />
+                <Stat
+                  label={t('security.uploadLimit')}
+                  value={runtime.data.request.uploadBodyLimit}
+                />
               </dl>
             </div>
-          </section>
+          </Card>
         ) : (
-          <section className="state">
-            The deployment status could not be read. Your sign-ins above are unaffected.
-          </section>
-        )
-      ) : null}
+          runtime.isError && (
+            <p className="text-text-muted">{t('security.deploymentUnavailable')}</p>
+          )
+        ))}
     </main>
   );
 }

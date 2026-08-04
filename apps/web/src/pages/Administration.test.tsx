@@ -1,17 +1,21 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UserRole, UserStatus } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
+import { renderWithUi } from '../testing/render';
 import { SystemSettings } from './SystemSettings';
 import { UserAdministration } from './UserAdministration';
 import { AuditLogViewer } from './AuditLogViewer';
 
-vi.mock('../api/client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() },
-}));
+// Only the transport is replaced; `errorMessage` is a pure helper over the
+// caught value and stubbing it would hide the sentence a user reads.
+vi.mock('../api/client', async () => {
+  const actual = await vi.importActual<typeof import('../api/client')>('../api/client');
+  return { ...actual, apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() } };
+});
 vi.mock('../realtime/socket', () => ({
   onRealtime: () => () => {},
   connectRealtime: vi.fn(),
@@ -112,21 +116,19 @@ describe('SystemSettings', () => {
     get.mockResolvedValue({ data: { data: settingsPayload } });
     put.mockResolvedValue({ data: { data: {} } });
 
-    const view = render(
+    renderWithUi(
       <MemoryRouter>
         <SystemSettings />
       </MemoryRouter>,
     );
 
-    expect(
-      await screen.findByRole('heading', { level: 2, name: 'Business identity' }),
-    ).toBeTruthy();
-    expect(screen.getByText('Built-in default')).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 2, name: 'The business' })).toBeTruthy();
+    expect(screen.getByText(/Built-in default/)).toBeTruthy();
 
     const nameField = screen.getByLabelText('Display name') as HTMLInputElement;
     expect(nameField.value).toBe('MedSupply B2B');
     fireEvent.change(nameField, { target: { value: 'Dhaka Medical' } });
-    fireEvent.click(screen.getByRole('button', { name: /Save Business identity/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save these settings' }));
 
     await waitFor(() => expect(put).toHaveBeenCalled());
     const [url, body] = put.mock.calls[0] as [
@@ -136,7 +138,6 @@ describe('SystemSettings', () => {
     expect(url).toBe('/settings/business');
     expect(body.version).toBe(0);
     expect(body.values.name).toBe('Dhaka Medical');
-    view.unmount();
   });
 
   it('reports a concurrent change and reloads instead of overwriting it', async () => {
@@ -145,27 +146,26 @@ describe('SystemSettings', () => {
       response: { data: { error: { code: 'STALE_SETTINGS', message: 'stale' } } },
     });
 
-    const view = render(
+    renderWithUi(
       <MemoryRouter>
         <SystemSettings />
       </MemoryRouter>,
     );
-    expect(
-      await screen.findByRole('heading', { level: 2, name: 'Business identity' }),
-    ).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Save Business identity/ }));
+    expect(await screen.findByRole('heading', { level: 2, name: 'The business' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save these settings' }));
 
+    // The wording is the catalogue's STALE_VERSION entry rather than a
+    // sentence typed into this page, so every screen says the same thing.
     expect(
       await screen.findByText(
-        'Someone else changed these settings. The latest values have been reloaded.',
+        'Somebody else changed these settings. The latest values have been reloaded.',
       ),
     ).toBeTruthy();
-    view.unmount();
   });
 
   it('only offers a reset for a group that has a saved override', async () => {
     get.mockResolvedValue({ data: { data: settingsPayload } });
-    const view = render(
+    renderWithUi(
       <MemoryRouter>
         <SystemSettings />
       </MemoryRouter>,
@@ -173,27 +173,27 @@ describe('SystemSettings', () => {
 
     // Business falls back to the built-in default, so there is nothing to reset.
     const businessReset = (await screen.findByRole('button', {
-      name: 'Reset to fallback',
+      name: 'Go back to the built-in values',
     })) as HTMLButtonElement;
     expect(businessReset.disabled).toBe(true);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Inventory thresholds' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stock limits' }));
     const inventoryReset = screen.getByRole('button', {
-      name: 'Reset to fallback',
+      name: 'Go back to the built-in values',
     }) as HTMLButtonElement;
     expect(inventoryReset.disabled).toBe(false);
-    view.unmount();
   });
 
   it('shows a permission-denied message rather than an empty form', async () => {
     get.mockRejectedValue({ response: { status: 403 } });
-    const view = render(
+    renderWithUi(
       <MemoryRouter>
         <SystemSettings />
       </MemoryRouter>,
     );
-    expect(await screen.findByText('Your role cannot view system settings.')).toBeTruthy();
-    view.unmount();
+    expect(
+      await screen.findByText('Your account does not have permission to do that.'),
+    ).toBeTruthy();
   });
 });
 
@@ -224,7 +224,7 @@ describe('UserAdministration', () => {
     get.mockResolvedValue({ data: directory });
     patch.mockResolvedValue({ data: { data: {} } });
 
-    const view = render(
+    renderWithUi(
       <MemoryRouter>
         <UserAdministration />
       </MemoryRouter>,
@@ -238,12 +238,11 @@ describe('UserAdministration', () => {
     await waitFor(() =>
       expect(patch).toHaveBeenCalledWith('/admin/users/user-2', { role: UserRole.MANAGER }),
     );
-    view.unmount();
   });
 
   it('disables role and status controls on your own account', async () => {
     get.mockResolvedValue({ data: directory });
-    const view = render(
+    renderWithUi(
       <MemoryRouter>
         <UserAdministration />
       </MemoryRouter>,
@@ -255,7 +254,6 @@ describe('UserAdministration', () => {
     const ownStatus = screen.getByLabelText('Status for admin@test.local') as HTMLSelectElement;
     expect(ownRole.disabled).toBe(true);
     expect(ownStatus.disabled).toBe(true);
-    view.unmount();
   });
 
   it('surfaces a rejected change from the server', async () => {
@@ -266,7 +264,7 @@ describe('UserAdministration', () => {
       },
     });
 
-    const view = render(
+    renderWithUi(
       <MemoryRouter>
         <UserAdministration />
       </MemoryRouter>,
@@ -276,8 +274,8 @@ describe('UserAdministration', () => {
       target: { value: UserRole.ADMIN },
     });
 
+    // The server's own sentence reaches the user through the toast.
     expect(await screen.findByText('Only a Super Admin may grant the Admin role')).toBeTruthy();
-    view.unmount();
   });
 
   it('renders read-only controls for a Manager', async () => {
@@ -288,15 +286,14 @@ describe('UserAdministration', () => {
     });
     get.mockResolvedValue({ data: directory });
 
-    const view = render(
+    renderWithUi(
       <MemoryRouter>
         <UserAdministration />
       </MemoryRouter>,
     );
     expect(await screen.findByText('nusrat@test.local')).toBeTruthy();
     expect(screen.queryByLabelText('Role for nusrat@test.local')).toBeNull();
-    expect(screen.getAllByText('Read only').length).toBe(2);
-    view.unmount();
+    expect(screen.getAllByText('You can see this but not change it').length).toBe(2);
   });
 });
 
@@ -326,30 +323,30 @@ describe('AuditLogViewer', () => {
       });
     });
 
-    const view = render(
+    renderWithUi(
       <MemoryRouter>
         <AuditLogViewer />
       </MemoryRouter>,
     );
 
-    expect(
-      await screen.findByText('SETTINGS UPDATED', { selector: 'p.notification-title' }),
-    ).toBeTruthy();
+    // The same words are also an <option> in the action filter, which is the
+    // point — the filter and the row now use one wording.
+    expect(await screen.findByText('Settings updated', { selector: 'p' })).toBeTruthy();
     expect(screen.getByText(/Farida Khan/)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show detail' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show what changed' }));
     expect(await screen.findByText(/Dhaka Medical/)).toBeTruthy();
-    view.unmount();
   });
 
   it('explains a permission failure instead of showing an empty log', async () => {
     get.mockRejectedValue({ response: { status: 403 } });
-    const view = render(
+    renderWithUi(
       <MemoryRouter>
         <AuditLogViewer />
       </MemoryRouter>,
     );
-    expect(await screen.findByText('Your role cannot read the audit log.')).toBeTruthy();
-    view.unmount();
+    expect(
+      await screen.findByText('Your account does not have permission to do that.'),
+    ).toBeTruthy();
   });
 });

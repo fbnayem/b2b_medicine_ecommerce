@@ -6,6 +6,8 @@ import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
 import { usePasswordPolicy } from '../lib/usePasswordPolicy';
 import { Button, Card, ErrorState, Field, Input, PageHeader, toast } from '../components/ui';
+import { errorMessage } from '../api/client';
+import { useLanguage } from '../lib/useLanguage';
 
 /**
  * Choosing your own password.
@@ -17,6 +19,7 @@ import { Button, Card, ErrorState, Field, Input, PageHeader, toast } from '../co
  * "temporary" password was issuing a permanent one.
  */
 export function ChangePassword() {
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -38,7 +41,7 @@ export function ChangePassword() {
     event.preventDefault();
     setError('');
     if (newPassword !== confirmation) {
-      setError('The two new passwords do not match.');
+      setError(t('auth.passwordsDoNotMatch'));
       return;
     }
     setBusy(true);
@@ -54,15 +57,16 @@ export function ChangePassword() {
       if (user && accessToken) setAuth({ ...user, forcePasswordChange: false }, accessToken);
 
       toast.success(
-        'Your password has been changed.',
+        t('auth.changed'),
         revoked > 0
-          ? `You were signed out of ${revoked} other device${revoked === 1 ? '' : 's'}.`
+          ? revoked === 1
+            ? t('auth.oneOtherSignedOut')
+            : t('auth.otherSignedOut', { count: revoked })
           : undefined,
       );
       navigate(user ? landingRouteFor(user.role as UserRole) : '/dashboard', { replace: true });
     } catch (caught) {
-      const failure = caught as { response?: { data?: { error?: { message?: string } } } };
-      setError(failure.response?.data?.error?.message ?? 'Unable to change your password.');
+      setError(errorMessage(caught, language, t('auth.changeFailed')));
     } finally {
       setBusy(false);
     }
@@ -72,20 +76,15 @@ export function ChangePassword() {
     <div className="mx-auto max-w-lg">
       <PageHeader
         routeId="change-password"
-        title={forced ? 'Choose your own password' : 'Change your password'}
-        description={
-          forced
-            ? 'Somebody set this password for you, so it is known to more than one person. ' +
-              'Choose one only you know before you carry on.'
-            : 'You will stay signed in here. Every other device will be signed out.'
-        }
+        title={forced ? t('auth.mustChangeTitle') : t('auth.changeOwnTitle')}
+        description={forced ? t('auth.mustChangeBody') : t('auth.changeOwnBody')}
       />
 
       <Card>
         <form onSubmit={submit} className="flex flex-col gap-4">
-          {error && <ErrorState title="That did not work" message={error} />}
+          {error && <ErrorState title={t('auth.thatDidNotWork')} message={error} />}
 
-          <Field label="Your current password" required>
+          <Field label={t('auth.currentPassword')} required>
             <Input
               type="password"
               autoComplete="current-password"
@@ -96,10 +95,10 @@ export function ChangePassword() {
           </Field>
 
           <Field
-            label="New password"
+            label={t('auth.newPassword')}
             required
-            hint={`At least ${minimum} characters.`}
-            error={tooShort ? `Use at least ${minimum} characters.` : undefined}
+            hint={t('auth.atLeast', { minimum })}
+            error={tooShort ? t('auth.passwordTooShort', { minimum }) : undefined}
           >
             <Input
               type="password"
@@ -111,9 +110,9 @@ export function ChangePassword() {
           </Field>
 
           <Field
-            label="New password again"
+            label={t('auth.repeatPassword')}
             required
-            error={mismatch ? 'These do not match.' : undefined}
+            error={mismatch ? t('auth.passwordsDoNotMatch') : undefined}
           >
             <Input
               type="password"
@@ -130,7 +129,7 @@ export function ChangePassword() {
             busy={busy}
             disabled={tooShort || mismatch || !currentPassword || !newPassword}
           >
-            Change password
+            {t('auth.changeButton')}
           </Button>
         </form>
       </Card>

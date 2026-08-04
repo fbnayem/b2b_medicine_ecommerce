@@ -1,121 +1,144 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '../api/client';
+import { parseMoney } from '@medsupply/utilities';
+import { apiClient, errorMessage, failureReference } from '../api/client';
+import {
+  Button,
+  Card,
+  ErrorState,
+  Field,
+  Input,
+  LinkButton,
+  PageHeader,
+  Textarea,
+} from '../components/ui';
+import { useLanguage } from '../lib/useLanguage';
 
-export const ShopForm: React.FC = () => {
+const EMPTY = {
+  name: '',
+  primaryPhone: '',
+  alternativePhone: '',
+  email: '',
+  territory: '',
+  drugLicenceNumber: '',
+  drugLicenceExpiryDate: '',
+  creditLimit: '',
+  paymentTermsDays: '30',
+  notes: '',
+};
+
+type FieldName = keyof typeof EMPTY;
+
+const TEXT_FIELDS: Array<[FieldName, string, string, boolean]> = [
+  ['name', 'shopName', 'text', true],
+  ['primaryPhone', 'primaryPhone', 'tel', true],
+  ['alternativePhone', 'alternativePhone', 'tel', false],
+  ['email', 'email', 'email', false],
+  ['territory', 'territory', 'text', false],
+  ['drugLicenceNumber', 'drugLicenceNumber', 'text', false],
+  ['drugLicenceExpiryDate', 'drugLicenceExpiry', 'date', false],
+  ['creditLimit', 'creditLimit', 'text', false],
+  ['paymentTermsDays', 'paymentTerms', 'number', false],
+];
+
+export function ShopForm() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({
-    name: '',
-    primaryPhone: '',
-    alternativePhone: '',
-    email: '',
-    territory: '',
-    drugLicenceNumber: '',
-    drugLicenceExpiryDate: '',
-    creditLimit: 0,
-    paymentTermsDays: 30,
-    notes: '',
-  });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const { t, language } = useLanguage();
+  const [form, setForm] = useState(EMPTY);
+  const [submitting, setSubmitting] = useState(false);
+  const [failure, setFailure] = useState<{ message: string; reference?: string }>();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setFailure(undefined);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+    /*
+     * `parseMoney`, not `Math.round(Number(input) * 100)`. The old line was
+     * float arithmetic on a credit limit — the figure that decides whether a
+     * customer's order is refused — which `AGENTS.md` forbids outright.
+     */
+    const credit = form.creditLimit ? parseMoney(form.creditLimit) : { ok: true, minor: 0 };
+    if (!credit.ok) {
+      setFailure({ message: t('shops.badAmount') });
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const payload = {
+      const response = await apiClient.post('/shops', {
         ...form,
-        creditLimit: Math.round(Number(form.creditLimit) * 100), // convert to paisa
+        creditLimit: credit.minor,
         paymentTermsDays: Number(form.paymentTermsDays),
         drugLicenceExpiryDate: form.drugLicenceExpiryDate || undefined,
-      };
-      const res = await apiClient.post('/shops', payload);
-      navigate(`/shops/${res.data.data._id}`);
-    } catch (e: any) {
-      setError(
-        e.response?.data?.error?.message ||
-          e.response?.data?.error?.details?.map((d: any) => d.message).join(', ') ||
-          'Failed to create shop',
-      );
+      });
+      navigate(`/shops/${response.data.data._id}`);
+    } catch (caught) {
+      setFailure({
+        message: errorMessage(caught, language, t('shops.createFailed')),
+        reference: failureReference(caught),
+      });
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
-  };
+  }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <button
-        onClick={() => navigate('/shops')}
-        className="text-blue-600 hover:underline mb-6 inline-block text-sm"
-      >
-        ← Back to Shops
-      </button>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Add New Shop</h1>
+    <main>
+      <PageHeader
+        routeId="shop-new"
+        title={t('shops.addTitle')}
+        description={t('shops.addSubtitle')}
+        actions={<LinkButton to="/shops">{t('shops.back')}</LinkButton>}
+      />
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg border border-red-200">
-          {error}
-        </div>
-      )}
+      <Card className="max-w-2xl">
+        <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
+          {failure && <ErrorState message={failure.message} reference={failure.reference} />}
 
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5"
-      >
-        {[
-          { label: 'Shop Name *', name: 'name', type: 'text', required: true },
-          {
-            label: 'Primary Phone * (+8801xxxxxxxxx)',
-            name: 'primaryPhone',
-            type: 'text',
-            required: true,
-          },
-          { label: 'Alternative Phone', name: 'alternativePhone', type: 'text' },
-          { label: 'Email', name: 'email', type: 'email' },
-          { label: 'Territory', name: 'territory', type: 'text' },
-          { label: 'Drug Licence Number', name: 'drugLicenceNumber', type: 'text' },
-          { label: 'Drug Licence Expiry Date', name: 'drugLicenceExpiryDate', type: 'date' },
-          { label: 'Credit Limit (৳)', name: 'creditLimit', type: 'number' },
-          { label: 'Payment Terms (Days)', name: 'paymentTermsDays', type: 'number' },
-        ].map(({ label, name, type, required }) => (
-          <div key={name}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-            <input
-              type={type}
-              name={name}
-              required={required}
-              value={(form as any)[name]}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {TEXT_FIELDS.map(([name, key, type, required]) => (
+              <Field
+                key={name}
+                label={t(`shops.${key}`)}
+                required={required}
+                hint={
+                  name === 'primaryPhone'
+                    ? t('shops.primaryPhoneHint')
+                    : name === 'creditLimit'
+                      ? t('shops.creditLimitHint')
+                      : undefined
+                }
+              >
+                <Input
+                  type={type}
+                  required={required}
+                  inputMode={name === 'creditLimit' ? 'decimal' : undefined}
+                  value={form[name]}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, [name]: event.target.value }))
+                  }
+                />
+              </Field>
+            ))}
           </div>
-        ))}
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Internal Notes</label>
-          <textarea
-            name="notes"
-            value={form.notes}
-            onChange={handleChange}
-            rows={3}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
+          <Field label={t('shops.internalNotes')}>
+            <Textarea
+              rows={3}
+              value={form.notes}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, notes: event.target.value }))
+              }
+            />
+          </Field>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium transition-all"
-        >
-          {loading ? 'Creating...' : 'Create Shop'}
-        </button>
-      </form>
-    </div>
+          <div className="flex justify-end">
+            <Button type="submit" variant="primary" busy={submitting}>
+              {submitting ? t('shops.creating') : t('shops.create')}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </main>
   );
-};
+}

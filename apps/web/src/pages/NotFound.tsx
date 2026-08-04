@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom';
 import { landingRouteFor } from '@medsupply/navigation';
 import type { UserRole } from '@medsupply/shared-types';
 import { useAuthStore } from '../store/useAuth';
+import { LinkButton, PageHeader } from '../components/ui';
+import { useLanguage } from '../lib/useLanguage';
 
 /**
  * A real "not found" screen.
@@ -12,21 +13,20 @@ import { useAuthStore } from '../store/useAuth';
  * wrong link and a rejected password looked exactly the same.
  */
 export function NotFound() {
+  const { t } = useLanguage();
   const user = useAuthStore((state) => state.user);
   const home = user ? landingRouteFor(user.role as UserRole) : '/login';
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-4 p-6">
-      <h1 className="text-2xl font-semibold text-text">That page does not exist</h1>
-      <p className="text-text-muted">
-        The address may have been mistyped, or the page may have moved. You are still signed in.
-      </p>
-      <Link
-        to={home}
-        className="flex min-h-11 w-fit items-center rounded-md bg-brand px-4 text-on-brand"
-      >
-        Go to the home screen
-      </Link>
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center p-6">
+      <PageHeader
+        routeId="not-found"
+        title={t('errorPages.notFoundTitle')}
+        description={t('errorPages.notFoundBody')}
+      />
+      <LinkButton variant="primary" to={home} className="w-fit">
+        {t('common.goHome')}
+      </LinkButton>
     </main>
   );
 }

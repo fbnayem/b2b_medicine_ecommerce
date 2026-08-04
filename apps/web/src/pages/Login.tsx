@@ -1,34 +1,20 @@
-import React, { useState } from 'react';
-import { useAuthStore } from '../store/useAuth';
-import { apiClient } from '../api/client';
+import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/useAuth';
+import { apiClient, errorMessage, failureReference } from '../api/client';
 import { landingRouteFor } from '../app/landing';
+import { Button, Card, ErrorState, Field, Input, PageHeader } from '../components/ui';
+import { useLanguage } from '../lib/useLanguage';
 
-export const Login: React.FC = () => {
+export function Login() {
+  const { t, language } = useLanguage();
+  const navigate = useNavigate();
+  const { setAuth, isAuthenticated, user } = useAuthStore();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const { setAuth, isAuthenticated, user } = useAuthStore();
-  const navigate = useNavigate();
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      const response = await apiClient.post('/auth/login', { email, password });
-      const { user, accessToken } = response.data.data;
-      setAuth(user, accessToken);
-      navigate(landingRouteFor(user.role));
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [submitting, setSubmitting] = useState(false);
+  const [failure, setFailure] = useState<{ message: string; reference?: string }>();
 
   // Now that a session survives a reload, someone who is already signed in can
   // land here from a bookmark. Showing them the form would invite them to
@@ -37,80 +23,66 @@ export const Login: React.FC = () => {
     return <Navigate to={landingRouteFor(user.role)} replace />;
   }
 
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setFailure(undefined);
+    setSubmitting(true);
+    try {
+      const response = await apiClient.post('/auth/login', { email, password });
+      const { user: signedIn, accessToken } = response.data.data;
+      setAuth(signedIn, accessToken);
+      navigate(landingRouteFor(signedIn.role));
+    } catch (caught) {
+      setFailure({
+        message: errorMessage(caught, language, t('auth.signInFailed')),
+        reference: failureReference(caught),
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg border border-gray-100">
-        <h1 className="text-3xl font-bold text-center text-gray-900 tracking-tight">
-          MedSupply B2B
-        </h1>
-        <h2 className="text-xl text-center text-gray-600">Sign in to your account</h2>
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center p-6">
+      <PageHeader routeId="login" title={t('common.appName')} description={t('auth.signInTitle')} />
+      <Card>
+        <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
+          {/*
+            An error state, not a coloured box. A refusal that is only visible
+            is a refusal a screen-reader user does not receive — and on this
+            screen the alternative reading is "my password was accepted and
+            nothing happened", which is exactly how the shop-owner routing
+            defect presented.
+          */}
+          {failure && <ErrorState message={failure.message} reference={failure.reference} />}
 
-        {/*
-          `role="alert"` because a refusal that is only visible is a refusal a
-          screen-reader user does not receive — and on this screen the
-          alternative reading is "my password was accepted and nothing
-          happened", which is exactly how the shop-owner routing defect
-          presented.
-        */}
-        {error && (
-          <div
-            id="login-error"
-            role="alert"
-            className="p-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200"
-          >
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            {/*
-              `htmlFor`/`id` rather than proximity. These labels sat next to
-              their inputs with nothing joining them, so assistive technology
-              announced the first field of the application as "edit text,
-              blank" — and no test noticed, because no test had ever looked for
-              a label.
-            */}
-            <label htmlFor="login-email" className="block text-sm font-medium text-gray-700">
-              Email Address
-            </label>
-            <input
-              id="login-email"
-              name="email"
+          <Field label={t('auth.email')} required>
+            <Input
               type="email"
+              name="email"
               autoComplete="username"
               required
-              aria-describedby={error ? 'login-error' : undefined}
-              className="w-full px-4 py-2 mt-1 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-colors"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
             />
-          </div>
-          <div>
-            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
-              id="login-password"
-              name="password"
+          </Field>
+
+          <Field label={t('auth.password')} required>
+            <Input
               type="password"
+              name="password"
               autoComplete="current-password"
               required
-              aria-describedby={error ? 'login-error' : undefined}
-              className="w-full px-4 py-2 mt-1 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-colors"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
             />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 disabled:opacity-50 transition-all font-medium"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
+          </Field>
+
+          <Button type="submit" variant="primary" busy={submitting}>
+            {submitting ? t('auth.signingIn') : t('common.signIn')}
+          </Button>
         </form>
-      </div>
-    </div>
+      </Card>
+    </main>
   );
-};
+}
