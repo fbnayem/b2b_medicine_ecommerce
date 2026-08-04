@@ -1960,6 +1960,46 @@ export const en = {
     placed: 'Order {{reference}} placed.',
     couldNotPlace: 'That order could not be placed.',
     couldNotPrice: 'The prices could not be worked out.',
+
+    /*
+     * The same screen, on the phone a rep actually carries.
+     *
+     * Most of the wording above is reused verbatim — a subtotal is a subtotal.
+     * What could not be reused is every sentence that mentions Enter or the
+     * arrow keys: true of a telesales operator at a keyboard, and false of
+     * somebody standing at a shop counter holding a handset. Reusing those
+     * would have been a catalogue that lies rather than a catalogue that is
+     * short.
+     */
+    pickCustomer: 'Who is this order for?',
+    pickCustomerBody: 'Your customers — the shops in the territory you cover.',
+    searchCustomerPlaceholder: 'Shop name, phone or code…',
+    couldNotLoadCustomers: 'Your customers could not be loaded.',
+    noCustomers: 'No customers in your territory',
+    noCustomersBody:
+      'Ask the office to put the shops you cover into your territory, then pull down to refresh.',
+    orderingFor: 'Ordering for',
+    change: 'Change customer',
+    tapToAdd: 'Search by brand, generic name or code. Tap a result to add it.',
+    typeMore: 'Type at least two letters.',
+    noMatches: 'Nothing matches that',
+    noMatchesBody: 'Try part of the brand name or the generic name.',
+    onThisOrder: 'On this order',
+    nothingYetOnPhone: 'Search above and tap a medicine to add the first line.',
+    increase: 'One more {{brand}}',
+    decrease: 'One fewer {{brand}}',
+    adjustedTo: '{{brand}} set to {{quantity}}, which is what the catalogue allows.',
+    removed: '{{brand}} taken off this order.',
+    refreshing: 'Updating the total',
+    blockedNoCustomer: 'Choose a customer first.',
+    blockedNoLines: 'Add a medicine first.',
+    blockedNoAddress: 'Choose where this order is going.',
+    noAddressOnFile:
+      'This customer has no delivery address recorded, so an order cannot be placed for them yet. The office can add one.',
+    blockedNoPrice: 'Waiting for the total.',
+    blockedOffline:
+      'No connection. An order needs a live price and a live credit check, so it cannot be taken now and sent later.',
+    notSaved: 'That order was not saved anywhere. Try again once you have a connection.',
   },
 
   priceLists: {

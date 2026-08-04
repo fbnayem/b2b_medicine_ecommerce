@@ -26,6 +26,7 @@ export const TAB_ROUTE_FILE: Record<string, string> = {
   notifications: 'notifications',
   security: 'security',
   medicines: 'medicines',
+  'order-entry': 'order-entry',
   cart: 'cart',
   'shop-account': 'account',
 };

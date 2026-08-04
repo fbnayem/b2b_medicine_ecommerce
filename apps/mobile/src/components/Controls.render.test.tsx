@@ -25,6 +25,21 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: 'Confirm delivery' })).toBeTruthy();
   });
 
+  it('can be announced as something other than its face, for the ones that carry a symbol', async () => {
+    /*
+     * The quantity stepper on the order-entry screen. Its buttons read "−" and
+     * "+", which a screen reader announces as the shape of the control rather
+     * than what pressing it does — and a rep using TalkBack would hear "minus"
+     * with no idea which line it belongs to.
+     */
+    await render(
+      <Button label="−" accessibilityLabel="One fewer Napa" onPress={() => undefined} />,
+    );
+    expect(screen.getByRole('button', { name: 'One fewer Napa' })).toBeTruthy();
+    // Still says "−" on the button itself; only the announcement differs.
+    expect(screen.getByText('−')).toBeTruthy();
+  });
+
   it('meets the 44px tap target the tokens set', async () => {
     await render(<Button label="Pick" onPress={() => undefined} />);
     // A Pressable's `style` is a function of press state, so this reads what

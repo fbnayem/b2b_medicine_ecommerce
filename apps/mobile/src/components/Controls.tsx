@@ -23,6 +23,15 @@ export type ButtonVariant = 'primary' | 'secondary' | 'danger';
 
 export interface ButtonProps {
   label: string;
+  /**
+   * What a screen reader announces, when the visible label is not a sentence.
+   *
+   * Defaults to `label`, which is right for every button whose face carries
+   * words. It is wrong for the few that carry a symbol: a quantity stepper
+   * announcing "minus" tells somebody the shape of the button rather than what
+   * pressing it does, and "one fewer Napa" is the thing they need.
+   */
+  accessibilityLabel?: string;
   onPress: () => void;
   variant?: ButtonVariant;
   disabled?: boolean;
@@ -39,6 +48,7 @@ function background(variant: ButtonVariant, pressed: boolean): string {
 
 export function Button({
   label,
+  accessibilityLabel,
   onPress,
   variant = 'primary',
   disabled,
@@ -49,7 +59,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: Boolean(inactive), busy: Boolean(busy) }}
       disabled={inactive}
       onPress={onPress}

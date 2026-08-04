@@ -254,3 +254,26 @@ reads a decision rather than guesses at an intention.
   `Order.placedBy` and `placedOnBehalf` are what make order-on-behalf safe:
   the control is not that the order looks like the shop placed it, but that it
   says plainly who actually did.
+
+## Order entry on mobile (phase 24)
+
+- **An order is never queued offline; a delivery still is.** `offlineQueue.ts`
+  exists and deliberately does not serve this screen. A delivery capture is a
+  record of something that already happened and the server can accept it late;
+  an order needs a live price and a live credit check, both of which are the
+  server's answers, so taking one on a dead connection would mean quoting a
+  shopkeeper a number this client invented. The screen refuses and says so.
+- **"No connection" is inferred from the last request, not from a radio.**
+  There is no connectivity library in this app and adding one for a single
+  boolean was not worth a dependency. `apiFailure` already distinguishes "the
+  request never reached the server" (`NETWORK`, `TIMEOUT`) from "the server
+  refused it", and the price quote runs continuously while an order is being
+  built — so by the time the submit button matters, a failed quote has already
+  answered the question. The cost of the inference is one wasted attempt in the
+  case where the connection dies between the last quote and the submission, and
+  that attempt is safe: it carries the same idempotency key as any retry.
+- **The customer a rep last ordered for is remembered across restarts.** Stored
+  under `medsupply.orders.customer.v1` in `AsyncStorage`, and used only while
+  that shop is still in the territory-scoped list the server returns — a
+  reassigned territory silently drops it rather than opening the screen on a
+  customer every submission would be refused for.

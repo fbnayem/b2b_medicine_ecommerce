@@ -786,15 +786,19 @@ export const MOBILE_TABS: Record<UserRole, MobileTabs> = {
   [UserRole.STOREKEEPER]: ['dashboard', 'fulfilment', 'fulfilment-ready', 'inventory', 'returns'],
   [UserRole.DELIVERY_PERSON]: ['dashboard', 'deliveries', 'returns', 'notifications', 'security'],
   /*
-   * A rep works out of the catalogue and the order book.
+   * A rep takes orders, so taking an order is a tab.
    *
-   * **Placing an order is web-only for now, and that is stated rather than
-   * implied.** The mobile cart submits for the signed-in owner's own shop, so
-   * offering it to a rep would be a dead end — they would fill it and be told
-   * no shop is assigned to their account. Their territory's shops are on the
-   * web sidebar; the phone carries what already works.
+   * This was `medicines`, the catalogue, because placing an order was web-only:
+   * the mobile cart submits for the signed-in owner's own shop, so a rep who
+   * filled it was told no shop is assigned to their account. That is now a real
+   * screen, and a rep standing in a shop with a phone in one hand needs it in
+   * one tap rather than on a desktop they are nowhere near.
+   *
+   * The catalogue is not lost by the swap — order entry's first control is a
+   * search across the same medicines, so it is now where a rep actually uses it
+   * rather than a list they browse and then cannot act on.
    */
-  [UserRole.SALES]: ['dashboard', 'medicines', 'orders', 'notifications', 'security'],
+  [UserRole.SALES]: ['dashboard', 'order-entry', 'orders', 'notifications', 'security'],
   [UserRole.SHOP_OWNER]: ['dashboard', 'medicines', 'cart', 'orders', 'shop-account'],
 };
 
