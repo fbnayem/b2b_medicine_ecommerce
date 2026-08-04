@@ -168,7 +168,6 @@ export const UNTESTED_ROUTES: readonly string[] = [
   'get /api/v1/returns/:id',
   'get /api/v1/returns/credit-notes/:id',
   'get /api/v1/shops/:id',
-  'get /api/v1/shops/my',
   /*
    * These four are mounted directly on the application, ahead of the coverage
    * recorder, so that a degraded process can still answer a probe and a scraper

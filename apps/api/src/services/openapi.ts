@@ -170,9 +170,13 @@ const OPERATIONS: Operation[] = [
   {
     method: 'get',
     path: '/api/v1/shops',
-    summary: 'Search shops; a Shop Owner sees only their own',
+    summary: 'The customer list, narrowed to the caller’s own territories',
     tag: 'Shops',
-    roles: ALL_ROLES,
+    // Not every role: a shop owner uses `/shops/my`, and the warehouse and
+    // delivery roles have no business reading the customer book at all. This
+    // said ALL_ROLES while the route said management-only — the drift the role
+    // reconciliation assertion is being added to catch.
+    roles: [...MANAGEMENT, UserRole.SALES],
     query: ['status', 'territory', 'search', 'page', 'limit'],
   },
   {

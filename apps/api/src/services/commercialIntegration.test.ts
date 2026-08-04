@@ -676,6 +676,73 @@ test('the quote a rep sees is the order the customer gets', async () => {
   assert.equal(order?.items[0]?.priceSource, quote.items[0]?.priceSource);
 });
 
+test('the customer picker offers exactly the shops the rep may order for', async () => {
+  /*
+   * The property that makes order entry usable, and the one this list existed
+   * for a phase without: **every shop the picker offers is a shop the
+   * submission will accept, and every shop it withholds is one it would
+   * refuse.** A picker that offers a choice the server rejects is worse than no
+   * picker — the rep finds out after typing the whole order.
+   *
+   * The list was management-only until now, so a rep saw none of it at all.
+   */
+  const listed = await api('GET', '/api/v1/shops?limit=100', rep._id);
+  assert.equal(listed.status, 200, 'a rep must be able to read their own customer list');
+
+  const names = (listed.body.data as unknown as Array<{ name: string; territory?: string }>).map(
+    (shop) => shop.name,
+  );
+
+  assert.ok(names.includes('Bismillah Pharmacy'), 'in their territory, so offered');
+  assert.equal(
+    names.includes('Sylhet Medicos'),
+    false,
+    'outside their territory — and the submission refuses it, so offering it ' +
+      'would be a dead end dressed up as a choice',
+  );
+
+  // The agreement, asserted rather than assumed: what is listed can be ordered.
+  const placed = await api('POST', '/api/v1/orders/quote', rep._id, {
+    shopId: String(inTerritory._id),
+    items: [{ medicineId: String(medicineId), requestedQuantity: 10 }],
+  });
+  assert.equal(placed.status, 200);
+});
+
+test('management is not territorial, so the list is not narrowed for them', async () => {
+  // Empty territories means every territory — the restriction applies to the
+  // people it was written for and to nobody else.
+  const listed = await api('GET', '/api/v1/shops?limit=100', manager._id);
+  const names = (listed.body.data as unknown as Array<{ name: string }>).map((shop) => shop.name);
+  assert.ok(names.includes('Sylhet Medicos'));
+  assert.ok(names.includes('Bismillah Pharmacy'));
+});
+
+test('a shop owner still sees only their own shop', async () => {
+  /*
+   * Guarding a short-circuit that is easy to refactor away: `listShops` returns
+   * early for a shop owner, and `/shops/my` depends on it entirely. Without
+   * this, moving that branch would hand every customer's phone number, credit
+   * limit and outstanding balance to any owner who asked.
+   */
+  const ownShop = await makeShop('Owner-Only Pharmacy', 'Dhaka North');
+  const owner = await User.create({
+    email: 'commercial-owner-scope@test.local',
+    passwordHash: 'x',
+    firstName: 'Only',
+    lastName: 'Owner',
+    role: UserRole.SHOP_OWNER,
+    status: UserStatus.ACTIVE,
+  });
+  await Shop.updateOne({ _id: ownShop._id }, { $set: { ownerIds: [owner._id] } });
+
+  const mine = await api('GET', '/api/v1/shops/my', owner._id);
+  assert.equal(mine.status, 200);
+  const rows = mine.body.data as unknown as Array<{ _id: string }>;
+  assert.equal(rows.length, 1, 'their own shop, and not the several others in the database');
+  assert.equal(String(rows[0]?._id), String(ownShop._id));
+});
+
 test('a rep cannot quote for a shop outside their territory', async () => {
   // The quote reaches the same `targetShop` the submission does, so it cannot
   // become a way to read another territory's prices without placing anything.

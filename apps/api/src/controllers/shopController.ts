@@ -5,7 +5,7 @@ import { CreateShopSchema, UpdateShopSchema } from '@medsupply/validation';
 import { ShopStatus, UserRole } from '@medsupply/shared-types';
 import { User } from '../models/User';
 import { assertPriceListAssignable } from '../services/priceListService';
-import { containsFilter } from '../services/requestSanitiser';
+import { containsFilter, escapeRegex } from '../services/requestSanitiser';
 
 /**
  * Turns the form's price-list field into what the document stores.
@@ -105,6 +105,28 @@ export const listShops = async (req: AuthRequest, res: Response, next: NextFunct
     if (typeof query.search === 'string' && query.search.trim()) {
       const term = containsFilter(query.search.trim());
       filter.$or = [{ name: term }, { primaryPhone: term }, { reference: term }];
+    }
+
+    /*
+     * A rep sees the customers they may actually act for, and nobody else.
+     *
+     * This list is the order-entry customer picker. Without the same rule the
+     * submission enforces, a rep is offered shops that `decideOnBehalf` will
+     * refuse, and finds out only after typing the whole order — a picker that
+     * offers a choice the server will reject is worse than no picker.
+     *
+     * The filter is built to mirror `territoryPermits` exactly rather than to
+     * approximate it: empty territories means unrestricted (no clause added),
+     * a named territory matches case-insensitively, and a shop with **no**
+     * territory recorded is excluded — because a missing field matches no
+     * regex, and "we do not know where this shop is" must not read as "anybody
+     * may sell to it".
+     */
+    const territories = req.user!.territories ?? [];
+    if (territories.length > 0) {
+      filter.territory = {
+        $in: territories.map((territory) => new RegExp(`^${escapeRegex(territory.trim())}$`, 'i')),
+      };
     }
 
     const [shops, total] = await Promise.all([
