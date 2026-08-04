@@ -1913,6 +1913,45 @@ export const en = {
    * and what they get free for buying in quantity. Both existed as models and a
    * resolver with no way in.
    */
+  /**
+   * Taking an order for a customer who is on the phone.
+   *
+   * Written for somebody typing while somebody else talks: short labels, and
+   * hints that say what the keyboard does rather than what the field means.
+   */
+  orderEntry: {
+    title: 'Take an order',
+    subtitle:
+      'For a customer on the phone or in front of you. Type a name, press Enter, type the quantity, press Enter again.',
+    customer: 'Customer',
+    chooseCustomer: 'Choose a customer',
+    deliverTo: 'Deliver to',
+    chooseAddress: 'Choose an address',
+    payment: 'Payment',
+    addLine: 'Add a medicine',
+    addLineHint:
+      'Search by brand, generic name, code or barcode. Arrow keys to choose, Enter to add.',
+    searchPlaceholder: 'Start typing a name\u2026',
+    quantityForPending: 'How many {{brand}}?',
+    quantityFor: 'Quantity of {{brand}}',
+    addToOrder: 'Add',
+    alreadyOnOrder: '{{brand}} is already on this order. Change the quantity instead.',
+    plusFree: '+ {{free}} free',
+    unitPrice: 'Unit price',
+    available: 'In stock',
+    lineTotal: 'Line total',
+    subtotal: 'Subtotal',
+    discount: 'Discount',
+    delivery: 'Delivery',
+    total: 'Total',
+    nothingYet: 'Nothing on this order yet',
+    nothingYetBody: 'Search above and press Enter to add the first line.',
+    place: 'Place this order',
+    placed: 'Order {{reference}} placed.',
+    couldNotPlace: 'That order could not be placed.',
+    couldNotPrice: 'The prices could not be worked out.',
+  },
+
   priceLists: {
     title: 'Price lists',
     subtitle:
@@ -2298,6 +2337,7 @@ export const en = {
   } as Record<string, string>,
 
   navItem: {
+    'order-entry': 'Take an order',
     'price-lists': 'Price lists',
     'price-list-new': 'Add a price list',
     'price-list-detail': 'Price list',

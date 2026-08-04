@@ -633,6 +633,60 @@ test('a shop can be assigned a price list, and not an inactive one', async () =>
   assert.equal((await Shop.findById(inTerritory._id))?.priceListId, null);
 });
 
+test('the quote a rep sees is the order the customer gets', async () => {
+  /*
+   * The property order entry rests on.
+   *
+   * A telesales operator reads a total to somebody on the phone before anything
+   * is placed. If that figure came from the screen's own arithmetic it would be
+   * the medicine's default price — not this customer's list, not the offer
+   * running on the line — and the invoice would say something else. So the
+   * quote runs the **same** `buildOrderSnapshot` the submission runs, and this
+   * is the test that keeps them the same.
+   */
+  const quoted = await api('POST', '/api/v1/orders/quote', rep._id, {
+    shopId: String(inTerritory._id),
+    items: [{ medicineId: String(medicineId), requestedQuantity: 20 }],
+  });
+  assert.equal(quoted.status, 200, JSON.stringify(quoted.body));
+
+  const quote = payload<{
+    estimatedTotalMinor: number;
+    items: Array<{ estimatedUnitPriceMinor: number; freeQuantity: number; priceSource: string }>;
+  }>(quoted);
+
+  assert.equal(await Order.countDocuments({ shopId: inTerritory._id, status: 'DRAFT' }), 0);
+
+  const placed = await submitQuantity(medicineId, 20, 'commercial-quote-1');
+  assert.equal(placed.status, 201, JSON.stringify(placed.body));
+  const order = await Order.findOne({ submissionIdempotencyKey: 'commercial-quote-1' });
+
+  assert.equal(
+    order?.estimatedTotalMinor,
+    quote.estimatedTotalMinor,
+    'the figure read out on the phone is the figure on the order',
+  );
+  assert.equal(order?.items[0]?.estimatedUnitPriceMinor, quote.items[0]?.estimatedUnitPriceMinor);
+  assert.equal(
+    order?.items[0]?.freeQuantity,
+    quote.items[0]?.freeQuantity,
+    'the free units are quoted too — a customer told about 10+1 and not given it ' +
+      'is a complaint, and one they were not told about is margin given away',
+  );
+  assert.equal(order?.items[0]?.priceSource, quote.items[0]?.priceSource);
+});
+
+test('a rep cannot quote for a shop outside their territory', async () => {
+  // The quote reaches the same `targetShop` the submission does, so it cannot
+  // become a way to read another territory's prices without placing anything.
+  const refused = await api('POST', '/api/v1/orders/quote', rep._id, {
+    shopId: String(outsideTerritory._id),
+    items: [{ medicineId: String(medicineId), requestedQuantity: 10 }],
+  });
+  assert.equal(refused.status, 403);
+  assert.equal((refused.body.error as unknown as { code: string }).code, 'SHOP_OUTSIDE_TERRITORY');
+});
+
 test('an MRP can be set, and a trade price above it is refused', async () => {
   /*
    * `mrpMinor` was on the model, in the shared types and read by

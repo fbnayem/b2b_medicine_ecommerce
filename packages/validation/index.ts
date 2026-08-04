@@ -27,6 +27,40 @@ const bdPhone = z
     'Invalid Bangladesh phone number (e.g. +8801712345678 or 01712345678)',
   );
 
+/**
+ * A schema for a PATCH: every field optional, **and no field defaulted**.
+ *
+ * `.partial()` alone is not enough, and the gap is not visible from reading it.
+ * In Zod 4 a defaulted field stays defaulted through `.partial()`, so parsing
+ * `{ name: 'New name' }` against a partial shop schema returns the name *plus*
+ * `creditLimit: 0`, `paymentTermsDays: 30`, `defaultDiscount: 0` and
+ * `deliveryAddresses: []` — none of which the caller sent. Those then go
+ * straight into `findByIdAndUpdate`, so **correcting a typo in a customer's
+ * name zeroed their credit limit, discarded their negotiated discount and
+ * deleted every delivery address they had.**
+ *
+ * The medicine catalogue had the same shape with worse consequences: editing a
+ * pack size cleared `coldChain` — a safety property on vaccines and insulin —
+ * and set `isActive` back to `true`, quietly returning a withdrawn medicine to
+ * the catalogue.
+ *
+ * A default answers "what if nobody said?", which is a question only a creation
+ * asks. A patch that mentions nothing means *change nothing*.
+ */
+type WithoutDefaults<Shape extends z.ZodRawShape> = {
+  [K in keyof Shape]: Shape[K] extends z.ZodDefault<infer Inner> ? Inner : Shape[K];
+};
+
+export function patchSchemaOf<Shape extends z.ZodRawShape>(schema: z.ZodObject<Shape>) {
+  const stripped = Object.fromEntries(
+    Object.entries(schema.shape).map(([key, value]) => [
+      key,
+      value instanceof z.ZodDefault ? value.removeDefault() : value,
+    ]),
+  ) as WithoutDefaults<Shape>;
+  return z.object(stripped).partial();
+}
+
 export const AddressSchema = z.object({
   label: z.string().min(1),
   line1: z.string().min(5),
@@ -64,7 +98,7 @@ export const CreateShopSchema = z.object({
   notes: z.string().optional(),
 });
 
-export const UpdateShopSchema = CreateShopSchema.partial();
+export const UpdateShopSchema = patchSchemaOf(CreateShopSchema);
 
 export const LoginSchema = z.object({
   email: z.string().email(),
@@ -200,7 +234,8 @@ const validateMedicine = (
 };
 
 export const CreateMedicineSchema = MedicineFieldsSchema.superRefine(validateMedicine);
-export const UpdateMedicineSchema = MedicineFieldsSchema.partial().superRefine(validateMedicine);
+export const UpdateMedicineSchema =
+  patchSchemaOf(MedicineFieldsSchema).superRefine(validateMedicine);
 
 export const ReceiveStockSchema = z
   .object({
@@ -286,6 +321,23 @@ export const SubmitOrderSchema = SaveOrderDraftSchema.extend({
   deliveryAddressId: z.string().min(1),
   requestedPaymentMethod: z.nativeEnum(PaymentMethod),
   idempotencyKey: z.string().trim().min(8).max(120),
+});
+
+/**
+ * What this customer would be charged, without placing anything.
+ *
+ * Order entry cannot show a price it has worked out for itself: the answer
+ * depends on the shop's own arrangement, the price list assigned to them and
+ * whatever free-goods offer is running — none of which the client knows. A
+ * screen that displays `defaultSellingPriceMinor` shows the operator one number
+ * and the customer another, which is the whole class of defect the price
+ * resolver exists to end.
+ *
+ * No delivery address and no payment method, because nothing is being placed.
+ */
+export const QuoteOrderSchema = z.object({
+  shopId: z.string().min(1).optional(),
+  items: z.array(OrderItemInputSchema).min(1).max(100),
 });
 
 export const CancellationRequestSchema = z.object({ reason: z.string().trim().min(5).max(500) });
@@ -1212,7 +1264,7 @@ const validatePriceList = (
 };
 
 export const CreatePriceListSchema = priceListFields.superRefine(validatePriceList);
-export const UpdatePriceListSchema = priceListFields.partial().superRefine(validatePriceList);
+export const UpdatePriceListSchema = patchSchemaOf(priceListFields).superRefine(validatePriceList);
 
 const schemeFields = z.object({
   name: z.string().trim().min(2).max(120),
@@ -1229,4 +1281,4 @@ const schemeFields = z.object({
 });
 
 export const CreateSchemeSchema = schemeFields.superRefine(validityWindow);
-export const UpdateSchemeSchema = schemeFields.partial().superRefine(validityWindow);
+export const UpdateSchemeSchema = patchSchemaOf(schemeFields).superRefine(validityWindow);

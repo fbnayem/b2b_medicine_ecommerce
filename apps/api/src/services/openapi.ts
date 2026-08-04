@@ -23,6 +23,7 @@ import {
   CreatePaymentSchema,
   CreatePriceListSchema,
   CreateSchemeSchema,
+  QuoteOrderSchema,
   UpdatePriceListSchema,
   UpdateSchemeSchema,
   CreateReturnSchema,
@@ -236,10 +237,21 @@ const OPERATIONS: Operation[] = [
   },
   {
     method: 'post',
-    path: '/api/v1/orders/submit',
-    summary: 'Submit an order request',
+    path: '/api/v1/orders/quote',
+    summary: 'Price a basket without placing it, so order entry can show what will be charged',
     tag: 'Orders',
-    roles: [UserRole.SHOP_OWNER],
+    roles: [...MANAGEMENT, UserRole.SALES, UserRole.SHOP_OWNER],
+    body: QuoteOrderSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/orders/submit',
+    summary: 'Submit an order request, optionally on behalf of a named shop',
+    tag: 'Orders',
+    // Opened to the roles that can act for somebody else when the SALES role
+    // landed; this document still said SHOP_OWNER, which is the kind of drift
+    // that makes a specification worse than none.
+    roles: [...MANAGEMENT, UserRole.SALES, UserRole.SHOP_OWNER],
     body: SubmitOrderSchema,
   },
   {

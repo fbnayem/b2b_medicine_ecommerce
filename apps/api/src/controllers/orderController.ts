@@ -11,6 +11,7 @@ import {
 import {
   CancellationDecisionSchema,
   CancellationRequestSchema,
+  QuoteOrderSchema,
   SaveOrderDraftSchema,
   SubmitOrderSchema,
 } from '@medsupply/validation';
@@ -101,6 +102,43 @@ async function audit(
     userAgent: req.get('user-agent'),
     correlationId: correlationId(),
   });
+}
+
+/**
+ * What this customer would pay, without placing anything.
+ *
+ * Order entry has to show the operator the price the customer will actually be
+ * charged while they are still typing, and that answer is the resolver's: the
+ * shop's own arrangement, then whichever price list they are assigned, then the
+ * medicine's default — plus any free-goods offer running on the line. A screen
+ * that works the figure out for itself shows the operator one number and the
+ * invoice another.
+ *
+ * Deliberately the **same** `buildOrderSnapshot` the draft and the submission
+ * use, rather than a second implementation that would agree with it only until
+ * one of them changed. Nothing is written and no reference is consumed.
+ */
+export async function quoteOrder(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const input = QuoteOrderSchema.parse(req.body);
+    const { shop, onBehalf } = await targetShop(req, input.shopId);
+    const snapshot = await buildOrderSnapshot(shop._id, input);
+    res.json({
+      data: {
+        shopId: String(shop._id),
+        shopName: shop.name,
+        shopReference: shop.reference,
+        onBehalf,
+        items: snapshot.items,
+        estimatedSubtotalMinor: snapshot.estimatedSubtotalMinor,
+        estimatedDiscountMinor: snapshot.estimatedDiscountMinor,
+        estimatedDeliveryChargeMinor: snapshot.estimatedDeliveryChargeMinor,
+        estimatedTotalMinor: snapshot.estimatedTotalMinor,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 }
 
 export async function saveDraft(req: AuthRequest, res: Response, next: NextFunction) {

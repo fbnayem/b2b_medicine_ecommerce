@@ -7,6 +7,7 @@ import {
   duplicateOrder,
   getOrder,
   listOrders,
+  quoteOrder,
   decideCancellationRequest,
   requestCancellation,
   saveDraft,
@@ -39,6 +40,9 @@ const placers = [
   UserRole.SHOP_OWNER,
 ];
 router.get('/', requireRole(readers), listOrders);
+// Prices a basket without placing it, so order entry can show the operator the
+// figure the customer will actually be charged while they are still typing.
+router.post('/quote', requireRole(placers), quoteOrder);
 router.post('/drafts', requireRole(placers), saveDraft);
 router.patch('/drafts/:id', requireRole(placers), updateDraft);
 router.delete('/drafts/:id', requireRole(placers), deleteDraft);

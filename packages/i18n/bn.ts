@@ -1825,6 +1825,39 @@ export const bn: Catalogue = {
     saveFailed: 'গুদামটি যোগ করা যায়নি।',
   },
 
+  orderEntry: {
+    title: 'অর্ডার নিন',
+    subtitle:
+      'ফোনে থাকা বা সামনে দাঁড়ানো গ্রাহকের জন্য। নাম লিখুন, এন্টার চাপুন, পরিমাণ লিখুন, আবার এন্টার চাপুন।',
+    customer: 'গ্রাহক',
+    chooseCustomer: 'গ্রাহক বেছে নিন',
+    deliverTo: 'যেখানে পৌঁছাবে',
+    chooseAddress: 'ঠিকানা বেছে নিন',
+    payment: 'পরিশোধ',
+    addLine: 'ওষুধ যোগ করুন',
+    addLineHint:
+      'ব্র্যান্ড, জেনেরিক নাম, কোড বা বারকোড দিয়ে খুঁজুন। তীর চিহ্নে বেছে নিন, এন্টারে যোগ করুন।',
+    searchPlaceholder: 'নাম লিখতে শুরু করুন…',
+    quantityForPending: '{{brand}} কতগুলি?',
+    quantityFor: '{{brand}}-এর পরিমাণ',
+    addToOrder: 'যোগ করুন',
+    alreadyOnOrder: '{{brand}} এই অর্ডারে আগেই আছে। বরং পরিমাণ বদলান।',
+    plusFree: '+ {{free}} ফ্রি',
+    unitPrice: 'একক দাম',
+    available: 'মজুদ',
+    lineTotal: 'লাইনের মোট',
+    subtotal: 'উপমোট',
+    discount: 'ছাড়',
+    delivery: 'ডেলিভারি',
+    total: 'মোট',
+    nothingYet: 'এই অর্ডারে এখনও কিছু নেই',
+    nothingYetBody: 'উপরে খুঁজে এন্টার চেপে প্রথম লাইনটি যোগ করুন।',
+    place: 'অর্ডারটি দিন',
+    placed: 'অর্ডার {{reference}} দেওয়া হয়েছে।',
+    couldNotPlace: 'অর্ডারটি দেওয়া যায়নি।',
+    couldNotPrice: 'দাম হিসাব করা যায়নি।',
+  },
+
   priceLists: {
     title: 'মূল্যতালিকা',
     subtitle:
@@ -2174,6 +2207,7 @@ export const bn: Catalogue = {
   } as Record<string, string>,
 
   navItem: {
+    'order-entry': 'অর্ডার নিন',
     'price-lists': 'মূল্যতালিকা',
     'price-list-new': 'মূল্যতালিকা যোগ করুন',
     'price-list-detail': 'মূল্যতালিকা',

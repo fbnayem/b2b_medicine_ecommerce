@@ -60,6 +60,7 @@ export const ROUTES: readonly RouteNode[] = [
   { id: 'dashboard', element: page(() => import('../pages/Dashboard'), 'Dashboard') },
 
   { id: 'orders', element: page(() => import('../pages/OrderList'), 'OrderList') },
+  { id: 'order-entry', element: page(() => import('../pages/OrderEntry'), 'OrderEntry') },
   { id: 'order-detail', element: page(() => import('../pages/OrderDetail'), 'OrderDetail') },
   { id: 'approvals', element: page(() => import('../pages/ApprovalQueue'), 'ApprovalQueue') },
   {

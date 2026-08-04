@@ -91,6 +91,22 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: 'orders',
   },
   {
+    /*
+     * Taking an order for somebody else.
+     *
+     * Not open to `SHOP_OWNER`: they have the cart, which submits for their own
+     * shop, and this screen's first field asks which customer the order is for.
+     * Offering them a customer picker they can only answer one way would be a
+     * worse version of the screen they already have.
+     */
+    id: 'order-entry',
+    label: 'Take an order',
+    path: '/orders/new',
+    roles: [...MANAGEMENT, UserRole.SALES],
+    group: 'work',
+    icon: 'orders',
+  },
+  {
     id: 'order-detail',
     label: 'Order',
     path: '/orders/:id',
