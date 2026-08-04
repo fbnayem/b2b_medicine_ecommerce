@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { brand as fallback } from '@medsupply/design-tokens';
 import { configureFormatting, formattingLocale, type DateFormat } from '@medsupply/utilities';
 import { apiClient } from '../api/client';
@@ -58,14 +58,23 @@ export function applyBranding(branding: Branding): void {
 }
 
 /**
- * Fetches branding once per session and configures the shared formatters.
+ * Fetches branding once per session, configures the shared formatters, and
+ * hands back what it read.
  *
  * `GET /settings/branding` sits behind `requireAuth`, so this waits for a
  * session rather than running at launch. Until it answers, the package defaults
  * apply — which is correct on the sign-in screen, where the tenant is not yet
  * known.
+ *
+ * It returns the branding rather than nothing because `locale` is the tenant's
+ * language, and `LanguageProvider` ranks that above the handset's own setting:
+ * this is a business tool on shared warehouse terminals and on personal phones,
+ * so the distributor's choice should beat a second-hand handset that came with
+ * its language already set.
  */
-export function useBrandingFormatting(isAuthenticated: boolean): void {
+export function useBranding(isAuthenticated: boolean): Branding {
+  const [branding, setBranding] = useState<Branding>(cached ?? DEFAULTS);
+
   useEffect(() => {
     if (!isAuthenticated || cached) return;
     let cancelled = false;
@@ -76,6 +85,7 @@ export function useBrandingFormatting(isAuthenticated: boolean): void {
         if (cancelled) return;
         const resolved: Branding = { ...DEFAULTS, ...response.data.data };
         cached = resolved;
+        setBranding(resolved);
         applyBranding(resolved);
       })
       .catch(() => {
@@ -87,4 +97,6 @@ export function useBrandingFormatting(isAuthenticated: boolean): void {
       cancelled = true;
     };
   }, [isAuthenticated]);
+
+  return branding;
 }

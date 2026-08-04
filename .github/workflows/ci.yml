@@ -100,6 +100,15 @@ jobs:
       - name: Mobile tests
         run: pnpm --filter @medsupply/mobile test
 
+      # Rendering, which the logic suite above cannot do. It runs on jest
+      # because `@testing-library/react-native` requires it, and version 14 is
+      # required because it is the release that dropped `react-test-renderer`,
+      # which does not support React 19. `run`, not a bare filter, for the
+      # reason recorded above the typecheck step: a suite nobody runs is the
+      # gap this repository has already shipped once.
+      - name: Mobile component tests
+        run: pnpm --filter @medsupply/mobile run test:components
+
       - name: Production builds
         run: |
           pnpm --filter @medsupply/api build

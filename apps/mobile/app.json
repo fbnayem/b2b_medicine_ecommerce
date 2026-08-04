@@ -43,7 +43,8 @@
           "defaultChannel": "medsupply-operations"
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-localization"
     ],
     "scheme": "medsupply"
   }

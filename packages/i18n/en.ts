@@ -75,6 +75,7 @@ export const en = {
     thatDidNotWork: 'That did not work',
     atLeast: 'At least {{minimum}} characters.',
     changeButton: 'Change my password',
+    restoringSession: 'Restoring your session',
   },
 
   /**

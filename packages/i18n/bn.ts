@@ -77,6 +77,7 @@ export const bn: Catalogue = {
     thatDidNotWork: 'এটি হয়নি',
     atLeast: 'অন্তত {{minimum}} অক্ষর।',
     changeButton: 'পাসওয়ার্ড বদলান',
+    restoringSession: 'আপনার সেশন ফিরিয়ে আনা হচ্ছে',
   },
 
   dashboard: {
