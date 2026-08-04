@@ -22,6 +22,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { applyScan, matchScan, parseScan, type ScannableLine } from '../lib/picking';
 import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
 
@@ -117,6 +118,24 @@ export function FulfilmentWork() {
   const [discrepancyNotes, setDiscrepancyNotes] = useState('');
   const [issued, setIssued] = useState<IssuedResult>();
 
+  /*
+   * Picking from the carton rather than from the screen.
+   *
+   * The sheet arrives with every line pre-filled at its full allocation, so the
+   * ordinary path is "walk the aisle, then press Confirm" — which records what
+   * was *allocated* and only catches a shortfall if the picker remembers to
+   * type one. That is fine for two lines and wrong for twenty.
+   *
+   * Scanning switches the sheet to counting **up**: the first scan zeroes every
+   * line and each scan after it adds one unit to the line whose batch number
+   * was read. Nothing changes for anyone who does not scan, which is why this
+   * is a mode rather than a new default — flipping the seed for everybody would
+   * turn a picker's muscle memory into systematic under-picking.
+   */
+  const [counting, setCounting] = useState(false);
+  const [scan, setScan] = useState('');
+  const [scanError, setScanError] = useState('');
+
   // Seeded from the server, then owned locally — a revalidation must not
   // overwrite counts a picker is halfway through entering.
   useEffect(() => {
@@ -129,6 +148,49 @@ export function FulfilmentWork() {
   }, [list]);
 
   const reload = () => queryClient.invalidateQueries({ queryKey: ['picking', id] });
+
+  /** The lines as the picker sees them: batch number on the carton, not an id. */
+  function scannableLines(current: PickingList): ScannableLine[] {
+    return current.items.map((item) => ({
+      id: item._id,
+      batchNumber: current.batchNumbers?.[item.batchId]?.batchNumber ?? '',
+      brandName: item.medicineId.brandName,
+      allocated: item.quantity,
+    }));
+  }
+
+  function onScan(current: PickingList) {
+    const parsed = parseScan(scan);
+    if (!parsed) return;
+
+    const result = matchScan(scannableLines(current), parsed.code);
+    if ('error' in result) {
+      setScanError(
+        result.error === 'AMBIGUOUS'
+          ? t('picking.scanAmbiguous', { code: parsed.code })
+          : t('picking.scanNotFound', { code: parsed.code }),
+      );
+      // The text stays so the picker can see what was actually read, which is
+      // usually the whole diagnosis with a scanner.
+      return;
+    }
+
+    setScanError('');
+    setPicked((state) => {
+      // The first scan zeroes the sheet: from here the count is what was
+      // physically handled, not what was allocated.
+      const base = counting
+        ? state
+        : Object.fromEntries(current.items.map((item) => [item._id, 0]));
+      const applied = applyScan(base[result.line.id] ?? 0, parsed.quantity, result.line.allocated);
+      if (applied.capped) {
+        toast.error(t('picking.scanCapped', { brand: result.line.brandName }));
+      }
+      return { ...base, [result.line.id]: applied.counted };
+    });
+    setCounting(true);
+    setScan('');
+  }
 
   async function post(path: string, body: Record<string, unknown>, done: string, failed: string) {
     if (!list) return;
@@ -356,6 +418,67 @@ export function FulfilmentWork() {
               }
               actions={<LinkButton to="/fulfilment">{t('picking.queue')}</LinkButton>}
             />
+
+            {current.status === 'PICKING' && (
+              <Card className="mb-4">
+                <div className="flex flex-col gap-2">
+                  <Field label={t('picking.scan')} hint={t('picking.scanHint')}>
+                    <Input
+                      autoFocus
+                      value={scan}
+                      onChange={(event) => setScan(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          onScan(current);
+                        }
+                      }}
+                      placeholder={t('picking.scanPlaceholder')}
+                    />
+                  </Field>
+
+                  {/*
+                    Announced rather than only drawn: a picker scanning down an
+                    aisle is looking at cartons, not at the screen, and a
+                    running count they cannot hear is a count they will not
+                    check.
+                  */}
+                  <p aria-live="polite" className="text-sm text-text-muted">
+                    {counting
+                      ? t('picking.countingProgress', {
+                          counted: Object.values(picked).reduce((sum, value) => sum + value, 0),
+                          allocated: current.items.reduce((sum, item) => sum + item.quantity, 0),
+                        })
+                      : t('picking.notCounting')}
+                  </p>
+
+                  {scanError && (
+                    <p role="alert" className="text-sm text-danger">
+                      {scanError}
+                    </p>
+                  )}
+
+                  {counting && (
+                    <div>
+                      <Button
+                        onClick={() => {
+                          setCounting(false);
+                          setScan('');
+                          setScanError('');
+                          setPicked(
+                            Object.fromEntries(
+                              current.items.map((item) => [item._id, item.quantity]),
+                            ),
+                          );
+                        }}
+                      >
+                        {t('picking.stopCounting')}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
 
             {current.discrepancies.length > 0 && (
               <Card className="mb-4">

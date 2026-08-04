@@ -17,13 +17,14 @@ import {
   StatusPill,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { useSavedFilter } from '../lib/savedFilter';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate } from '../lib/finance';
 
 export function DeliveryBoard() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useSavedFilter('deliveries', '');
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
 

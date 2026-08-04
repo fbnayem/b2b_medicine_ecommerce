@@ -1471,6 +1471,16 @@ export const en = {
   } as Record<DeliveryPriority, string>,
 
   picking: {
+    scan: 'Scan or type a batch number',
+    scanHint: 'One scan is one carton. Add “x 12” to record a whole outer at once.',
+    scanPlaceholder: 'Scan here…',
+    scanNotFound: 'Nothing on this order matches {{code}}.',
+    scanAmbiguous: '{{code}} matches more than one line. Scan the batch number instead.',
+    scanCapped: 'That is already the whole allocation of {{brand}}.',
+    countingProgress: 'Counting from scans: {{counted}} of {{allocated}} units.',
+    notCounting:
+      'Every line is set to its full allocation. Your first scan starts counting from zero.',
+    stopCounting: 'Stop counting and refill the sheet',
     loading: 'Loading this picking list',
     couldNotLoad: 'This picking list could not be loaded.',
     queue: 'Back to the queue',

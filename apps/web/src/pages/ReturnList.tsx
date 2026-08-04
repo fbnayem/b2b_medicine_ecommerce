@@ -19,6 +19,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { useSavedFilter } from '../lib/savedFilter';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
 import { RETURN_STATUS_FILTER_ORDER } from './returnLabels';
@@ -43,7 +44,7 @@ export function ReturnList() {
   const { t } = useLanguage();
   const role = useAuthStore((state) => state.user?.role);
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useSavedFilter('returns', '');
   const [reference, setReference] = useState('');
   const [applied, setApplied] = useState({ status: '', q: '' });
   const [page, setPage] = useState(1);

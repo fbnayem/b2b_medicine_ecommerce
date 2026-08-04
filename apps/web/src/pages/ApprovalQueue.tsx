@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { OrderStatus } from '@medsupply/shared-types';
 import type { Order, Shop } from '@medsupply/shared-types';
@@ -12,6 +11,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { useSavedFilter } from '../lib/savedFilter';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime, formatMinor } from '../lib/finance';
 
@@ -27,7 +27,7 @@ const STATES = [
 
 export function ApprovalQueue() {
   const { t } = useLanguage();
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useSavedFilter('approvals', '');
 
   const queue = useApiCollection<Order>(
     ['approval-queue', status],

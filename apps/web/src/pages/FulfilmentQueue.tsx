@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Badge,
@@ -10,6 +9,7 @@ import {
   Resource,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { useSavedFilter } from '../lib/savedFilter';
 import { useLanguage } from '../lib/useLanguage';
 
 interface PickingList {
@@ -24,7 +24,7 @@ const QUEUES = ['', 'PENDING', 'PICKING', 'PAUSED', 'PACKING', 'BLOCKED_DISCREPA
 
 export function FulfilmentQueue() {
   const { t } = useLanguage();
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useSavedFilter('fulfilment', '');
 
   const queue = useApiCollection<PickingList>(
     ['fulfilment-queue', status],
