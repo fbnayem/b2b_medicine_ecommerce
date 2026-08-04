@@ -385,7 +385,11 @@ export async function pdf(req: AuthRequest, res: Response, next: NextFunction) {
             String(item.medicineSnapshot?.brandName ?? ''),
             item.batchNumber,
             formatDate(item.expiryDate),
-            formatQuantity(item.quantity),
+            // "10 + 1 free" where a scheme applied; just the quantity where
+            // none did, so nothing changes on an ordinary invoice.
+            item.freeQuantity
+              ? `${formatQuantity(item.quantity)} + ${formatQuantity(item.freeQuantity)} free`
+              : formatQuantity(item.quantity),
             formatMoneyMinor(item.unitPriceMinor, money),
             formatMoneyMinor(item.discountMinor, money),
             formatMoneyMinor(item.lineTotalMinor, money),

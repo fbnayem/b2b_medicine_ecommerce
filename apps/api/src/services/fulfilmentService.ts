@@ -452,6 +452,14 @@ export async function packAndInvoice(
           batchNumber: batch.batchNumber,
           expiryDate: batch.expiryDate,
           quantity: packed.packedQuantity,
+          /*
+           * Carried onto the invoice so the document can say "10 + 1 free".
+           *
+           * `quantity` is unchanged and `calculatePackedInvoice` never sees
+           * this, which is the whole reason schemes could be added beside a
+           * double-entry ledger without touching the money arithmetic.
+           */
+          freeQuantity: orderItem.freeQuantity ?? 0,
           unitPriceMinor: line.unitPriceMinor!,
           discountMinor: discount,
           lineTotalMinor: lineTotal,

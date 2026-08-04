@@ -36,6 +36,15 @@ const lineSchema = new mongoose.Schema(
     expiryDate: { type: Date, required: true },
     /** Copied from the invoice so the ceiling survives a later catalogue edit. */
     invoicedQuantity: { type: Number, required: true, min: 1 },
+    /**
+     * How many units physically went out on this line.
+     *
+     * Larger than `invoicedQuantity` only where a scheme sent free goods.
+     * Crediting a return has to prorate over **this**, not over what was
+     * charged: returning six of eleven credits six elevenths, and per-charged
+     * unit would refund a tenth more than the customer ever handed over.
+     */
+    dispatchedQuantity: { type: Number, min: 0 },
     requestedQuantity: { type: Number, required: true, min: 1 },
     approvedQuantity: quantity,
     receivedQuantity: quantity,

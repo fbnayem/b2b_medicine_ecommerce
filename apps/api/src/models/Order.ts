@@ -34,6 +34,18 @@ const itemSchema = new mongoose.Schema(
     medicineSnapshot: { type: medicineSnapshotSchema, required: true },
     requestedQuantity: { type: Number, required: true, min: 1 },
     /**
+     * Free units riding alongside the chargeable ones, from a scheme.
+     *
+     * **Defaults to zero, which is why no invoice needed a backfill** — and
+     * that is required rather than convenient, since an issued invoice is
+     * immutable by a pre-save hook. `requestedQuantity` stays the chargeable
+     * quantity; allocation asks for the sum, so the warehouse picks eleven and
+     * the invoice prices ten. The money arithmetic never learns anything
+     * changed.
+     */
+    freeQuantity: { type: Number, min: 0, default: 0 },
+    schemeReference: { type: String, trim: true },
+    /**
      * Where the price on this line came from.
      *
      * Snapshotted, like `medicineSnapshot`: a price change next month must not

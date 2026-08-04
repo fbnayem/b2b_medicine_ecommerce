@@ -117,7 +117,15 @@ export async function approveOrder(
               isBlocked: batch.isBlocked,
               isQuarantined: batch.isQuarantined,
             })),
-            lineInput.approvedQuantity,
+            /*
+             * The chargeable quantity **plus** the free units.
+             *
+             * This is the one line where a scheme touches stock: the warehouse
+             * has to pick eleven for a 10+1, and the shelf has to be reduced by
+             * eleven. Everything downstream still prices `approvedQuantity`, so
+             * the money does not move — only the dispatched count does.
+             */
+            lineInput.approvedQuantity + (item.freeQuantity ?? 0),
           );
         } catch {
           throw Object.assign(

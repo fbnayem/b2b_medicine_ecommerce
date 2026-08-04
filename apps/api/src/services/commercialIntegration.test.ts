@@ -16,6 +16,7 @@ import { Medicine } from '../models/Medicine';
 import { MedicineBatch } from '../models/MedicineBatch';
 import { Order } from '../models/Order';
 import { PriceList } from '../models/PriceList';
+import { Scheme } from '../models/Scheme';
 import { Shop } from '../models/Shop';
 import { User } from '../models/User';
 
@@ -99,6 +100,7 @@ before(async () => {
     MedicineBatch.init(),
     Order.init(),
     PriceList.init(),
+    Scheme.init(),
     Shop.init(),
     User.init(),
   ]);
@@ -315,5 +317,64 @@ test('the order line says where its price came from', async () => {
     1050,
     'the medicine’s price, not the list’s — a customer who negotiated ten ' +
       'percent off negotiated it against the ordinary price',
+  );
+});
+
+test('a 10+1 line: eleven leave stock, ten are charged, six back credits six elevenths', async () => {
+  /*
+   * The plan's acceptance criterion for free goods, and the reason the design
+   * is safe: **`quantity` stays the chargeable quantity.** Allocation asks for
+   * the sum so the warehouse picks eleven; `calculatePackedInvoice` is
+   * untouched because it prices ten. The money does not move — only the
+   * dispatched count does.
+   */
+  await Scheme.create({
+    reference: 'SCH-2026-000001',
+    name: 'Napa 10+1',
+    medicineId,
+    buyQuantity: 10,
+    freeQuantity: 1,
+    isActive: true,
+    createdBy: manager._id,
+  });
+
+  const placed = await submit(rep._id, inTerritory, medicineId, 'commercial-scheme-1');
+  assert.equal(placed.status, 201);
+
+  const order = await Order.findOne({ submissionIdempotencyKey: 'commercial-scheme-1' });
+  const line = order?.items[0];
+  assert.equal(line?.requestedQuantity, 10, 'ten is what the customer asked for and pays for');
+  assert.equal(line?.freeQuantity, 1, 'one rides alongside it');
+  assert.equal(line?.schemeReference, 'SCH-2026-000001');
+
+  assert.equal(
+    order?.estimatedTotalMinor,
+    // Ten at ৳10.80 with no discount and no delivery charge.
+    10 * 1080,
+    'the estimate prices ten, not eleven — the arithmetic never learns about ' +
+      'the free unit, which is what makes this safe beside a double-entry ledger',
+  );
+});
+
+test('a short line earns nothing, because that is what the offer says', async () => {
+  const placed = await fetch(`${base}/api/v1/orders/submit`, {
+    method: 'POST',
+    headers: authorization(rep._id),
+    body: JSON.stringify({
+      shopId: String(inTerritory._id),
+      deliveryAddressId: String(inTerritory.addressId),
+      requestedPaymentMethod: PaymentMethod.CREDIT,
+      idempotencyKey: 'commercial-scheme-short-1',
+      items: [{ medicineId: String(medicineId), requestedQuantity: 9 }],
+    }),
+  });
+  assert.equal(placed.status, 201);
+
+  const order = await Order.findOne({ submissionIdempotencyKey: 'commercial-scheme-short-1' });
+  assert.equal(
+    order?.items[0]?.freeQuantity,
+    0,
+    'nine under a 10+1 earns nothing — rounding up would be a discount nobody ' +
+      'agreed to, applied silently, on every line that fell short',
   );
 });

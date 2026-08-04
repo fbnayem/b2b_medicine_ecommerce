@@ -4,6 +4,7 @@ import { MedicineBatch } from '../models/MedicineBatch';
 import { Shop } from '../models/Shop';
 import { calculateOrderEstimate } from './orderPricing';
 import { priceListForShop, resolvePriceFrom, type ResolvedPrice } from './pricingService';
+import { freeUnitsFor, schemesForOrder } from './schemeService';
 
 export type OrderInput = {
   items: Array<{ medicineId: string; requestedQuantity: number; shopNotes?: string }>;
@@ -70,6 +71,17 @@ export async function buildOrderSnapshot(shopId: Types.ObjectId, input: OrderInp
    * One list read for the whole order rather than one per line.
    */
   const priceList = await priceListForShop(shop);
+  /*
+   * Free goods, resolved beside the price and at the same hook point.
+   *
+   * `requestedQuantity` stays the chargeable quantity throughout; the free
+   * units ride alongside it, so `calculateOrderEstimate` below prices exactly
+   * what it always priced.
+   */
+  const schemes = await schemesForOrder(
+    input.items.map((item) => item.medicineId),
+    shop._id,
+  );
   const resolved = new Map<string, ResolvedPrice>(
     input.items.map((item) => [
       item.medicineId,
@@ -106,6 +118,10 @@ export async function buildOrderSnapshot(shopId: Types.ObjectId, input: OrderInp
         unit: medicine.unit,
       },
       requestedQuantity: item.requestedQuantity,
+      // Dispatched but not charged. Zero unless a scheme applies, which is why
+      // nothing already in the database needed touching.
+      freeQuantity: freeUnitsFor(item.requestedQuantity, schemes.get(item.medicineId)),
+      schemeReference: schemes.get(item.medicineId)?.reference,
       estimatedUnitPriceMinor: resolved.get(item.medicineId)!.unitPriceMinor,
       // Where the price came from, on the line. A price change next month
       // cannot rewrite what was ordered, and a dispute can be answered from

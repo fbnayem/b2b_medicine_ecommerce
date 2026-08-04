@@ -339,6 +339,10 @@ export async function createReturn(input: CreateReturnInput, actor: ReturnActor)
           batchNumber: invoiceLine.batchNumber,
           expiryDate: invoiceLine.expiryDate,
           invoicedQuantity: invoiceLine.quantity,
+          // What actually left the warehouse. Equal to the invoiced quantity
+          // unless a scheme added free units to this line — and crediting has
+          // to prorate over this, not over what was charged.
+          dispatchedQuantity: invoiceLine.quantity + (invoiceLine.freeQuantity ?? 0),
           requestedQuantity: requested.quantity,
           unitPriceMinor: invoiceLine.unitPriceMinor,
           discountMinor: 0,
@@ -352,6 +356,7 @@ export async function createReturn(input: CreateReturnInput, actor: ReturnActor)
       const estimate = computeReturnCredit({
         lines: lines.map((line) => ({
           invoicedQuantity: line.invoicedQuantity,
+          dispatchedQuantity: line.dispatchedQuantity ?? line.invoicedQuantity,
           unitPriceMinor: line.unitPriceMinor,
           lineDiscountMinor:
             invoice.items.find(
@@ -512,6 +517,7 @@ export async function decideReturn(id: string, input: ReturnDecisionInput, actor
       const credit = computeReturnCredit({
         lines: record.lines.map((line) => ({
           invoicedQuantity: line.invoicedQuantity,
+          dispatchedQuantity: line.dispatchedQuantity ?? line.invoicedQuantity,
           unitPriceMinor: line.unitPriceMinor,
           lineDiscountMinor:
             invoice.items.find(
@@ -824,6 +830,7 @@ export async function receiveReturn(id: string, input: ReturnReceiptInput, actor
       const credit = computeReturnCredit({
         lines: record.lines.map((line) => ({
           invoicedQuantity: line.invoicedQuantity,
+          dispatchedQuantity: line.dispatchedQuantity ?? line.invoicedQuantity,
           unitPriceMinor: line.unitPriceMinor,
           lineDiscountMinor:
             invoice.items.find(

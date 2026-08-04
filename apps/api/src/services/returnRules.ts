@@ -248,8 +248,44 @@ export function lineRefundMinor(input: {
   unitPriceMinor: number;
   lineDiscountMinor: number;
   quantity: number;
+  /**
+   * How many units physically went out, where a scheme sent more than were
+   * charged. Absent means they are the same, which is every line issued before
+   * schemes existed and every line without one.
+   */
+  dispatchedQuantity?: number;
 }) {
   if (input.quantity === 0) return { refundMinor: 0, discountMinor: 0 };
+
+  const dispatched = input.dispatchedQuantity ?? input.invoicedQuantity;
+
+  /*
+   * A scheme line: eleven went out and ten were charged.
+   *
+   * Returning six credits six **elevenths** of what was paid, not six tenths.
+   * Crediting per charged unit would refund more than the customer handed over
+   * — on a 10+1 that is a tenth too much, every time, and it comes out of
+   * margin rather than out of anything anybody decided.
+   *
+   * `prorateMinor` rather than a second proration written here: it is already
+   * BigInt, already rounds half-up, and is already the primitive the rest of
+   * the credit arithmetic uses.
+   */
+  if (dispatched > input.invoicedQuantity) {
+    if (input.quantity > dispatched) {
+      throw ruleError('Return quantity exceeds what was dispatched', 'RETURN_EXCEEDS_INVOICE');
+    }
+    const chargedTotal = input.unitPriceMinor * input.invoicedQuantity - input.lineDiscountMinor;
+    if (!Number.isSafeInteger(chargedTotal)) {
+      throw ruleError('Return line value exceeds the safe integer range', 'MONEY_OVERFLOW', 500);
+    }
+    const refundMinor = prorateMinor(Math.max(0, chargedTotal), input.quantity, dispatched);
+    return {
+      refundMinor,
+      discountMinor: prorateMinor(input.lineDiscountMinor, input.quantity, dispatched),
+    };
+  }
+
   if (input.quantity > input.invoicedQuantity) {
     throw ruleError('Return quantity exceeds the invoiced quantity', 'RETURN_EXCEEDS_INVOICE');
   }

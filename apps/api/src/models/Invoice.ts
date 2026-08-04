@@ -12,6 +12,14 @@ const itemSchema = new mongoose.Schema(
   {
     medicineId: { type: mongoose.Schema.Types.ObjectId, ref: 'Medicine', required: true },
     medicineSnapshot: { type: mongoose.Schema.Types.Mixed, required: true },
+    /**
+     * Free units on this line. Priced at nothing, dispatched all the same.
+     *
+     * `quantity` remains what was charged, so `calculatePackedInvoice` is
+     * untouched and every invoice issued before schemes existed reads
+     * correctly with this at its default of zero.
+     */
+    freeQuantity: { type: Number, min: 0, default: 0 },
     batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'MedicineBatch', required: true },
     batchNumber: { type: String, required: true },
     expiryDate: { type: Date, required: true },
