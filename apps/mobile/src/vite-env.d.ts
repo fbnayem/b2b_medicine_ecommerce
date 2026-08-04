@@ -14,4 +14,18 @@
  */
 interface ImportMeta {
   glob(pattern: string): Record<string, () => Promise<unknown>>;
+  /**
+   * The eager, raw form — file contents as strings at build time.
+   *
+   * Added for `tokenDiscipline.test.ts`, which has to read screens to check
+   * they take their colours from the token package. Reading them with
+   * `node:fs` would mean putting Node's definitions on this package's config,
+   * and the paragraph above is the reason not to: a screen that ships to
+   * Hermes must not be able to reach a filesystem, and the type system is
+   * where that is cheapest to enforce.
+   */
+  glob(
+    pattern: string | string[],
+    options: { query: '?raw'; import: 'default'; eager: true },
+  ): Record<string, string>;
 }

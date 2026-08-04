@@ -60,6 +60,80 @@ export const en = {
       'Somebody set this password for you, so it is known to more than one person. Choose one only you know before you carry on.',
   },
 
+  /**
+   * The vocabulary every page shares.
+   *
+   * Zero of the 53 web pages called the translation function, so the switch
+   * changed the shell and nothing inside it. Most of what those pages say is
+   * not bespoke — it is "Add", "Status", "Showing 1–50 of 384" — and putting
+   * that here first means converting a page is mostly wiring rather than
+   * writing, and that two pages cannot end up with "Delete" and "Remove" for
+   * the same button.
+   */
+  actions: {
+    add: 'Add',
+    edit: 'Edit',
+    view: 'View',
+    remove: 'Remove',
+    create: 'Create',
+    submit: 'Submit',
+    confirm: 'Confirm',
+    approve: 'Approve',
+    reject: 'Reject',
+    refresh: 'Refresh',
+    export: 'Export',
+    print: 'Print',
+    back: 'Back',
+    apply: 'Apply',
+    clear: 'Clear',
+    filter: 'Filter',
+    reason: 'Reason',
+    // A destructive action names what it destroys at the call site; this is
+    // only the verb.
+    delete: 'Delete',
+  },
+
+  /**
+   * Column headings and field labels. One word per concept across every
+   * screen — a "Reference" is never a "Ref" on the next page.
+   */
+  fields: {
+    reference: 'Reference',
+    date: 'Date',
+    status: 'Status',
+    quantity: 'Quantity',
+    amount: 'Amount',
+    total: 'Total',
+    customer: 'Customer',
+    shop: 'Shop',
+    medicine: 'Medicine',
+    brand: 'Brand',
+    batch: 'Batch',
+    expiry: 'Expiry',
+    price: 'Price',
+    notes: 'Notes',
+    phone: 'Phone',
+    email: 'Email address',
+    address: 'Address',
+    createdBy: 'Created by',
+    createdAt: 'Created',
+    dueDate: 'Due',
+    outstanding: 'Outstanding',
+  },
+
+  /** Lists, tables and the things said around them. */
+  lists: {
+    searchPlaceholder: 'Search…',
+    noResults: 'Nothing matched that search',
+    noResultsBody: 'Check the spelling, or clear the filters and try again.',
+    showing: 'Showing {{first}}–{{last}} of {{total}}',
+    previous: 'Previous',
+    next: 'Next',
+    pagination: 'Pagination',
+    loadingList: 'Loading {{what}}',
+    couldNotLoad: 'This could not be loaded.',
+  },
+
   nav: {
     sections: 'Sections',
     goTo: 'Go to…',

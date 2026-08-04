@@ -30,6 +30,8 @@ export {
   type BadgeTone,
   type PageHeaderProps,
 } from './Data';
+export { DataTable, type Column, type DataTableProps } from './DataTable';
+export { Resource, type ResourceProps } from './Resource';
 export { StatusPill, statusLabel, type StatusKind } from './StatusPill';
 export { toast, Toaster } from './toast';
 export { AskProvider, requireReason, useAsk } from './ask';
