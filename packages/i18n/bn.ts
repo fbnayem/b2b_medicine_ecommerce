@@ -2187,6 +2187,7 @@ export const bn: Catalogue = {
     [UserRole.MANAGER]: 'ম্যানেজার',
     [UserRole.STOREKEEPER]: 'স্টোরকিপার',
     [UserRole.DELIVERY_PERSON]: 'ডেলিভারি কর্মী',
+    [UserRole.SALES]: 'বিক্রয় প্রতিনিধি',
     [UserRole.SHOP_OWNER]: 'দোকান মালিক',
   },
 

@@ -33,6 +33,15 @@ const itemSchema = new mongoose.Schema(
     medicineId: { type: mongoose.Schema.Types.ObjectId, ref: 'Medicine', required: true },
     medicineSnapshot: { type: medicineSnapshotSchema, required: true },
     requestedQuantity: { type: Number, required: true, min: 1 },
+    /**
+     * Where the price on this line came from.
+     *
+     * Snapshotted, like `medicineSnapshot`: a price change next month must not
+     * rewrite what was ordered, and a dispute about price is answered from the
+     * order rather than by reconstructing a price list's history.
+     */
+    priceSource: { type: String, trim: true },
+    priceListReference: { type: String, trim: true },
     estimatedUnitPriceMinor: { type: Number, required: true, min: 0 },
     estimatedDiscountMinor: { type: Number, required: true, min: 0 },
     estimatedLineTotalMinor: { type: Number, required: true, min: 0 },
@@ -56,6 +65,17 @@ const orderSchema = new mongoose.Schema(
   {
     reference: { type: String, required: true, unique: true, index: true },
     shopId: { type: mongoose.Schema.Types.ObjectId, ref: 'Shop', required: true, index: true },
+    /**
+     * Who actually placed this order.
+     *
+     * The control that makes order-on-behalf safe is **not** that the order
+     * looks like the shop placed it — it is that the record says plainly who
+     * did. Most volume in this trade arrives by phone or through a rep with a
+     * paper book, and an order book that cannot distinguish those from a shop
+     * owner tapping their own screen is an order book nobody can audit.
+     */
+    placedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
+    placedOnBehalf: { type: Boolean, default: false, index: true },
     submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     items: { type: [itemSchema], required: true },
     deliveryAddressSnapshot: addressSnapshotSchema,

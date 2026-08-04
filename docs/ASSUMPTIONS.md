@@ -222,3 +222,35 @@
   deployment; the ledger still balances in raw minor units. Ledger entries
   carrying their own currency, FX rates, revaluation and realised gain/loss are
   Phase 14, and were chosen with the cost stated.
+
+## The commercial model (Phase 8)
+
+The plan named three business rules that had to be settled before the price
+resolver could be written, because the model supports either answer and code
+cannot invent one. These are the answers, recorded here so the next person
+reads a decision rather than guesses at an intention.
+
+- **Price precedence is shop override → assigned price list → medicine
+  default.** The most specific arrangement wins, and the resolver records
+  **which** of the three it used on the order line. A price that cannot say
+  where it came from is a price nobody can defend in a dispute, and disputes
+  about price are the ordinary case in this trade rather than the exception.
+- **A scheme does not stack with a price-list discount.** Free goods are the
+  discount for that line. Allowing both means a rep can hand out an unbounded
+  concession by combining two things neither of which looks unusual on its own,
+  and the margin only becomes visible after the invoice is issued and
+  immutable. Where both apply the scheme wins, because it is the more specific
+  arrangement and the one the shop was told about.
+- **Free goods do not count toward credit exposure.** Exposure is what the
+  customer owes, and they owe nothing for the free units — the invoice charges
+  `quantity`, not `quantity + freeQuantity`. The stock leaves either way and
+  the recall trace and the controlled register both see all of it, because
+  those read `StockMovement`, which records what was dispatched.
+- **MRP is data, margin is derived.** `marginBasisPoints` is computed as
+  `round((mrp − trade) × 10_000 / mrp)` at the point of display and never
+  stored. A stored margin is a third number that can disagree with the two it
+  came from, and it would have to be recomputed on every price change.
+- **A `SALES` user is scoped by territory, and the record names the human.**
+  `Order.placedBy` and `placedOnBehalf` are what make order-on-behalf safe:
+  the control is not that the order looks like the shop placed it, but that it
+  says plainly who actually did.

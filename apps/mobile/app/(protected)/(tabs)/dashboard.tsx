@@ -10,28 +10,22 @@ import { disconnectRealtime, onRealtime } from '../../../src/notifications/realt
 import { unregisterCurrentDevice } from '../../../src/notifications/push';
 import { TAB_ROUTE_FILE } from '../../../src/navigation/tabs';
 import { colour, layout } from '../../../src/theme';
+import { useLanguage } from '../../../src/i18n/useLanguage';
 
 const emptyUnread: UnreadNotificationSummary = {
   total: 0,
   byCategory: {} as UnreadNotificationSummary['byCategory'],
 };
 
-/**
- * Role names as a person would say them.
- *
- * This screen previously rendered `Role: {user.role}`, so a delivery rider was
- * shown the string `DELIVERY_PERSON`.
- */
-const ROLE_LABEL: Record<UserRole, string> = {
-  [UserRole.SUPER_ADMIN]: 'Super administrator',
-  [UserRole.ADMIN]: 'Administrator',
-  [UserRole.MANAGER]: 'Manager',
-  [UserRole.STOREKEEPER]: 'Storekeeper',
-  [UserRole.DELIVERY_PERSON]: 'Delivery person',
-  [UserRole.SHOP_OWNER]: 'Shop owner',
-};
-
-const GROUPS = ['work', 'catalogue', 'money', 'insight', 'administration', 'account'] as const;
+const GROUPS = [
+  'work',
+  'catalogue',
+  'purchasing',
+  'money',
+  'insight',
+  'administration',
+  'account',
+] as const;
 
 /**
  * The mobile home screen.
@@ -47,6 +41,7 @@ const GROUPS = ['work', 'catalogue', 'money', 'insight', 'administration', 'acco
  * everything else that role is allowed to reach.
  */
 export default function DashboardScreen() {
+  const { t } = useLanguage();
   const { user, logout } = useAuthStore();
   const [unread, setUnread] = useState<UnreadNotificationSummary>(emptyUnread);
 
@@ -96,7 +91,14 @@ export default function DashboardScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.greeting}>Welcome, {user?.firstName}</Text>
-        <Text style={styles.role}>{role ? ROLE_LABEL[role] : ''}</Text>
+        {/*
+          Was a second English `Record<UserRole, string>` in this file. The
+          catalogue's is the same shape in both languages, so a new role is a
+          compile error there — which is how a private copy goes stale without
+          anybody noticing. This screen rendered `DELIVERY_PERSON` before either
+          existed.
+        */}
+        <Text style={styles.role}>{role ? t(`roles.${role}`) : ''}</Text>
       </View>
 
       <Pressable

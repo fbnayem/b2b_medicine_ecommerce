@@ -27,6 +27,7 @@ import { ActivityVisibility, recordActivity } from '../services/activityService'
 import { emitEntityUpdate } from '../services/realtime';
 import { MANAGEMENT_ROLES, shopManagementIds } from '../services/notificationAudience';
 import { correlationId } from '../services/logger';
+import { decideOnBehalf } from '../services/onBehalfRules';
 
 async function ownedShop(req: AuthRequest) {
   const shop = await Shop.findOne({ ownerIds: req.user!._id });
@@ -36,6 +37,40 @@ async function ownedShop(req: AuthRequest) {
       code: 'SHOP_REQUIRED',
     });
   return shop;
+}
+
+/**
+ * The shop this order is for.
+ *
+ * A shop owner gets their own, exactly as before. Anybody else has to name one
+ * and has to be allowed to act for it — which is what makes order-on-behalf a
+ * feature rather than a hole. The decision is here rather than on the screen,
+ * because a filter a client applies is a filter a client can drop.
+ */
+async function targetShop(req: AuthRequest, shopId?: string) {
+  const role = req.user!.role as UserRole;
+  if (role === UserRole.SHOP_OWNER || !shopId)
+    return { shop: await ownedShop(req), onBehalf: false };
+
+  const shop = await Shop.findById(shopId);
+  if (!shop)
+    throw Object.assign(new Error('Shop not found'), { statusCode: 404, code: 'NOT_FOUND' });
+
+  const decision = decideOnBehalf(
+    { role, territories: req.user!.territories },
+    { territory: shop.territory },
+  );
+  if (!decision.allowed) {
+    throw Object.assign(
+      new Error(
+        decision.code === 'SHOP_OUTSIDE_TERRITORY'
+          ? 'That shop is not in your territory'
+          : 'Your role cannot place an order for another shop',
+      ),
+      { statusCode: 403, code: decision.code },
+    );
+  }
+  return { shop, onBehalf: true };
 }
 async function ownOrder(req: AuthRequest, id: string) {
   const order = await Order.findById(id);
@@ -71,12 +106,14 @@ async function audit(
 export async function saveDraft(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const input = SaveOrderDraftSchema.parse(req.body);
-    const shop = await ownedShop(req);
+    const { shop, onBehalf } = await targetShop(req, input.shopId);
     const snapshot = await buildOrderSnapshot(shop._id, input);
     const order = await Order.create({
       reference: await nextReference('ORD'),
       shopId: shop._id,
       submittedBy: req.user!._id,
+      placedBy: req.user!._id,
+      placedOnBehalf: onBehalf,
       ...input,
       ...snapshot,
       status: OrderStatus.DRAFT,
@@ -126,7 +163,7 @@ export async function submitOrder(req: AuthRequest, res: Response, next: NextFun
     const input = SubmitOrderSchema.parse(req.body);
     const duplicate = await Order.findOne({ submissionIdempotencyKey: input.idempotencyKey });
     if (duplicate) return res.json({ data: duplicate, meta: { idempotentReplay: true } });
-    const shop = await ownedShop(req);
+    const { shop, onBehalf } = await targetShop(req, input.shopId);
     if (shop.status !== ShopStatus.ACTIVE)
       return res.status(409).json({
         error: {
@@ -157,9 +194,25 @@ export async function submitOrder(req: AuthRequest, res: Response, next: NextFun
         reference: await nextReference('ORD'),
         shopId: shop._id,
         submittedBy: req.user!._id,
+        // The record names the human. That, not the shape of the order, is
+        // what makes placing one for somebody else auditable.
+        placedBy: req.user!._id,
+        placedOnBehalf: onBehalf,
         statusHistory: [],
       });
-    Object.assign(order, input, snapshot, {
+    /*
+     * `shopId` is stripped from the input before it is assigned.
+     *
+     * `Object.assign(order, input, …)` copies whatever the client sent, so the
+     * raw `shopId` would overwrite the one `targetShop` resolved — and a shop
+     * owner naming somebody else's shop would have their order **reassigned to
+     * it**, past the check that exists to prevent exactly that. Found by the
+     * test written for the opposite case, which is the only reason it is not
+     * shipping.
+     */
+    const { shopId: _requestedShopId, ...assignable } = input;
+    Object.assign(order, assignable, snapshot, {
+      shopId: shop._id,
       deliveryAddressSnapshot: address.toObject(),
       contactSnapshot: { name: shop.name, phone: shop.primaryPhone, email: shop.email },
       status: OrderStatus.SUBMITTED,

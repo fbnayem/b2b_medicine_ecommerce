@@ -2303,6 +2303,7 @@ export const en = {
     [UserRole.MANAGER]: 'Manager',
     [UserRole.STOREKEEPER]: 'Storekeeper',
     [UserRole.DELIVERY_PERSON]: 'Delivery person',
+    [UserRole.SALES]: 'Sales representative',
     [UserRole.SHOP_OWNER]: 'Shop owner',
   } as Record<UserRole, string>,
 

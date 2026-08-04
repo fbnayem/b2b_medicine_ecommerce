@@ -18,6 +18,19 @@ const medicineSchema = new mongoose.Schema(
     productImageUrl: String,
     costPriceMinor: { type: Number, required: true, min: 0 },
     defaultSellingPriceMinor: { type: Number, required: true, min: 0 },
+    /**
+     * The price printed on the pack.
+     *
+     * The number every pharmacy in this market reads off the carton, and the
+     * one this system could not show — so a shop owner could not be shown their
+     * own margin and nothing could be priced off it the way the trade actually
+     * prices. Nullable until backfilled: making it required would invalidate
+     * every medicine already in the catalogue, which is not a migration.
+     *
+     * Margin is **derived**, never stored:
+     * `round((mrp - trade) * 10_000 / mrp)` in basis points.
+     */
+    mrpMinor: { type: Number, min: 0 },
     minimumOrderQuantity: { type: Number, required: true, min: 1, default: 1 },
     maximumOrderQuantity: { type: Number, min: 1 },
     classification: { type: String, enum: Object.values(MedicineClassification), required: true },

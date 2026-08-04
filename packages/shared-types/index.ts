@@ -53,6 +53,15 @@ export const UserRole = {
   MANAGER: 'MANAGER',
   STOREKEEPER: 'STOREKEEPER',
   DELIVERY_PERSON: 'DELIVERY_PERSON',
+  /**
+   * A field or telesales representative who places orders **for** shops.
+   *
+   * Most volume in this trade arrives by phone, WhatsApp or a rep with a paper
+   * book, and every order route was `SHOP_OWNER`-only — so there was no path
+   * for any of it. Scoped by territory, and every order they place records
+   * that they placed it.
+   */
+  SALES: 'SALES',
   SHOP_OWNER: 'SHOP_OWNER',
 } as const;
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
@@ -152,6 +161,11 @@ export interface Medicine {
   productImageUrl?: string;
   costPriceMinor: number;
   defaultSellingPriceMinor: number;
+  /**
+   * The price printed on the pack. Nullable until backfilled — making it
+   * required would invalidate every medicine already in the catalogue.
+   */
+  mrpMinor?: number;
   minimumOrderQuantity: number;
   maximumOrderQuantity?: number;
   classification: MedicineClassification;

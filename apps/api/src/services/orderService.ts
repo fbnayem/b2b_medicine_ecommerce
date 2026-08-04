@@ -3,6 +3,7 @@ import { Medicine } from '../models/Medicine';
 import { MedicineBatch } from '../models/MedicineBatch';
 import { Shop } from '../models/Shop';
 import { calculateOrderEstimate } from './orderPricing';
+import { priceListForShop, resolvePriceFrom, type ResolvedPrice } from './pricingService';
 
 export type OrderInput = {
   items: Array<{ medicineId: string; requestedQuantity: number; shopNotes?: string }>;
@@ -55,14 +56,35 @@ export async function buildOrderSnapshot(shopId: Types.ObjectId, input: OrderInp
         code: 'QUANTITY_INVALID',
       });
   }
+  /*
+   * What this customer pays, and why.
+   *
+   * These two lines read `medicine.defaultSellingPriceMinor` and
+   * `shop.defaultDiscount` directly: one price for everybody, one percentage
+   * per customer, and no record of where either came from. `resolvePriceFrom`
+   * replaces both at the same point, and the important half is the **source**,
+   * which is snapshotted onto the line — a price that cannot say where it came
+   * from is a price nobody can defend, and disputes about price are the
+   * ordinary case in this trade.
+   *
+   * One list read for the whole order rather than one per line.
+   */
+  const priceList = await priceListForShop(shop);
+  const resolved = new Map<string, ResolvedPrice>(
+    input.items.map((item) => [
+      item.medicineId,
+      resolvePriceFrom(map.get(item.medicineId)!, shop, priceList),
+    ]),
+  );
+
   const priced = calculateOrderEstimate(
     input.items.map((item) => {
-      const medicine = map.get(item.medicineId)!;
+      const price = resolved.get(item.medicineId)!;
       return {
         medicineId: item.medicineId,
         quantity: item.requestedQuantity,
-        unitPriceMinor: medicine.defaultSellingPriceMinor,
-        discountPercent: shop.defaultDiscount,
+        unitPriceMinor: price.unitPriceMinor,
+        discountPercent: price.discountPercent,
         available: availableMap.get(item.medicineId) ?? 0,
       };
     }),
@@ -84,7 +106,12 @@ export async function buildOrderSnapshot(shopId: Types.ObjectId, input: OrderInp
         unit: medicine.unit,
       },
       requestedQuantity: item.requestedQuantity,
-      estimatedUnitPriceMinor: medicine.defaultSellingPriceMinor,
+      estimatedUnitPriceMinor: resolved.get(item.medicineId)!.unitPriceMinor,
+      // Where the price came from, on the line. A price change next month
+      // cannot rewrite what was ordered, and a dispute can be answered from
+      // the order rather than by reconstructing a list's history.
+      priceSource: resolved.get(item.medicineId)!.source,
+      priceListReference: resolved.get(item.medicineId)!.priceListReference,
       estimatedDiscountMinor: price.discountMinor,
       estimatedLineTotalMinor: price.lineTotalMinor,
       availableStockSnapshot: price.available,

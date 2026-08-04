@@ -290,15 +290,6 @@ function NavigationSearch({ items }: { items: NavItem[] }) {
   );
 }
 
-const ROLE_LABEL: Record<UserRole, string> = {
-  [UserRole.SUPER_ADMIN]: 'Super administrator',
-  [UserRole.ADMIN]: 'Administrator',
-  [UserRole.MANAGER]: 'Manager',
-  [UserRole.STOREKEEPER]: 'Storekeeper',
-  [UserRole.DELIVERY_PERSON]: 'Delivery person',
-  [UserRole.SHOP_OWNER]: 'Shop owner',
-};
-
 function AccountMenu({
   name,
   role,
@@ -334,7 +325,14 @@ function AccountMenu({
         >
           <DropdownMenu.Label className="px-3 py-2 text-xs text-text-muted">
             {/* The role in words. `dashboard.tsx` on mobile showed the raw enum. */}
-            {c.roles[role] ?? ROLE_LABEL[role]}
+            {/*
+              Was `c.roles[role] ?? ROLE_LABEL[role]`, with `ROLE_LABEL` a
+              second English copy of the same map living in this file. The
+              catalogue's is `Record<UserRole, string>` in both languages, so a
+              new role is a compile error there — which is exactly how the
+              fallback would have gone stale without anybody noticing.
+            */}
+            {c.roles[role]}
           </DropdownMenu.Label>
           <DropdownMenu.Item asChild>
             <Link

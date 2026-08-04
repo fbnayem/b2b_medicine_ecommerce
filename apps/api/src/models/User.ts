@@ -14,6 +14,15 @@ const userSchema = new mongoose.Schema(
       enum: Object.values(UserRole),
       required: true,
     },
+    /**
+     * The areas a sales representative carries, matched against `Shop.territory`.
+     *
+     * Empty means every territory, which is what every existing user has and
+     * what management needs. A rep with territories set can place an order only
+     * for a shop in one of them — checked in the service, not on the screen,
+     * because a filter a client applies is a filter a client can drop.
+     */
+    territories: { type: [String], default: [] },
     status: {
       type: String,
       enum: Object.values(UserStatus),

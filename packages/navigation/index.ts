@@ -85,7 +85,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     id: 'orders',
     label: 'Orders',
     path: '/orders',
-    roles: [...WAREHOUSE, UserRole.SHOP_OWNER],
+    // A rep works out of the order book; the list is scoped server-side.
+    roles: [...WAREHOUSE, UserRole.SALES, UserRole.SHOP_OWNER],
     group: 'work',
     icon: 'orders',
   },
@@ -93,7 +94,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     id: 'order-detail',
     label: 'Order',
     path: '/orders/:id',
-    roles: [...WAREHOUSE, UserRole.SHOP_OWNER],
+    roles: [...WAREHOUSE, UserRole.SALES, UserRole.SHOP_OWNER],
     group: 'work',
     icon: 'orders',
     hidden: true,
@@ -230,7 +231,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     id: 'medicines',
     label: 'Medicines',
     path: '/medicines',
-    roles: [...WAREHOUSE, UserRole.SHOP_OWNER],
+    roles: [...WAREHOUSE, UserRole.SALES, UserRole.SHOP_OWNER],
     group: 'catalogue',
     icon: 'catalogue',
   },
@@ -551,7 +552,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     id: 'shops',
     label: 'Shops',
     path: '/shops',
-    roles: MANAGEMENT,
+    // A rep sees their territory here; the list is scoped server-side.
+    roles: [...MANAGEMENT, UserRole.SALES],
     group: 'administration',
     icon: 'shops',
   },
@@ -559,7 +561,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     id: 'shop-detail',
     label: 'Shop',
     path: '/shops/:id',
-    roles: MANAGEMENT,
+    roles: [...MANAGEMENT, UserRole.SALES],
     group: 'administration',
     icon: 'shops',
     hidden: true,
@@ -704,6 +706,16 @@ export const MOBILE_TABS: Record<UserRole, MobileTabs> = {
   [UserRole.MANAGER]: ['dashboard', 'approvals', 'orders', 'payments', 'analytics'],
   [UserRole.STOREKEEPER]: ['dashboard', 'fulfilment', 'fulfilment-ready', 'inventory', 'returns'],
   [UserRole.DELIVERY_PERSON]: ['dashboard', 'deliveries', 'returns', 'notifications', 'security'],
+  /*
+   * A rep works out of the catalogue and the order book.
+   *
+   * **Placing an order is web-only for now, and that is stated rather than
+   * implied.** The mobile cart submits for the signed-in owner's own shop, so
+   * offering it to a rep would be a dead end — they would fill it and be told
+   * no shop is assigned to their account. Their territory's shops are on the
+   * web sidebar; the phone carries what already works.
+   */
+  [UserRole.SALES]: ['dashboard', 'medicines', 'orders', 'notifications', 'security'],
   [UserRole.SHOP_OWNER]: ['dashboard', 'medicines', 'cart', 'orders', 'shop-account'],
 };
 
@@ -714,6 +726,7 @@ export const LANDING_ROUTE: Record<UserRole, string> = {
   [UserRole.MANAGER]: '/dashboard',
   [UserRole.STOREKEEPER]: '/dashboard',
   [UserRole.DELIVERY_PERSON]: '/dashboard',
+  [UserRole.SALES]: '/dashboard',
   [UserRole.SHOP_OWNER]: '/dashboard',
 };
 

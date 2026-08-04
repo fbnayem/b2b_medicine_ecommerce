@@ -199,6 +199,15 @@ export const OrderItemInputSchema = z.object({
 });
 
 export const SaveOrderDraftSchema = z.object({
+  /**
+   * Which shop this order is for.
+   *
+   * Absent for a shop owner, who can only order for their own. Named by a
+   * sales representative or a manager placing it on somebody's behalf, and
+   * refused by the service if that actor may not act for that shop — a
+   * territory rule does not belong in a schema.
+   */
+  shopId: z.string().min(1).optional(),
   items: z.array(OrderItemInputSchema).min(1).max(100),
   deliveryAddressId: z.string().optional(),
   requestedPaymentMethod: z.nativeEnum(PaymentMethod).optional(),
