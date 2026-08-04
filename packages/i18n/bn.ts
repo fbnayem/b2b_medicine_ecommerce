@@ -228,6 +228,7 @@ export const bn: Catalogue = {
     manageStock: 'স্টক দেখুন',
     noBatches: 'এখনও কোনও স্টক আসেনি।',
     reserved: 'সংরক্ষিত',
+    packSize: 'প্যাকের আকার',
     location: 'কোথায় আছে',
   },
 
@@ -247,6 +248,10 @@ export const bn: Catalogue = {
     saveDraft: 'পরে শেষ করবেন',
     draftSaved: 'সংরক্ষণ হয়েছে। পরে এসে অর্ডারটি শেষ করতে পারবেন।',
     checkout: 'দেখে নিয়ে পাঠান',
+    addedToOrder: '{{brand}} আপনার অর্ডারে যোগ হয়েছে।',
+    draftFailed: 'সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।',
+    remove: 'সরান',
+    removed: '{{brand}} অর্ডার থেকে সরানো হয়েছে।',
   },
 
   checkout: {

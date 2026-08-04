@@ -1,90 +1,95 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { Medicine } from '@medsupply/shared-types';
+import type { Medicine } from '@medsupply/shared-types';
 import { apiClient } from '../../src/api/client';
 import { formatMoneyMinor } from '../../src/finance/money';
+import { useLanguage } from '../../src/i18n/useLanguage';
+import {
+  Card,
+  ErrorState,
+  ListRow,
+  LoadingState,
+  Screen,
+  SectionTitle,
+} from '../../src/components';
+import { colour, layout } from '../../src/theme';
 
 export default function MedicineDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t } = useLanguage();
   const [item, setItem] = useState<Medicine>();
   const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setError('');
+    try {
+      const response = await apiClient.get(`/inventory/medicines/${id}`);
+      setItem(response.data.data);
+    } catch {
+      setError(t('catalogue.couldNotLoadOne'));
+    }
+  }, [id, t]);
+
   useEffect(() => {
-    apiClient
-      .get(`/inventory/medicines/${id}`)
-      .then((response) => setItem(response.data.data))
-      .catch((caught: Error) => setError(caught.message));
-  }, [id]);
-  if (error)
+    void load();
+  }, [load]);
+
+  if (error) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
-      </View>
+      <Screen>
+        {/* This was a red line of text with nothing to press. */}
+        <ErrorState message={error} onRetry={() => void load()} />
+      </Screen>
     );
-  if (!item)
+  }
+
+  if (!item) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-        <Text>Loading details…</Text>
-      </View>
+      <Screen>
+        <LoadingState label={t('catalogue.loadingOne')} />
+      </Screen>
     );
+  }
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.reference}>
+    <Screen>
+      <Text style={{ color: colour.brand, fontSize: layout.fontSize.sm }}>
         {item.reference} · {item.sku}
       </Text>
-      <Text style={styles.heading}>
+      <Text style={{ fontSize: layout.fontSize['2xl'], fontWeight: '700', color: colour.text }}>
         {item.brandName} {item.strength}
       </Text>
-      <Text style={styles.sub}>
+      <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.base }}>
         {item.genericName} · {item.dosageForm}
       </Text>
-      <View style={styles.panel}>
-        {[
-          ['Manufacturer', item.manufacturer],
-          ['Pack size', item.packSize],
-          ['Category', item.category],
-          ['Classification', item.classification],
-          ['Cold chain', item.coldChain ? 'Required' : 'No'],
-          ['General availability', (item.totalAvailable ?? 0) > 0 ? 'Available' : 'Out of stock'],
-        ].map(([label, value]) => (
-          <View style={styles.detail} key={label}>
-            <Text style={styles.label}>{label}</Text>
-            <Text style={styles.value}>{value}</Text>
-          </View>
-        ))}
-        <Text style={styles.price}>{formatMoneyMinor(item.defaultSellingPriceMinor)}</Text>
-      </View>
-      {item.description ? <Text style={styles.description}>{item.description}</Text> : null}
-    </ScrollView>
+
+      <Card>
+        <SectionTitle>{t('catalogue.about')}</SectionTitle>
+        <ListRow label={t('catalogue.manufacturer')} value={item.manufacturer} />
+        <ListRow label={t('catalogue.packSize')} value={item.packSize} />
+        <ListRow label={t('catalogue.category')} value={item.category} />
+        <ListRow label={t('catalogue.classification')} value={item.classification} />
+        <ListRow
+          label={t('catalogue.coldChain')}
+          value={item.coldChain ? t('catalogue.yes') : t('catalogue.no')}
+        />
+        <ListRow
+          label={t('catalogue.availability')}
+          value={
+            (item.totalAvailable ?? 0) > 0 ? t('catalogue.available') : t('catalogue.outOfStock')
+          }
+        />
+        <ListRow
+          label={t('catalogue.yourPrice')}
+          value={formatMoneyMinor(item.defaultSellingPriceMinor)}
+          numeric
+        />
+      </Card>
+
+      {item.description ? (
+        <Text style={{ color: colour.text, lineHeight: 22 }}>{item.description}</Text>
+      ) : null}
+    </Screen>
   );
 }
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  content: { padding: 18 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  reference: { color: '#176b47', fontFamily: 'monospace' },
-  heading: { fontSize: 28, fontWeight: '800', color: '#17211b', marginTop: 8 },
-  sub: { color: '#607067', marginTop: 5, fontSize: 16 },
-  panel: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 18,
-    marginTop: 22,
-    borderWidth: 1,
-    borderColor: '#dce5df',
-  },
-  detail: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#edf1ee',
-  },
-  label: { color: '#718077' },
-  value: { fontWeight: '600', flex: 1, textAlign: 'right' },
-  price: { fontSize: 24, fontWeight: '800', color: '#126b45', marginTop: 20 },
-  description: { lineHeight: 22, marginTop: 18, color: '#3e4b44' },
-  error: { color: '#8b2525' },
-});

@@ -1,14 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { UserRole } from '@medsupply/shared-types';
 import type { Medicine } from '@medsupply/shared-types';
@@ -16,14 +7,32 @@ import { apiClient } from '../../../src/api/client';
 import { useCart } from '../../../src/store/useCart';
 import { useAuthStore } from '../../../src/store/useAuth';
 import { formatMoneyMinor } from '../../../src/finance/money';
+import { useLanguage } from '../../../src/i18n/useLanguage';
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Field,
+  Input,
+  LoadingState,
+  Screen,
+  toast,
+} from '../../../src/components';
+import { colour, layout } from '../../../src/theme';
+
 export default function MedicinesScreen() {
+  const { t } = useLanguage();
   const add = useCart((state) => state.add);
   const user = useAuthStore((state) => state.user);
+  const isOwner = user?.role === UserRole.SHOP_OWNER;
+
   const [items, setItems] = useState<Medicine[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+
   const load = useCallback(
     async (refresh = false) => {
       if (refresh) setRefreshing(true);
@@ -37,101 +46,131 @@ export default function MedicinesScreen() {
             })
           ).data.data,
         );
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'Unable to load medicines');
+      } catch {
+        setError(t('catalogue.couldNotLoad'));
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [search],
+    [search, t],
   );
+
   useEffect(() => {
     const timer = setTimeout(() => void load(), 300);
     return () => clearTimeout(timer);
   }, [load]);
-  if (loading)
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-        <Text>Loading medicines...</Text>
-      </View>
-    );
+
   return (
-    <View style={styles.screen}>
-      <TextInput
-        accessibilityLabel="Search medicines"
-        style={styles.search}
-        placeholder="Brand, generic, manufacturer or SKU"
-        value={search}
-        onChangeText={setSearch}
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item._id}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />
-        }
-        ListEmptyComponent={
-          <View style={styles.center}>
-            <Text>No medicines found.</Text>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.card}
-            onPress={() =>
-              router.push({ pathname: '/(protected)/medicine-detail', params: { id: item._id } })
-            }
-          >
-            <View style={styles.row}>
-              <Text style={styles.reference}>{item.reference}</Text>
-              <Text>{item.totalAvailable ? 'Available' : 'Out of stock'}</Text>
-            </View>
-            <Text style={styles.title}>
-              {item.brandName} {item.strength}
-            </Text>
-            <Text>
-              {item.genericName} / {item.dosageForm}
-            </Text>
-            <Text style={styles.muted}>
-              {item.manufacturer} / {item.packSize}
-            </Text>
-            <Text style={styles.price}>{formatMoneyMinor(item.defaultSellingPriceMinor)}</Text>
-            {user?.role === UserRole.SHOP_OWNER && (
-              <Pressable
-                style={styles.add}
-                disabled={!item.totalAvailable}
-                onPress={() => add(item)}
-              >
-                <Text style={styles.addText}>Add to cart</Text>
-              </Pressable>
-            )}
-          </Pressable>
-        )}
-      />
-    </View>
+    <Screen scroll={false}>
+      <Field label={t('catalogue.searchLabel')}>
+        <Input
+          label={t('catalogue.searchLabel')}
+          placeholder={t('catalogue.searchPlaceholder')}
+          value={search}
+          onChangeText={setSearch}
+        />
+      </Field>
+
+      {loading ? (
+        <LoadingState label={t('catalogue.loading')} />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => void load()} />
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={{ gap: layout.space[3], paddingBottom: layout.space[6] }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />
+          }
+          ListEmptyComponent={
+            <EmptyState title={t('catalogue.none')} description={t('catalogue.noneBody')} />
+          }
+          renderItem={({ item }) => {
+            const available = (item.totalAvailable ?? 0) > 0;
+            return (
+              <Card>
+                {/*
+                 * The row and the button are siblings, not nested.
+                 *
+                 * "Add to order" used to be a `Pressable` inside the card's own
+                 * `Pressable`, and React Native hands a touch to the deepest
+                 * responder — so while the button was *enabled* it worked, and
+                 * the moment it was disabled the tap fell through to the card
+                 * and navigated instead. Out of stock therefore meant "tapping
+                 * Add opens the medicine", which reads as the app ignoring you.
+                 */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.brandName} ${item.strength}`}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(protected)/medicine-detail',
+                      params: { id: item._id },
+                    })
+                  }
+                  style={{ minHeight: layout.minTapTarget, gap: layout.space[1] }}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      gap: layout.space[2],
+                    }}
+                  >
+                    <Text style={{ color: colour.brand, fontSize: layout.fontSize.sm }}>
+                      {item.reference}
+                    </Text>
+                    <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>
+                      {available ? t('catalogue.available') : t('catalogue.outOfStock')}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: layout.fontSize.lg,
+                      fontWeight: '600',
+                      color: colour.text,
+                    }}
+                  >
+                    {item.brandName} {item.strength}
+                  </Text>
+                  <Text style={{ color: colour.text }}>
+                    {item.genericName} · {item.dosageForm}
+                  </Text>
+                  <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>
+                    {item.manufacturer} · {item.packSize}
+                  </Text>
+                  <Text
+                    style={{
+                      marginTop: layout.space[1],
+                      fontSize: layout.fontSize.lg,
+                      fontWeight: '600',
+                      color: colour.brand,
+                      fontVariant: ['tabular-nums'],
+                    }}
+                  >
+                    {formatMoneyMinor(item.defaultSellingPriceMinor)}
+                  </Text>
+                </Pressable>
+
+                {isOwner ? (
+                  <Button
+                    label={t('catalogue.addToOrder')}
+                    disabled={!available}
+                    onPress={() => {
+                      add(item);
+                      // Nothing used to happen visibly, so the only way to know
+                      // the tap had registered was to open the cart.
+                      toast.success(t('cart.addedToOrder', { brand: item.brandName }));
+                    }}
+                  />
+                ) : null}
+              </Card>
+            );
+          }}
+        />
+      )}
+    </Screen>
   );
 }
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5', padding: 14 },
-  search: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#c8d5cd',
-    borderRadius: 10,
-    padding: 13,
-    marginBottom: 12,
-  },
-  card: { backgroundColor: '#fff', padding: 16, borderRadius: 13, marginBottom: 10 },
-  row: { flexDirection: 'row', justifyContent: 'space-between' },
-  reference: { color: '#126b45' },
-  title: { fontSize: 18, fontWeight: '700', marginTop: 8 },
-  muted: { color: '#718077', marginTop: 4 },
-  price: { fontSize: 17, fontWeight: '700', color: '#126b45', marginTop: 10 },
-  add: { backgroundColor: '#126b45', padding: 11, borderRadius: 8, marginTop: 12 },
-  addText: { color: '#fff', fontWeight: '700', textAlign: 'center' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  error: { color: '#8b2525', padding: 10 },
-});

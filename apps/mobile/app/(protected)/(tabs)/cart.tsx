@@ -1,11 +1,34 @@
-import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { FlatList, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { apiClient } from '../../../src/api/client';
 import { useCart } from '../../../src/store/useCart';
 import { formatMoneyMinor } from '../../../src/finance/money';
+import { useLanguage } from '../../../src/i18n/useLanguage';
+import {
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Input,
+  ListRow,
+  Screen,
+  toast,
+} from '../../../src/components';
+import { colour, layout } from '../../../src/theme';
+
 export default function CartScreen() {
+  const { t } = useLanguage();
   const { items, quantity, remove, draftId, recover } = useCart();
+  const [saving, setSaving] = useState(false);
+
+  const subtotalMinor = items.reduce(
+    (total, item) => total + item.medicine.defaultSellingPriceMinor * item.quantity,
+    0,
+  );
+
   async function save() {
+    setSaving(true);
     try {
       const body = {
         items: items.map((item) => ({
@@ -17,82 +40,114 @@ export default function CartScreen() {
         ? await apiClient.patch(`/orders/drafts/${draftId}`, body)
         : await apiClient.post('/orders/drafts', body);
       recover(items, response.data.data._id);
-      Alert.alert('Saved', 'Draft saved successfully.');
-    } catch (caught: unknown) {
-      Alert.alert(
-        'Unable to save',
-        (caught as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error
-          ?.message ?? 'Try again.',
-      );
+      toast.success(t('cart.draftSaved'));
+    } catch {
+      toast.error(t('cart.draftFailed'));
+    } finally {
+      setSaving(false);
     }
   }
+
   return (
-    <View style={styles.screen}>
+    <Screen scroll={false}>
       <FlatList
         data={items}
         keyExtractor={(item) => item.medicine._id}
+        contentContainerStyle={{ gap: layout.space[3], paddingBottom: layout.space[6] }}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.title}>Your cart is empty</Text>
-            <Pressable onPress={() => router.push('/(protected)/(tabs)/medicines')}>
-              <Text style={styles.link}>Browse medicines</Text>
-            </Pressable>
-          </View>
+          <EmptyState
+            title={t('cart.empty')}
+            description={t('cart.emptyBody')}
+            action={{
+              label: t('cart.browse'),
+              onPress: () => router.push('/(protected)/(tabs)/medicines'),
+            }}
+          />
         }
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.title}>
-              {item.medicine.brandName} {item.medicine.strength}
-            </Text>
-            <Text>{formatMoneyMinor(item.medicine.defaultSellingPriceMinor)} each</Text>
-            <TextInput
-              accessibilityLabel={`Quantity for ${item.medicine.brandName}`}
-              style={styles.input}
-              keyboardType="number-pad"
-              value={String(item.quantity)}
-              onChangeText={(value) => quantity(item.medicine._id, Number(value))}
-            />
-            <Pressable onPress={() => remove(item.medicine._id)}>
-              <Text style={styles.danger}>Remove</Text>
-            </Pressable>
-          </View>
-        )}
+        renderItem={({ item }) => {
+          const { medicine } = item;
+          const minimum = medicine.minimumOrderQuantity;
+          const maximum = medicine.maximumOrderQuantity;
+          return (
+            <Card>
+              <Text style={{ fontSize: layout.fontSize.lg, fontWeight: '600', color: colour.text }}>
+                {medicine.brandName} {medicine.strength}
+              </Text>
+
+              <Field
+                label={t('cart.quantityFor', { brand: medicine.brandName })}
+                hint={
+                  maximum
+                    ? t('cart.minimumAndMaximum', { minimum, maximum })
+                    : t('cart.minimum', { minimum })
+                }
+              >
+                <Input
+                  label={t('cart.quantityFor', { brand: medicine.brandName })}
+                  keyboardType="number-pad"
+                  value={String(item.quantity)}
+                  /*
+                   * Digits only, and clamped when the field is left.
+                   *
+                   * This was `Number(value)` straight into the store, so
+                   * clearing the field posted a quantity of 0 and any stray
+                   * character posted NaN — neither of which is a quantity, and
+                   * both of which reached the order draft.
+                   */
+                  onChangeText={(value) => {
+                    const digits = value.replace(/[^0-9]/g, '');
+                    quantity(medicine._id, digits ? Number(digits) : 0);
+                  }}
+                  onBlur={() => {
+                    if (item.quantity < minimum) quantity(medicine._id, minimum);
+                    else if (maximum && item.quantity > maximum) quantity(medicine._id, maximum);
+                  }}
+                />
+              </Field>
+
+              <ListRow
+                label={t('cart.unitPrice')}
+                value={formatMoneyMinor(medicine.defaultSellingPriceMinor)}
+                numeric
+              />
+              <ListRow
+                label={t('cart.lineTotal')}
+                value={formatMoneyMinor(medicine.defaultSellingPriceMinor * item.quantity)}
+                numeric
+              />
+
+              <Button
+                variant="secondary"
+                label={t('cart.remove')}
+                onPress={() => {
+                  remove(medicine._id);
+                  toast.success(t('cart.removed', { brand: medicine.brandName }));
+                }}
+              />
+            </Card>
+          );
+        }}
       />
-      {items.length > 0 && (
-        <View style={styles.actions}>
-          <Pressable style={styles.secondary} onPress={() => void save()}>
-            <Text>Save draft</Text>
-          </Pressable>
-          <Pressable style={styles.primary} onPress={() => router.push('/(protected)/checkout')}>
-            <Text style={styles.primaryText}>Checkout</Text>
-          </Pressable>
+
+      {items.length > 0 ? (
+        <View style={{ gap: layout.space[2], paddingTop: layout.space[2] }}>
+          <ListRow label={t('cart.subtotal')} value={formatMoneyMinor(subtotalMinor)} numeric />
+          <View style={{ flexDirection: 'row', gap: layout.space[2] }}>
+            <Button
+              variant="secondary"
+              style={{ flex: 1 }}
+              busy={saving}
+              label={t('cart.saveDraft')}
+              onPress={() => void save()}
+            />
+            <Button
+              style={{ flex: 1 }}
+              label={t('cart.checkout')}
+              onPress={() => router.push('/(protected)/checkout')}
+            />
+          </View>
         </View>
-      )}
-    </View>
+      ) : null}
+    </Screen>
   );
 }
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5', padding: 14 },
-  card: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 10 },
-  title: { fontWeight: '700', fontSize: 17 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#bdcbc2',
-    borderRadius: 8,
-    padding: 9,
-    marginVertical: 10,
-  },
-  danger: { color: '#9b2929' },
-  empty: { alignItems: 'center', padding: 40, gap: 12 },
-  link: { color: '#126b45', fontWeight: '700' },
-  actions: { flexDirection: 'row', gap: 10 },
-  primary: { flex: 1, backgroundColor: '#126b45', padding: 14, borderRadius: 9 },
-  primaryText: { color: '#fff', fontWeight: '700', textAlign: 'center' },
-  secondary: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 9,
-    alignItems: 'center',
-  },
-});

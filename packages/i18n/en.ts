@@ -256,6 +256,7 @@ export const en = {
     manageStock: 'Manage stock',
     noBatches: 'No stock has been received yet.',
     reserved: 'Reserved',
+    packSize: 'Pack size',
     location: 'Where it is',
   },
 
@@ -275,6 +276,10 @@ export const en = {
     saveDraft: 'Save for later',
     draftSaved: 'Saved. You can come back to this order later.',
     checkout: 'Review and send',
+    addedToOrder: '{{brand}} added to your order.',
+    draftFailed: 'That could not be saved. Try again.',
+    remove: 'Remove',
+    removed: '{{brand}} removed from your order.',
   },
 
   checkout: {

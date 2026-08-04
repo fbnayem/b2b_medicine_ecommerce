@@ -1,86 +1,112 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import type { Order } from '@medsupply/shared-types';
+import { errorMessage } from '@medsupply/api-client';
 import { apiClient } from '../../src/api/client';
 import { ActivityTimelineView } from '../../src/notifications/ActivityTimelineView';
 import { formatMoneyMinor } from '../../src/finance/money';
 import { formatFinanceDateTime } from '../../src/finance/date';
+import { useLanguage } from '../../src/i18n/useLanguage';
+import {
+  Card,
+  ErrorState,
+  ListRow,
+  LoadingState,
+  Screen,
+  SectionTitle,
+  StatusPill,
+} from '../../src/components';
+import { colour, layout } from '../../src/theme';
+
 export default function OrderDetailScreen() {
   const { id, submitted } = useLocalSearchParams<{ id: string; submitted?: string }>();
+  const { t, language } = useLanguage();
   const [order, setOrder] = useState<Order>();
   const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setError('');
+    try {
+      const response = await apiClient.get(`/orders/${id}`);
+      setOrder(response.data.data);
+    } catch (caught) {
+      setError(errorMessage(caught, language, t('orders.couldNotLoadOne')));
+    }
+  }, [id, language, t]);
+
   useEffect(() => {
-    apiClient
-      .get(`/orders/${id}`)
-      .then((response) => setOrder(response.data.data))
-      .catch(() => setError('Unable to load order.'));
-  }, [id]);
-  if (!order && !error)
+    void load();
+  }, [load]);
+
+  if (error) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-      </View>
+      <Screen>
+        <ErrorState message={error} onRetry={() => void load()} />
+      </Screen>
     );
-  if (error)
+  }
+
+  if (!order) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
-      </View>
+      <Screen>
+        <LoadingState label={t('orders.loadingOne')} />
+      </Screen>
     );
+  }
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      {submitted ? <Text style={styles.success}>Order submitted successfully</Text> : null}
-      <Text style={styles.reference}>{order!.reference}</Text>
-      <Text style={styles.heading}>{order!.status.replaceAll('_', ' ')}</Text>
-      <View style={styles.panel}>
-        {order!.items.map((item) => (
-          <View style={styles.row} key={item.medicineId}>
-            <View>
-              <Text style={styles.title}>{item.medicineSnapshot.brandName}</Text>
-              <Text>
-                {item.requestedQuantity} x {formatMoneyMinor(item.estimatedUnitPriceMinor)}
-              </Text>
-            </View>
-            <Text style={styles.title}>{formatMoneyMinor(item.estimatedLineTotalMinor)}</Text>
-          </View>
+    <Screen>
+      {submitted ? (
+        <View
+          accessible
+          accessibilityRole="alert"
+          style={{
+            backgroundColor: colour.brandSubtle,
+            borderRadius: layout.radius.md,
+            padding: layout.space[3],
+          }}
+        >
+          <Text style={{ color: colour.text, fontWeight: '600' }}>{t('orders.submitted')}</Text>
+        </View>
+      ) : null}
+
+      <Text style={{ color: colour.brand, fontSize: layout.fontSize.sm }}>{order.reference}</Text>
+      <StatusPill kind="order" status={order.status} />
+
+      <Card>
+        <SectionTitle>{t('orders.whatYouOrdered')}</SectionTitle>
+        {order.items.map((item) => (
+          <ListRow
+            key={item.medicineId}
+            label={`${item.medicineSnapshot.brandName} × ${item.requestedQuantity}`}
+            value={formatMoneyMinor(item.estimatedLineTotalMinor)}
+            numeric
+          />
         ))}
-        <View style={styles.row}>
-          <Text style={styles.title}>Estimated total</Text>
-          <Text style={styles.title}>{formatMoneyMinor(order!.estimatedTotalMinor)}</Text>
-        </View>
-      </View>
-      <Text style={styles.heading}>Status timeline</Text>
-      {order!.statusHistory.map((entry, index) => (
-        <View style={styles.timeline} key={`${entry.to}-${index}`}>
-          <Text style={styles.title}>{entry.to.replaceAll('_', ' ')}</Text>
-          <Text>{formatFinanceDateTime(entry.at)}</Text>
-        </View>
-      ))}
+        <ListRow
+          label={t('orders.estimatedTotal')}
+          value={formatMoneyMinor(order.estimatedTotalMinor)}
+          numeric
+        />
+      </Card>
+
+      <Card>
+        <SectionTitle>{t('orders.timeline')}</SectionTitle>
+        {order.statusHistory.map((entry, index) => (
+          <ListRow
+            key={`${entry.to}-${index}`}
+            label={formatFinanceDateTime(entry.at)}
+            value={<StatusPill kind="order" status={entry.to} />}
+          />
+        ))}
+      </Card>
+
       <ActivityTimelineView
         entityType="Order"
-        entityId={String(order!._id)}
-        title="Order activity"
+        entityId={String(order._id)}
+        title={t('orders.activity')}
       />
-    </ScrollView>
+    </Screen>
   );
 }
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  content: { padding: 16 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  success: { backgroundColor: '#e6f7ed', color: '#126b45', padding: 12, borderRadius: 9 },
-  reference: { color: '#126b45', marginTop: 18 },
-  heading: { fontSize: 23, fontWeight: '800', marginVertical: 10 },
-  panel: { backgroundColor: '#fff', padding: 15, borderRadius: 12 },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#edf1ee',
-  },
-  title: { fontWeight: '700' },
-  timeline: { backgroundColor: '#fff', padding: 13, borderRadius: 9, marginBottom: 8 },
-  error: { color: '#8b2525' },
-});
