@@ -1,133 +1,146 @@
-import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { useParams } from 'react-router-dom';
 import { UserRole } from '@medsupply/shared-types';
 import type { Medicine, MedicineBatch } from '@medsupply/shared-types';
-import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
-import './inventory.css';
+import {
+  Card,
+  DataTable,
+  EmptyState,
+  LinkButton,
+  PageHeader,
+  Resource,
+  type Column,
+} from '../components/ui';
+import { useApiCollection, useApiResource } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
+
+/** A label and its value, so the detail lists on every page line up the same way. */
+function Detail({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border py-2 last:border-b-0">
+      <dt className="text-sm text-text-muted">{label}</dt>
+      <dd className="text-text">{children}</dd>
+    </div>
+  );
+}
 
 export function MedicineDetail() {
   const { id } = useParams();
+  const { t } = useLanguage();
   const user = useAuthStore((state) => state.user);
-  const [medicine, setMedicine] = useState<Medicine>();
-  const [batches, setBatches] = useState<MedicineBatch[]>([]);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
   const canSeeStock = user?.role !== UserRole.SHOP_OWNER;
-  async function load() {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await apiClient.get(`/inventory/medicines/${id}`);
-      setMedicine(response.data.data);
-      if (canSeeStock)
-        setBatches(
-          (await apiClient.get('/inventory/batches', { params: { medicineId: id } })).data.data,
-        );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to load medicine');
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => {
-    void load();
-  }, [id]);
-  if (loading)
-    return (
-      <main className="inventory-page">
-        <section className="state">Loading medicine…</section>
-      </main>
-    );
-  if (error || !medicine)
-    return (
-      <main className="inventory-page">
-        <section className="state error">
-          <p>{error || 'Medicine not found'}</p>
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      </main>
-    );
+
+  const medicine = useApiResource<Medicine>(['medicine', id], `/inventory/medicines/${id}`);
+  const batches = useApiCollection<MedicineBatch>(
+    ['medicine-batches', id],
+    `/inventory/batches?medicineId=${id}`,
+    { enabled: canSeeStock },
+  );
+
+  const batchColumns: ReadonlyArray<Column<MedicineBatch>> = [
+    // The batch *number* printed on the carton, never the database id: that is
+    // what a storekeeper can read off the box in front of them.
+    { key: 'batch', header: t('fields.batch'), cell: (batch) => batch.batchNumber },
+    {
+      key: 'expiry',
+      header: t('fields.expiry'),
+      cell: (batch) => formatFinanceDate(batch.expiryDate),
+    },
+    {
+      key: 'available',
+      header: t('catalogue.available'),
+      numeric: true,
+      cell: (batch) => batch.quantities.available,
+    },
+    {
+      key: 'reserved',
+      header: t('catalogue.reserved'),
+      numeric: true,
+      cell: (batch) => batch.quantities.reserved,
+    },
+    {
+      key: 'location',
+      header: t('catalogue.location'),
+      cell: (batch) => batch.warehouseLocation,
+    },
+  ];
+
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">
-            {medicine.reference} · {medicine.sku}
-          </p>
-          <h1>
-            {medicine.brandName} {medicine.strength}
-          </h1>
-          <p>
-            {medicine.genericName} · {medicine.dosageForm} · {medicine.packSize}
-          </p>
-        </div>
-        <Link className="secondary-button" to="/medicines">
-          Back to catalogue
-        </Link>
-      </header>
-      <section className="detail-grid">
-        <article className="panel">
-          <h2>Product details</h2>
-          <dl>
-            <dt>Manufacturer</dt>
-            <dd>{medicine.manufacturer}</dd>
-            <dt>Category</dt>
-            <dd>{medicine.category}</dd>
-            <dt>Classification</dt>
-            <dd>{medicine.classification}</dd>
-            <dt>Cold chain</dt>
-            <dd>{medicine.coldChain ? 'Required' : 'No'}</dd>
-            <dt>Order limits</dt>
-            <dd>
-              {medicine.minimumOrderQuantity}–{medicine.maximumOrderQuantity ?? 'No maximum'}{' '}
-              {medicine.unit}
-            </dd>
-            <dt>Selling price</dt>
-            <dd>{formatMinor(medicine.defaultSellingPriceMinor)}</dd>
-            <dt>Availability</dt>
-            <dd>{(medicine.totalAvailable ?? 0) > 0 ? 'Available' : 'Out of stock'}</dd>
-          </dl>
-          <p>{medicine.description}</p>
-        </article>
-        {canSeeStock && (
-          <article className="panel">
-            <div className="panel-heading">
-              <h2>Batches</h2>
-              <Link to="/inventory">Manage inventory</Link>
+    <main>
+      <Resource
+        query={medicine}
+        loadingLabel={t('catalogue.loadingOne')}
+        errorMessageFallback={t('catalogue.couldNotLoadOne')}
+      >
+        {(item) => (
+          <>
+            <PageHeader
+              routeId="medicine-detail"
+              title={`${item.brandName} ${item.strength}`}
+              description={`${item.genericName} · ${item.dosageForm} · ${item.packSize}`}
+              actions={<LinkButton to="/medicines">{t('catalogue.back')}</LinkButton>}
+            />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <h2 className="mb-2 text-lg font-semibold text-text">{t('catalogue.about')}</h2>
+                <dl className="m-0">
+                  <Detail label={t('common.reference')}>
+                    {item.reference} · {item.sku}
+                  </Detail>
+                  <Detail label={t('catalogue.manufacturer')}>{item.manufacturer}</Detail>
+                  <Detail label={t('catalogue.category')}>{item.category}</Detail>
+                  <Detail label={t('catalogue.classification')}>{item.classification}</Detail>
+                  <Detail label={t('catalogue.coldChain')}>
+                    {item.coldChain ? t('catalogue.yes') : t('catalogue.no')}
+                  </Detail>
+                  <Detail label={t('catalogue.orderLimits')}>
+                    {item.minimumOrderQuantity}–
+                    {item.maximumOrderQuantity ?? t('catalogue.noMaximum')} {item.unit}
+                  </Detail>
+                  <Detail label={t('catalogue.yourPrice')}>
+                    {formatMinor(item.defaultSellingPriceMinor)}
+                  </Detail>
+                  <Detail label={t('catalogue.availability')}>
+                    {(item.totalAvailable ?? 0) > 0
+                      ? t('catalogue.available')
+                      : t('catalogue.outOfStock')}
+                  </Detail>
+                </dl>
+                {item.description && <p className="mt-3 text-text-muted">{item.description}</p>}
+              </Card>
+
+              {canSeeStock && (
+                <Card>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <h2 className="text-lg font-semibold text-text">{t('catalogue.batches')}</h2>
+                    <LinkButton size="sm" to="/inventory">
+                      {t('catalogue.manageStock')}
+                    </LinkButton>
+                  </div>
+                  <Resource
+                    query={batches}
+                    loadingLabel={t('catalogue.batches')}
+                    errorMessageFallback={t('lists.couldNotLoad')}
+                    empty={<EmptyState title={t('catalogue.noBatches')} />}
+                  >
+                    {(page) => (
+                      <DataTable
+                        caption={t('catalogue.batches')}
+                        columns={batchColumns}
+                        rows={page.items}
+                        rowKey={(batch) => batch._id}
+                        rowTest={(batch) => batch.batchNumber}
+                      />
+                    )}
+                  </Resource>
+                </Card>
+              )}
             </div>
-            {batches.length === 0 ? (
-              <p className="muted">No stock has been received.</p>
-            ) : (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Batch</th>
-                      <th>Expiry</th>
-                      <th>Available</th>
-                      <th>Reserved</th>
-                      <th>Location</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {batches.map((batch) => (
-                      <tr key={batch._id}>
-                        <td>{batch.batchNumber}</td>
-                        <td>{formatFinanceDate(batch.expiryDate)}</td>
-                        <td>{batch.quantities.available}</td>
-                        <td>{batch.quantities.reserved}</td>
-                        <td>{batch.warehouseLocation}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </article>
+          </>
         )}
-      </section>
+      </Resource>
     </main>
   );
 }

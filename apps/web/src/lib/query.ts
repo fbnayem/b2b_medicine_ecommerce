@@ -77,10 +77,14 @@ export interface Collection<T> {
 /**
  * A list, tolerating both response shapes the API actually returns.
  *
- * Paginated endpoints answer `{ items, total, page, limit }` while older ones
- * answer `{ data: [...] }` — `orderController` and `returnController` disagree
- * about this today. Normalising here means a page never has to know which kind
- * it is talking to.
+ * The API answers a list in three shapes. Some endpoints send
+ * `{ items, total, page, limit }`, some send `{ data: [...] }` with nothing
+ * else, and some send `{ data: [...], meta: { page, limit, total, pages } }` —
+ * `orderController`, `returnController` and `activityService` disagree about
+ * this today. Normalising here means a page never has to know which kind it is
+ * talking to, and in particular that **a page cannot silently lose its
+ * pagination** by reading `total` from the wrong place and getting the length
+ * of the current page back.
  *
  * This hides an inconsistency rather than fixing it. The real repair is
  * server-side, and it belongs with the API work rather than with a UI phase;
@@ -100,11 +104,14 @@ export function useApiCollection<T>(
         : Array.isArray(payload.data)
           ? (payload.data as T[])
           : [];
+      const meta = (payload.meta ?? payload) as Record<string, unknown>;
+      const number = (value: unknown, fallback: number) =>
+        typeof value === 'number' ? value : fallback;
       return {
         items,
-        total: typeof payload.total === 'number' ? payload.total : items.length,
-        page: typeof payload.page === 'number' ? payload.page : 1,
-        limit: typeof payload.limit === 'number' ? payload.limit : items.length,
+        total: number(meta.total, items.length),
+        page: number(meta.page, 1),
+        limit: number(meta.limit, items.length),
       };
     },
     ...options,

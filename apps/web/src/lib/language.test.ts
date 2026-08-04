@@ -40,6 +40,11 @@ describe('the Bangla catalogue', () => {
 
     expect(untranslated, `these are still in English: ${untranslated.join(', ')}`).toEqual([
       'common.appName',
+      // A worked example of a document reference. References are ASCII with
+      // Western digits by rule — `AGENTS.md` fixes the `RET-2026-000001` shape
+      // — so translating this placeholder would show somebody a pattern they
+      // will never see on a real document.
+      'returns.referenceHint',
     ]);
   });
 

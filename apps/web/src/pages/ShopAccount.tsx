@@ -1,7 +1,20 @@
-import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { FinanceSummaryCards } from '../components/FinanceSummaryCards';
+import {
+  Button,
+  Card,
+  DataTable,
+  EmptyState,
+  LinkButton,
+  PageHeader,
+  Resource,
+  StatusPill,
+  toast,
+  type Column,
+} from '../components/ui';
+import { useApiCollection, useApiResource } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatFinanceDateTime, formatMinor } from '../lib/finance';
 import {
   invoiceDue,
@@ -9,37 +22,16 @@ import {
   type FinanceInvoiceSummary,
   type FinancePayment,
 } from './financeTypes';
-import './inventory.css';
 
 export function ShopAccount() {
-  const [summary, setSummary] = useState<AccountSummary>();
-  const [invoices, setInvoices] = useState<FinanceInvoiceSummary[]>([]);
-  const [payments, setPayments] = useState<FinancePayment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { t } = useLanguage();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [summaryResponse, invoiceResponse, paymentResponse] = await Promise.all([
-        apiClient.get('/finance/my/summary'),
-        apiClient.get('/finance/my/invoices'),
-        apiClient.get('/payments', { params: { page: 1, limit: 10 } }),
-      ]);
-      setSummary(summaryResponse.data.data as AccountSummary);
-      setInvoices(invoiceResponse.data.data as FinanceInvoiceSummary[]);
-      setPayments(paymentResponse.data.data as FinancePayment[]);
-      setError('');
-    } catch {
-      setError('Unable to load your financial account.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const summary = useApiResource<AccountSummary>(['my-finance-summary'], '/finance/my/summary');
+  const invoices = useApiCollection<FinanceInvoiceSummary>(['my-invoices'], '/finance/my/invoices');
+  const payments = useApiCollection<FinancePayment>(
+    ['my-payments', 1],
+    '/payments?page=1&limit=10',
+  );
 
   async function openInvoice(invoiceId: string) {
     try {
@@ -51,118 +43,144 @@ export function ShopAccount() {
       window.open(url, '_blank', 'noopener,noreferrer');
       window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
     } catch {
-      setError('Unable to open this invoice PDF.');
+      toast.error(t('account.pdfFailed'));
     }
   }
 
+  const invoiceColumns: ReadonlyArray<Column<FinanceInvoiceSummary>> = [
+    { key: 'reference', header: t('account.document'), cell: (invoice) => invoice.reference },
+    {
+      key: 'issued',
+      header: t('account.invoiceDate'),
+      cell: (invoice) => formatFinanceDate(invoice.invoiceDate),
+    },
+    {
+      key: 'due',
+      header: t('fields.dueDate'),
+      cell: (invoice) => formatFinanceDate(invoice.dueDate),
+    },
+    {
+      key: 'total',
+      header: t('fields.total'),
+      numeric: true,
+      cell: (invoice) => formatMinor(invoice.grandTotalMinor),
+    },
+    {
+      key: 'remaining',
+      header: t('account.remaining'),
+      numeric: true,
+      cell: (invoice) => <strong>{formatMinor(invoiceDue(invoice))}</strong>,
+    },
+    {
+      key: 'pdf',
+      header: '',
+      label: '',
+      cell: (invoice) => (
+        <Button
+          size="sm"
+          label={`${t('account.openPdf')} ${invoice.reference}`}
+          onClick={() => void openInvoice(invoice._id)}
+        >
+          {t('account.openPdf')}
+        </Button>
+      ),
+    },
+  ];
+
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Your account</p>
-          <h1>Account and credit</h1>
-          <p>Invoices, payments, outstanding balance and available credit.</p>
-        </div>
-        <div className="actions">
-          <Link className="secondary-button" to="/account/payments">
-            Payment history
-          </Link>
-          <Link className="primary-button" to="/account/statement">
-            Account statement
-          </Link>
-        </div>
-      </header>
-      {error ? (
-        <section className="state error" role="alert">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
-      {loading ? (
-        <section className="state">Loading your account...</section>
-      ) : summary ? (
-        <>
-          <FinanceSummaryCards summary={summary} />
-          <section className="detail-grid">
-            <article className="panel">
-              <div className="panel-heading">
-                <h2>Invoices</h2>
-                <span>{invoices.length}</span>
-              </div>
-              {invoices.length === 0 ? (
-                <div className="state">No invoices have been issued.</div>
-              ) : (
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Invoice</th>
-                        <th>Date</th>
-                        <th>Due date</th>
-                        <th>Total</th>
-                        <th>Remaining</th>
-                        <th>Document</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {invoices.map((invoice) => (
-                        <tr key={invoice._id}>
-                          <td>{invoice.reference}</td>
-                          <td>{formatFinanceDate(invoice.invoiceDate)}</td>
-                          <td>{formatFinanceDate(invoice.dueDate)}</td>
-                          <td>{formatMinor(invoice.grandTotalMinor)}</td>
-                          <td>
-                            <strong>{formatMinor(invoiceDue(invoice))}</strong>
-                          </td>
-                          <td>
-                            <button
-                              className="secondary-button"
-                              onClick={() => void openInvoice(invoice._id)}
-                            >
-                              PDF
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </article>
-            <article className="panel">
-              <div className="panel-heading">
-                <h2>Recent payments</h2>
-                <Link to="/account/payments">View all</Link>
-              </div>
-              {payments.length === 0 ? (
-                <div className="state">No payments recorded yet.</div>
-              ) : (
-                <ol className="movement-list">
-                  {payments.map((payment) => (
-                    <li key={payment._id}>
-                      <div>
-                        <Link to={`/account/payments/${payment._id}`}>
-                          <strong>{payment.reference}</strong>
-                        </Link>
-                        <span>{payment.method.replaceAll('_', ' ')}</span>
-                        <small>
-                          {formatFinanceDateTime(
-                            payment.collectionTime ?? payment.collectedAt ?? payment.createdAt,
-                          )}
-                        </small>
-                      </div>
-                      <div>
-                        <strong>{formatMinor(payment.amountMinor)}</strong>
-                        <small>{payment.status}</small>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </article>
-          </section>
-        </>
-      ) : null}
+    <main>
+      <PageHeader
+        routeId="shop-account"
+        title={t('account.title')}
+        description={t('account.subtitle')}
+        actions={
+          <>
+            <LinkButton to="/account/payments">{t('account.paymentHistory')}</LinkButton>
+            <LinkButton variant="primary" to="/account/statement">
+              {t('account.statement')}
+            </LinkButton>
+          </>
+        }
+      />
+
+      <Resource
+        query={summary}
+        loadingLabel={t('account.loading')}
+        errorMessageFallback={t('account.couldNotLoad')}
+      >
+        {(data) => <FinanceSummaryCards summary={data} />}
+      </Resource>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Card>
+          <h2 className="mb-2 text-lg font-semibold text-text">{t('account.invoices')}</h2>
+          <Resource
+            query={invoices}
+            loadingLabel={t('account.invoices')}
+            errorMessageFallback={t('account.couldNotLoad')}
+            empty={<EmptyState title={t('account.noInvoices')} />}
+          >
+            {(page) => (
+              <DataTable
+                caption={t('account.invoices')}
+                columns={invoiceColumns}
+                rows={page.items}
+                rowKey={(invoice) => invoice._id}
+                rowTest={(invoice) => invoice.reference}
+              />
+            )}
+          </Resource>
+        </Card>
+
+        <Card>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-text">{t('account.recentPayments')}</h2>
+            <Link className="text-brand underline" to="/account/payments">
+              {t('account.viewAll')}
+            </Link>
+          </div>
+          <Resource
+            query={payments}
+            loadingLabel={t('account.recentPayments')}
+            errorMessageFallback={t('account.couldNotLoad')}
+            empty={<EmptyState title={t('account.noPayments')} />}
+          >
+            {(page) => (
+              <ul className="m-0 list-none p-0">
+                {page.items.map((payment) => (
+                  <li
+                    key={payment._id}
+                    className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border py-2 last:border-b-0"
+                  >
+                    <div>
+                      <Link
+                        className="font-medium text-brand underline"
+                        to={`/account/payments/${payment._id}`}
+                      >
+                        {payment.reference}
+                      </Link>
+                      <p className="text-sm text-text-muted">
+                        {t(`paymentMethod.${payment.method}`)} ·{' '}
+                        {formatFinanceDateTime(
+                          payment.collectionTime ?? payment.collectedAt ?? payment.createdAt,
+                        )}
+                      </p>
+                    </div>
+                    <div className="text-end">
+                      <strong className="tabular-nums text-text">
+                        {formatMinor(payment.amountMinor)}
+                      </strong>
+                      <p className="mt-1">
+                        <StatusPill kind="payment" status={payment.status} />
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Resource>
+        </Card>
+      </div>
     </main>
   );
 }

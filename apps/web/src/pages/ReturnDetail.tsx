@@ -1,19 +1,35 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { ActivityEntityType, RealtimeEvent, ReturnStatus, UserRole } from '@medsupply/shared-types';
-import { apiClient } from '../api/client';
+import { apiClient, errorMessage } from '../api/client';
 import { ActivityTimeline } from '../components/ActivityTimeline';
 import { useAuthStore } from '../store/useAuth';
 import { useRealtimeEvent } from '../realtime/useRealtime';
+import {
+  Button,
+  Card,
+  DataTable,
+  Field,
+  Input,
+  LinkButton,
+  PageHeader,
+  Resource,
+  StatusPill,
+  Textarea,
+  requireReason,
+  toast,
+  useAsk,
+  type Column,
+} from '../components/ui';
+import { useApiResource } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import {
   createActionKey,
   formatFinanceDate,
   formatFinanceDateTime,
   formatMinor,
 } from '../lib/finance';
-import { statusLabel } from './returnLabels';
-import './inventory.css';
-import { requireReason, useAsk } from '../components/ui';
 
 interface DetailLine {
   medicineId: string;
@@ -63,598 +79,672 @@ interface ReturnDetailData {
   creditNote?: { _id: string; reference: string; totalMinor: number; issuedAt: string };
 }
 
-type DecisionDraft = Record<string, string>;
-type ReceiptDraft = Record<
-  string,
-  { restock: string; damaged: string; expired: string; quarantined: string }
->;
+type ReceiptEntry = { restock: string; damaged: string; expired: string; quarantined: string };
 
 const lineId = (line: DetailLine) => `${line.medicineId}:${line.batchId}`;
 const number = (value: string) => Math.max(0, Math.trunc(Number(value) || 0));
-
 const MANAGEMENT: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER];
+const EMPTY_RECEIPT: ReceiptEntry = { restock: '0', damaged: '0', expired: '0', quarantined: '0' };
+
+/** A figure with its name above it, used for the four credit totals. */
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <Card>
+      <p className="text-sm text-text-muted">{label}</p>
+      <p className="text-xl font-semibold tabular-nums text-text">{value}</p>
+    </Card>
+  );
+}
 
 export function ReturnDetail() {
   const ask = useAsk();
   const { id = '' } = useParams();
+  const { t, language } = useLanguage();
   const role = useAuthStore((state) => state.user?.role);
-  const [record, setRecord] = useState<ReturnDetailData | null>(null);
-  const [decision, setDecision] = useState<DecisionDraft>({});
-  const [receipt, setReceipt] = useState<ReceiptDraft>({});
+  const queryClient = useQueryClient();
+
+  const query = useApiResource<ReturnDetailData>(['return', id], `/returns/${id}`);
+  const record = query.data;
+
+  const [decision, setDecision] = useState<Record<string, string>>({});
+  const [receipt, setReceipt] = useState<Record<string, ReceiptEntry>>({});
   const [reviewNotes, setReviewNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
-  const [status, setStatus] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.get(`/returns/${id}`);
-      const data = response.data.data as ReturnDetailData;
-      setRecord(data);
-      setDecision(
-        Object.fromEntries(
-          data.lines.map((line) => [
-            lineId(line),
-            String(line.approvedQuantity || line.requestedQuantity),
-          ]),
-        ),
-      );
-      setReceipt(
-        Object.fromEntries(
-          data.lines.map((line) => [
-            lineId(line),
-            {
-              restock: String(
-                line.restockQuantity || (line.receivedQuantity ? 0 : line.approvedQuantity),
-              ),
-              damaged: String(line.damagedQuantity || 0),
-              expired: String(line.expiredQuantity || 0),
-              quarantined: String(line.quarantinedQuantity || 0),
-            },
-          ]),
-        ),
-      );
-      setError('');
-    } catch (caught) {
-      const failure = caught as { response?: { status?: number } };
-      setError(
-        failure.response?.status === 403
-          ? 'You do not have access to this return.'
-          : failure.response?.status === 404
-            ? 'This return no longer exists.'
-            : 'Unable to load this return.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
+  // The editable quantities are seeded from the server's answer and then owned
+  // locally, so a background revalidation cannot overwrite figures a reviewer
+  // is halfway through typing.
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!record) return;
+    setDecision(
+      Object.fromEntries(
+        record.lines.map((line) => [
+          lineId(line),
+          String(line.approvedQuantity || line.requestedQuantity),
+        ]),
+      ),
+    );
+    setReceipt(
+      Object.fromEntries(
+        record.lines.map((line) => [
+          lineId(line),
+          {
+            restock: String(
+              line.restockQuantity || (line.receivedQuantity ? 0 : line.approvedQuantity),
+            ),
+            damaged: String(line.damagedQuantity || 0),
+            expired: String(line.expiredQuantity || 0),
+            quarantined: String(line.quarantinedQuantity || 0),
+          },
+        ]),
+      ),
+    );
+  }, [record]);
 
   useRealtimeEvent<{ entityId?: string }>(RealtimeEvent.RETURN_UPDATED, (payload) => {
-    if (!payload?.entityId || payload.entityId === id) void load();
+    if (!payload?.entityId || payload.entityId === id) {
+      void queryClient.invalidateQueries({ queryKey: ['return', id] });
+    }
   });
 
-  async function act(action: string, body: Record<string, unknown>, successMessage: string) {
+  async function act(action: string, body: Record<string, unknown>, done: string) {
     if (!record) return;
     setBusy(action);
-    setStatus('');
     try {
       await apiClient.post(`/returns/${record._id}/${action}`, {
         version: record.version,
         idempotencyKey: createActionKey(`return-${action}`),
         ...body,
       });
-      setStatus(successMessage);
-      setError('');
-      await load();
+      await queryClient.invalidateQueries({ queryKey: ['return', id] });
+      toast.success(done);
     } catch (caught) {
-      const failure = caught as {
-        response?: { data?: { error?: { message?: string; code?: string } } };
-      };
-      const code = failure.response?.data?.error?.code;
-      // Reload first: `load` clears the error on success, so setting the
-      // message afterwards is what keeps the explanation on screen.
-      if (code === 'STALE_RETURN') await load();
-      setError(
-        code === 'STALE_RETURN'
-          ? 'Someone else updated this return. The latest version has been reloaded.'
-          : (failure.response?.data?.error?.message ?? 'That action could not be completed.'),
-      );
+      // A stale version means somebody else moved it on. Reload before saying
+      // so, or the reviewer reads the complaint against figures that are
+      // already out of date.
+      await queryClient.invalidateQueries({ queryKey: ['return', id] });
+      toast.error(errorMessage(caught, language, t('returnDetail.actionFailed')));
     } finally {
       setBusy('');
     }
   }
 
-  if (loading)
-    return (
-      <main className="inventory-page">
-        <section className="state">Loading return...</section>
-      </main>
-    );
-  if (!record) {
-    return (
-      <main className="inventory-page">
-        <section className="state error" role="alert">
-          {error || 'This return could not be loaded.'}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      </main>
-    );
-  }
-
-  const isManagement = role ? MANAGEMENT.includes(role) : false;
-  const isStorekeeper = role === UserRole.STOREKEEPER;
-  const isDeliveryPerson = role === UserRole.DELIVERY_PERSON;
-  const isOwner = role === UserRole.SHOP_OWNER;
-  const canReview =
-    isManagement &&
-    (record.status === ReturnStatus.REQUESTED || record.status === ReturnStatus.UNDER_REVIEW);
-  const approved =
-    record.status === ReturnStatus.APPROVED || record.status === ReturnStatus.PARTIALLY_APPROVED;
-  const canCollect = (isManagement || isDeliveryPerson) && approved;
-  const canReceive =
-    (isManagement || isStorekeeper) && (approved || record.status === ReturnStatus.COLLECTED);
-  const canCredit = isManagement && record.status === ReturnStatus.RECEIVED;
-  const cancellable: ReturnStatus[] = [
-    ReturnStatus.REQUESTED,
-    ReturnStatus.UNDER_REVIEW,
-    ReturnStatus.APPROVED,
-    ReturnStatus.PARTIALLY_APPROVED,
+  const itemColumns: ReadonlyArray<Column<DetailLine>> = [
+    {
+      key: 'item',
+      header: t('returns.columnItem'),
+      cell: (line) => (
+        <div>
+          <p className="font-medium text-text">{line.medicineSnapshot.brandName}</p>
+          <p className="text-sm text-text-muted">
+            {line.medicineSnapshot.strength} · {t(`returnReason.${line.reason}`)}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'batch',
+      header: t('fields.batch'),
+      cell: (line) => (
+        <div>
+          <p className="text-text">{line.batchNumber}</p>
+          <p className="text-sm text-text-muted">
+            {t('returns.expires', { date: formatFinanceDate(line.expiryDate) })}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'invoiced',
+      header: t('returnDetail.columnInvoiced'),
+      numeric: true,
+      cell: (line) => line.invoicedQuantity,
+    },
+    {
+      key: 'requested',
+      header: t('returnDetail.columnRequested'),
+      numeric: true,
+      cell: (line) => line.requestedQuantity,
+    },
+    {
+      key: 'approved',
+      header: t('returnDetail.columnApproved'),
+      numeric: true,
+      cell: (line) => line.approvedQuantity,
+    },
+    {
+      key: 'received',
+      header: t('returnDetail.columnReceived'),
+      numeric: true,
+      cell: (line) => line.receivedQuantity,
+    },
+    {
+      key: 'disposition',
+      header: t('returnDetail.columnDisposition'),
+      cell: (line) =>
+        line.receivedQuantity
+          ? [
+              line.restockQuantity && t('returnDetail.restocked', { count: line.restockQuantity }),
+              line.damagedQuantity && t('returnDetail.damaged', { count: line.damagedQuantity }),
+              line.expiredQuantity &&
+                t('returnDetail.expiredUnits', { count: line.expiredQuantity }),
+              line.quarantinedQuantity &&
+                t('returnDetail.quarantined', { count: line.quarantinedQuantity }),
+            ]
+              .filter(Boolean)
+              .join(', ')
+          : '—',
+    },
+    {
+      key: 'credit',
+      header: t('returnDetail.columnCredit'),
+      numeric: true,
+      cell: (line) => <strong>{formatMinor(line.refundMinor)}</strong>,
+    },
   ];
-  const canCancel = (isManagement || isOwner) && cancellable.includes(record.status);
 
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Return {record.reference}</p>
-          <h1>
-            <span className={`return-status ${record.status.toLowerCase()}`}>
-              {statusLabel(record.status)}
-            </span>
-          </h1>
-          <p>
-            Requested {formatFinanceDateTime(record.requestedAt)}
-            {record.requestedBy
-              ? ` by ${record.requestedBy.firstName} ${record.requestedBy.lastName}`
-              : ''}
-            .
-          </p>
-        </div>
-        <Link className="secondary-button" to="/returns">
-          All returns
-        </Link>
-      </header>
+    <main>
+      <Resource
+        query={query}
+        loadingLabel={t('returnDetail.loading')}
+        errorMessageFallback={t('returnDetail.couldNotLoad')}
+      >
+        {(data) => {
+          const isManagement = role ? MANAGEMENT.includes(role) : false;
+          const isOwner = role === UserRole.SHOP_OWNER;
+          const approved =
+            data.status === ReturnStatus.APPROVED ||
+            data.status === ReturnStatus.PARTIALLY_APPROVED;
+          const canReview =
+            isManagement &&
+            (data.status === ReturnStatus.REQUESTED || data.status === ReturnStatus.UNDER_REVIEW);
+          const canCollect = (isManagement || role === UserRole.DELIVERY_PERSON) && approved;
+          const canReceive =
+            (isManagement || role === UserRole.STOREKEEPER) &&
+            (approved || data.status === ReturnStatus.COLLECTED);
+          const canCredit = isManagement && data.status === ReturnStatus.RECEIVED;
+          const canCancel =
+            (isManagement || isOwner) &&
+            (
+              [
+                ReturnStatus.REQUESTED,
+                ReturnStatus.UNDER_REVIEW,
+                ReturnStatus.APPROVED,
+                ReturnStatus.PARTIALLY_APPROVED,
+              ] as string[]
+            ).includes(data.status);
 
-      {error ? (
-        <section className="state error" role="alert">
-          {error}
-        </section>
-      ) : null}
-      {status ? (
-        <section className="state success" role="status">
-          {status}
-        </section>
-      ) : null}
+          const who = data.requestedBy
+            ? `${data.requestedBy.firstName} ${data.requestedBy.lastName}`
+            : undefined;
 
-      <section className="metric-grid finance-metrics">
-        <article>
-          <span>Requested value</span>
-          <strong>{formatMinor(record.requestedTotalMinor)}</strong>
-        </article>
-        <article>
-          <span>Credit subtotal</span>
-          <strong>{formatMinor(record.approvedSubtotalMinor)}</strong>
-        </article>
-        <article>
-          <span>Credit tax</span>
-          <strong>{formatMinor(record.approvedTaxMinor)}</strong>
-        </article>
-        <article>
-          <span>Credit total</span>
-          <strong>{formatMinor(record.approvedTotalMinor)}</strong>
-        </article>
-      </section>
-
-      <section className="panel detail-grid">
-        <div>
-          <h2>Reference</h2>
-          <p>
-            Invoice:{' '}
-            {record.invoiceId ? (
-              <Link to={`/orders/${record.orderId?._id ?? ''}`}>{record.invoiceId.reference}</Link>
-            ) : (
-              '—'
-            )}
-          </p>
-          <p>Order: {record.orderId?.reference ?? '—'}</p>
-          {isOwner ? null : (
-            <p>
-              Shop: {record.shopId?.name ?? '—'} <small>{record.shopId?.reference}</small>
-            </p>
-          )}
-          <p>Main reason: {record.primaryReason.replaceAll('_', ' ').toLowerCase()}</p>
-        </div>
-        <div>
-          <h2>Progress</h2>
-          <p>
-            Reviewed: {record.reviewedAt ? formatFinanceDateTime(record.reviewedAt) : 'Not yet'}
-          </p>
-          <p>
-            Collected: {record.collectedAt ? formatFinanceDateTime(record.collectedAt) : 'Not yet'}
-          </p>
-          <p>
-            Received: {record.receivedAt ? formatFinanceDateTime(record.receivedAt) : 'Not yet'}
-          </p>
-          <p>
-            Credit note:{' '}
-            {record.creditNote ? (
-              <a
-                href={`/api/v1/returns/credit-notes/${record.creditNote._id}?format=pdf`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {record.creditNote.reference}
-              </a>
-            ) : (
-              'Not issued'
-            )}
-          </p>
-        </div>
-      </section>
-
-      {record.shopNotes ? (
-        <section className="panel">
-          <h2>Customer notes</h2>
-          <p>{record.shopNotes}</p>
-        </section>
-      ) : null}
-      {record.rejectionReason ? (
-        <section className="panel">
-          <h2>Rejection reason</h2>
-          <p>{record.rejectionReason}</p>
-        </section>
-      ) : null}
-      {record.internalNotes && !isOwner ? (
-        <section className="panel">
-          <h2>Internal notes</h2>
-          <p>{record.internalNotes}</p>
-        </section>
-      ) : null}
-
-      <section className="panel">
-        <h2>Returned items</h2>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Batch</th>
-                <th>Invoiced</th>
-                <th>Requested</th>
-                <th>Approved</th>
-                <th>Received</th>
-                <th>Disposition</th>
-                <th>Credit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {record.lines.map((line) => (
-                <tr key={lineId(line)}>
-                  <td>
-                    {line.medicineSnapshot.brandName}
-                    <small>
-                      {line.medicineSnapshot.strength} ·{' '}
-                      {line.reason.replaceAll('_', ' ').toLowerCase()}
-                    </small>
-                  </td>
-                  <td>
-                    {line.batchNumber}
-                    <small>Expires {formatFinanceDate(line.expiryDate)}</small>
-                  </td>
-                  <td>{line.invoicedQuantity}</td>
-                  <td>{line.requestedQuantity}</td>
-                  <td>{line.approvedQuantity}</td>
-                  <td>{line.receivedQuantity}</td>
-                  <td>
-                    {line.receivedQuantity
-                      ? [
-                          line.restockQuantity ? `${line.restockQuantity} restocked` : '',
-                          line.damagedQuantity ? `${line.damagedQuantity} damaged` : '',
-                          line.expiredQuantity ? `${line.expiredQuantity} expired` : '',
-                          line.quarantinedQuantity ? `${line.quarantinedQuantity} quarantined` : '',
-                        ]
-                          .filter(Boolean)
-                          .join(', ')
-                      : '—'}
-                  </td>
-                  <td>
-                    <strong>{formatMinor(line.refundMinor)}</strong>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {canReview ? (
-        <section className="panel">
-          <h2>Review decision</h2>
-          <p className="muted">
-            Approve the quantities you accept. Approving nothing records the return as rejected.
-          </p>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Requested</th>
-                  <th>Approve</th>
-                </tr>
-              </thead>
-              <tbody>
-                {record.lines.map((line) => (
-                  <tr key={`decide-${lineId(line)}`}>
-                    <td>{line.medicineSnapshot.brandName}</td>
-                    <td>{line.requestedQuantity}</td>
-                    <td>
-                      <input
-                        aria-label={`Approved quantity for ${line.medicineSnapshot.brandName}`}
-                        type="number"
-                        min={0}
-                        max={line.requestedQuantity}
-                        value={decision[lineId(line)] ?? ''}
-                        onChange={(event) =>
-                          setDecision((current) => ({
-                            ...current,
-                            [lineId(line)]: event.target.value,
-                          }))
-                        }
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <label>
-            Review notes
-            <textarea
-              rows={2}
-              maxLength={1000}
-              value={reviewNotes}
-              onChange={(event) => setReviewNotes(event.target.value)}
-            />
-          </label>
-          <div className="actions">
-            {record.status === ReturnStatus.REQUESTED ? (
-              <button
-                className="secondary-button"
-                disabled={Boolean(busy)}
-                onClick={() => void act('review', {}, 'Return claimed for review.')}
-              >
-                {busy === 'review' ? 'Claiming...' : 'Start review'}
-              </button>
-            ) : null}
-            <button
-              className="primary-button"
-              disabled={Boolean(busy)}
-              onClick={() =>
-                void act(
-                  'decision',
-                  {
-                    reviewNotes: reviewNotes.trim() || undefined,
-                    lines: record.lines.map((line) => ({
-                      medicineId: line.medicineId,
-                      batchId: line.batchId,
-                      approvedQuantity: Math.min(
-                        line.requestedQuantity,
-                        number(decision[lineId(line)] ?? '0'),
-                      ),
-                    })),
-                  },
-                  'Review decision recorded.',
-                )
-              }
-            >
-              {busy === 'decision' ? 'Saving...' : 'Save decision'}
-            </button>
-            <button
-              className="danger-button"
-              disabled={Boolean(busy) || rejectionReason.trim().length < 5}
-              onClick={() =>
-                void act('reject', { rejectionReason: rejectionReason.trim() }, 'Return rejected.')
-              }
-            >
-              {busy === 'reject' ? 'Rejecting...' : 'Reject return'}
-            </button>
-            <input
-              aria-label="Rejection reason"
-              placeholder="Reason for rejection"
-              value={rejectionReason}
-              onChange={(event) => setRejectionReason(event.target.value)}
-            />
-          </div>
-        </section>
-      ) : null}
-
-      {canReceive ? (
-        <section className="panel">
-          <h2>Receive and inspect</h2>
-          <p className="muted">
-            Record where each unit goes. Only restocked units return to saleable stock; an expired
-            batch cannot be restocked.
-          </p>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Approved</th>
-                  <th>Restock</th>
-                  <th>Damaged</th>
-                  <th>Expired</th>
-                  <th>Quarantine</th>
-                </tr>
-              </thead>
-              <tbody>
-                {record.lines
-                  .filter((line) => line.approvedQuantity > 0)
-                  .map((line) => {
-                    const key = lineId(line);
-                    const entry = receipt[key] ?? {
-                      restock: '0',
-                      damaged: '0',
-                      expired: '0',
-                      quarantined: '0',
-                    };
-                    const total =
-                      number(entry.restock) +
-                      number(entry.damaged) +
-                      number(entry.expired) +
-                      number(entry.quarantined);
-                    return (
-                      <tr key={`receive-${key}`}>
-                        <td>
-                          {line.medicineSnapshot.brandName}
-                          <small>Batch {line.batchNumber}</small>
-                        </td>
-                        <td className={total > line.approvedQuantity ? 'over-limit' : ''}>
-                          {total} / {line.approvedQuantity}
-                        </td>
-                        {(['restock', 'damaged', 'expired', 'quarantined'] as const).map(
-                          (field) => (
-                            <td key={field}>
-                              <input
-                                aria-label={`${field} quantity for ${line.medicineSnapshot.brandName}`}
-                                type="number"
-                                min={0}
-                                max={line.approvedQuantity}
-                                value={entry[field]}
-                                onChange={(event) =>
-                                  setReceipt((current) => ({
-                                    ...current,
-                                    [key]: { ...entry, [field]: event.target.value },
-                                  }))
-                                }
-                              />
-                            </td>
-                          ),
-                        )}
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-          <div className="actions">
-            <button
-              className="primary-button"
-              disabled={Boolean(busy)}
-              onClick={() =>
-                void act(
-                  'receive',
-                  {
-                    lines: record.lines
-                      .filter((line) => line.approvedQuantity > 0)
-                      .map((line) => {
-                        const entry = receipt[lineId(line)] ?? {
-                          restock: '0',
-                          damaged: '0',
-                          expired: '0',
-                          quarantined: '0',
-                        };
-                        return {
-                          medicineId: line.medicineId,
-                          batchId: line.batchId,
-                          restockQuantity: number(entry.restock),
-                          damagedQuantity: number(entry.damaged),
-                          expiredQuantity: number(entry.expired),
-                          quarantinedQuantity: number(entry.quarantined),
-                        };
-                      }),
-                  },
-                  'Goods received and stock updated.',
-                )
-              }
-            >
-              {busy === 'receive' ? 'Booking in...' : 'Confirm receipt'}
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      <section className="panel">
-        <h2>Actions</h2>
-        <div className="actions">
-          {canCollect ? (
-            <button
-              className="secondary-button"
-              disabled={Boolean(busy)}
-              onClick={() => void act('collect', {}, 'Marked as collected from the shop.')}
-            >
-              {busy === 'collect' ? 'Saving...' : 'Mark collected'}
-            </button>
-          ) : null}
-          {canCredit ? (
-            <button
-              className="primary-button"
-              disabled={Boolean(busy)}
-              onClick={() => {
-                void (async () => {
-                  const agreed = await ask.confirm({
-                    title: `Issue a credit note for ${formatMinor(record.approvedTotalMinor)}?`,
-                    description:
-                      'This posts to the customer’s ledger straight away and cannot be edited ' +
-                      'afterwards. The amount comes off what they owe.',
-                    confirmLabel: 'Issue credit note',
-                  });
-                  if (agreed)
-                    await act('credit-note', {}, 'Credit note issued and posted to the ledger.');
-                })();
-              }}
-            >
-              {busy === 'credit-note' ? 'Issuing...' : 'Issue credit note'}
-            </button>
-          ) : null}
-          {canCancel ? (
-            <button
-              className="danger-button"
-              disabled={Boolean(busy)}
-              onClick={async () => {
-                const reason = await ask.prompt({
-                  title: 'Cancel this return request',
-                  description:
-                    'The claim against the invoice is released, so the invoice goes back to being ' +
-                    'due in full.',
-                  label: 'Reason',
-                  multiline: true,
-                  confirmLabel: 'Cancel the return',
-                  danger: true,
-                  validate: requireReason(),
-                });
-                if (reason && reason.trim().length >= 5) {
-                  void act('cancel', { reason: reason.trim() }, 'Return cancelled.');
+          return (
+            <>
+              <PageHeader
+                routeId="return-detail"
+                title={data.reference}
+                description={
+                  <span className="flex flex-wrap items-center gap-2">
+                    <StatusPill kind="return" status={data.status} />
+                    {who
+                      ? t('returnDetail.requestedBy', {
+                          when: formatFinanceDateTime(data.requestedAt),
+                          who,
+                        })
+                      : t('returnDetail.requestedOn', {
+                          when: formatFinanceDateTime(data.requestedAt),
+                        })}
+                  </span>
                 }
-              }}
-            >
-              {busy === 'cancel' ? 'Cancelling...' : 'Cancel return'}
-            </button>
-          ) : null}
-          {!canCollect && !canCredit && !canCancel && !canReview && !canReceive ? (
-            <p className="muted">No further action is available to your role at this stage.</p>
-          ) : null}
-        </div>
-      </section>
+                actions={<LinkButton to="/returns">{t('returnDetail.all')}</LinkButton>}
+              />
 
-      <ActivityTimeline entityType={ActivityEntityType.RETURN} entityId={record._id} />
+              <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Metric
+                  label={t('returnDetail.requestedValue')}
+                  value={formatMinor(data.requestedTotalMinor)}
+                />
+                <Metric
+                  label={t('returnDetail.creditSubtotal')}
+                  value={formatMinor(data.approvedSubtotalMinor)}
+                />
+                <Metric
+                  label={t('returnDetail.creditTax')}
+                  value={formatMinor(data.approvedTaxMinor)}
+                />
+                <Metric
+                  label={t('returnDetail.creditTotal')}
+                  value={formatMinor(data.approvedTotalMinor)}
+                />
+              </div>
+
+              <div className="mb-4 grid gap-4 lg:grid-cols-2">
+                <Card>
+                  <h2 className="mb-2 text-lg font-semibold text-text">
+                    {t('returnDetail.references')}
+                  </h2>
+                  <p className="text-text">
+                    {t('returns.columnInvoice')}:{' '}
+                    {data.invoiceId ? (
+                      <Link
+                        className="text-brand underline"
+                        to={`/orders/${data.orderId?._id ?? ''}`}
+                      >
+                        {data.invoiceId.reference}
+                      </Link>
+                    ) : (
+                      '—'
+                    )}
+                  </p>
+                  <p className="text-text">
+                    {t('returnDetail.order')}: {data.orderId?.reference ?? '—'}
+                  </p>
+                  {!isOwner && (
+                    <p className="text-text">
+                      {t('fields.shop')}: {data.shopId?.name ?? '—'}{' '}
+                      <span className="text-sm text-text-muted">{data.shopId?.reference}</span>
+                    </p>
+                  )}
+                  <p className="text-text">
+                    {t('returnDetail.mainReason')}: {t(`returnReason.${data.primaryReason}`)}
+                  </p>
+                </Card>
+
+                <Card>
+                  <h2 className="mb-2 text-lg font-semibold text-text">
+                    {t('returnDetail.progress')}
+                  </h2>
+                  <p className="text-text">
+                    {t('returnDetail.reviewed')}:{' '}
+                    {data.reviewedAt
+                      ? formatFinanceDateTime(data.reviewedAt)
+                      : t('returnDetail.notYet')}
+                  </p>
+                  <p className="text-text">
+                    {t('returnDetail.collected')}:{' '}
+                    {data.collectedAt
+                      ? formatFinanceDateTime(data.collectedAt)
+                      : t('returnDetail.notYet')}
+                  </p>
+                  <p className="text-text">
+                    {t('returnDetail.received')}:{' '}
+                    {data.receivedAt
+                      ? formatFinanceDateTime(data.receivedAt)
+                      : t('returnDetail.notYet')}
+                  </p>
+                  <p className="text-text">
+                    {t('returnDetail.creditNote')}:{' '}
+                    {data.creditNote ? (
+                      <a
+                        className="text-brand underline"
+                        href={`/api/v1/returns/credit-notes/${data.creditNote._id}?format=pdf`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {data.creditNote.reference}
+                      </a>
+                    ) : (
+                      t('returnDetail.notIssued')
+                    )}
+                  </p>
+                </Card>
+              </div>
+
+              {data.shopNotes && (
+                <Card className="mb-4">
+                  <h2 className="mb-1 text-lg font-semibold text-text">
+                    {t('returnDetail.customerNotes')}
+                  </h2>
+                  <p className="text-text-muted">{data.shopNotes}</p>
+                </Card>
+              )}
+              {data.rejectionReason && (
+                <Card className="mb-4">
+                  <h2 className="mb-1 text-lg font-semibold text-text">
+                    {t('returnDetail.rejectionReason')}
+                  </h2>
+                  <p className="text-text-muted">{data.rejectionReason}</p>
+                </Card>
+              )}
+              {data.internalNotes && !isOwner && (
+                <Card className="mb-4">
+                  <h2 className="mb-1 text-lg font-semibold text-text">
+                    {t('returnDetail.internalNotes')}
+                  </h2>
+                  <p className="text-text-muted">{data.internalNotes}</p>
+                </Card>
+              )}
+
+              <Card className="mb-4">
+                <h2 className="mb-2 text-lg font-semibold text-text">{t('returnDetail.items')}</h2>
+                <DataTable
+                  caption={t('returnDetail.items')}
+                  columns={itemColumns}
+                  rows={data.lines}
+                  rowKey={lineId}
+                  rowTest={(line) => line.batchNumber}
+                />
+              </Card>
+
+              {canReview && (
+                <Card className="mb-4">
+                  <h2 className="mb-1 text-lg font-semibold text-text">
+                    {t('returnDetail.reviewTitle')}
+                  </h2>
+                  <p className="mb-3 max-w-prose text-text-muted">{t('returnDetail.reviewBody')}</p>
+                  <DataTable
+                    caption={t('returnDetail.reviewTitle')}
+                    columns={[
+                      {
+                        key: 'item',
+                        header: t('returns.columnItem'),
+                        cell: (line) => line.medicineSnapshot.brandName,
+                      },
+                      {
+                        key: 'requested',
+                        header: t('returnDetail.columnRequested'),
+                        numeric: true,
+                        cell: (line) => line.requestedQuantity,
+                      },
+                      {
+                        key: 'approve',
+                        header: t('returnDetail.approveColumn'),
+                        numeric: true,
+                        cell: (line) => (
+                          <input
+                            aria-label={t('returnDetail.approvedFor', {
+                              brand: line.medicineSnapshot.brandName,
+                            })}
+                            type="number"
+                            min={0}
+                            max={line.requestedQuantity}
+                            value={decision[lineId(line)] ?? ''}
+                            onChange={(event) =>
+                              setDecision((current) => ({
+                                ...current,
+                                [lineId(line)]: event.target.value,
+                              }))
+                            }
+                            className="min-h-11 w-24 rounded-md border border-border bg-surface px-3 text-end tabular-nums text-text"
+                          />
+                        ),
+                      },
+                    ]}
+                    rows={data.lines}
+                    rowKey={(line) => `decide-${lineId(line)}`}
+                  />
+                  <div className="mt-3 flex flex-col gap-3">
+                    <Field label={t('returnDetail.reviewNotes')}>
+                      <Textarea
+                        rows={2}
+                        maxLength={1000}
+                        value={reviewNotes}
+                        onChange={(event) => setReviewNotes(event.target.value)}
+                      />
+                    </Field>
+                    <Field label={t('returnDetail.rejectionLabel')}>
+                      <Input
+                        value={rejectionReason}
+                        onChange={(event) => setRejectionReason(event.target.value)}
+                      />
+                    </Field>
+                    <div className="flex flex-wrap gap-2">
+                      {data.status === ReturnStatus.REQUESTED && (
+                        <Button
+                          busy={busy === 'review'}
+                          disabled={Boolean(busy)}
+                          onClick={() => void act('review', {}, t('returnDetail.claimed'))}
+                        >
+                          {busy === 'review'
+                            ? t('returnDetail.claiming')
+                            : t('returnDetail.startReview')}
+                        </Button>
+                      )}
+                      <Button
+                        variant="primary"
+                        busy={busy === 'decision'}
+                        disabled={Boolean(busy)}
+                        onClick={() =>
+                          void act(
+                            'decision',
+                            {
+                              reviewNotes: reviewNotes.trim() || undefined,
+                              lines: data.lines.map((line) => ({
+                                medicineId: line.medicineId,
+                                batchId: line.batchId,
+                                approvedQuantity: Math.min(
+                                  line.requestedQuantity,
+                                  number(decision[lineId(line)] ?? '0'),
+                                ),
+                              })),
+                            },
+                            t('returnDetail.decisionSaved'),
+                          )
+                        }
+                      >
+                        {busy === 'decision'
+                          ? t('returnDetail.saving')
+                          : t('returnDetail.saveDecision')}
+                      </Button>
+                      <Button
+                        variant="danger"
+                        busy={busy === 'reject'}
+                        disabled={Boolean(busy) || rejectionReason.trim().length < 5}
+                        onClick={() =>
+                          void act(
+                            'reject',
+                            { rejectionReason: rejectionReason.trim() },
+                            t('returnDetail.rejected'),
+                          )
+                        }
+                      >
+                        {busy === 'reject'
+                          ? t('returnDetail.rejecting')
+                          : t('returnDetail.rejectReturn')}
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {canReceive && (
+                <Card className="mb-4">
+                  <h2 className="mb-1 text-lg font-semibold text-text">
+                    {t('returnDetail.receiveTitle')}
+                  </h2>
+                  <p className="mb-3 max-w-prose text-text-muted">
+                    {t('returnDetail.receiveBody')}
+                  </p>
+                  <DataTable
+                    caption={t('returnDetail.receiveTitle')}
+                    columns={[
+                      {
+                        key: 'item',
+                        header: t('returns.columnItem'),
+                        cell: (line) => (
+                          <div>
+                            <p className="text-text">{line.medicineSnapshot.brandName}</p>
+                            <p className="text-sm text-text-muted">{line.batchNumber}</p>
+                          </div>
+                        ),
+                      },
+                      {
+                        key: 'counted',
+                        header: t('returnDetail.columnApproved'),
+                        numeric: true,
+                        cell: (line) => {
+                          const entry = receipt[lineId(line)] ?? EMPTY_RECEIPT;
+                          const counted =
+                            number(entry.restock) +
+                            number(entry.damaged) +
+                            number(entry.expired) +
+                            number(entry.quarantined);
+                          return (
+                            <span className={counted > line.approvedQuantity ? 'text-danger' : ''}>
+                              {t('returnDetail.countedOf', {
+                                counted,
+                                approved: line.approvedQuantity,
+                              })}
+                            </span>
+                          );
+                        },
+                      },
+                      ...(
+                        [
+                          ['restock', 'returnDetail.restock'],
+                          ['damaged', 'returnDetail.damagedColumn'],
+                          ['expired', 'returnDetail.expiredColumn'],
+                          ['quarantined', 'returnDetail.quarantineColumn'],
+                        ] as const
+                      ).map(([field, key]) => ({
+                        key: field,
+                        header: t(key),
+                        numeric: true,
+                        cell: (line: DetailLine) => {
+                          const entry = receipt[lineId(line)] ?? EMPTY_RECEIPT;
+                          return (
+                            <input
+                              aria-label={t('returnDetail.dispositionFor', {
+                                field: t(key),
+                                brand: line.medicineSnapshot.brandName,
+                              })}
+                              type="number"
+                              min={0}
+                              max={line.approvedQuantity}
+                              value={entry[field]}
+                              onChange={(event) =>
+                                setReceipt((current) => ({
+                                  ...current,
+                                  [lineId(line)]: { ...entry, [field]: event.target.value },
+                                }))
+                              }
+                              className="min-h-11 w-20 rounded-md border border-border bg-surface px-2 text-end tabular-nums text-text"
+                            />
+                          );
+                        },
+                      })),
+                    ]}
+                    rows={data.lines.filter((line) => line.approvedQuantity > 0)}
+                    rowKey={(line) => `receive-${lineId(line)}`}
+                  />
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      variant="primary"
+                      busy={busy === 'receive'}
+                      disabled={Boolean(busy)}
+                      onClick={() =>
+                        void act(
+                          'receive',
+                          {
+                            lines: data.lines
+                              .filter((line) => line.approvedQuantity > 0)
+                              .map((line) => {
+                                const entry = receipt[lineId(line)] ?? EMPTY_RECEIPT;
+                                return {
+                                  medicineId: line.medicineId,
+                                  batchId: line.batchId,
+                                  restockQuantity: number(entry.restock),
+                                  damagedQuantity: number(entry.damaged),
+                                  expiredQuantity: number(entry.expired),
+                                  quarantinedQuantity: number(entry.quarantined),
+                                };
+                              }),
+                          },
+                          t('returnDetail.receivedDone'),
+                        )
+                      }
+                    >
+                      {busy === 'receive'
+                        ? t('returnDetail.bookingIn')
+                        : t('returnDetail.confirmReceipt')}
+                    </Button>
+                  </div>
+                </Card>
+              )}
+
+              <Card className="mb-4">
+                <h2 className="mb-2 text-lg font-semibold text-text">
+                  {t('returnDetail.actions')}
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {canCollect && (
+                    <Button
+                      busy={busy === 'collect'}
+                      disabled={Boolean(busy)}
+                      onClick={() => void act('collect', {}, t('returnDetail.collectedDone'))}
+                    >
+                      {t('returnDetail.markCollected')}
+                    </Button>
+                  )}
+                  {canCredit && (
+                    <Button
+                      variant="primary"
+                      busy={busy === 'credit-note'}
+                      disabled={Boolean(busy)}
+                      onClick={() => {
+                        void (async () => {
+                          const agreed = await ask.confirm({
+                            title: t('returnDetail.confirmCreditTitle', {
+                              amount: formatMinor(data.approvedTotalMinor),
+                            }),
+                            description: t('returnDetail.confirmCreditBody'),
+                            confirmLabel: t('returnDetail.issueCreditNote'),
+                          });
+                          if (agreed) {
+                            await act('credit-note', {}, t('returnDetail.creditIssued'));
+                          }
+                        })();
+                      }}
+                    >
+                      {busy === 'credit-note'
+                        ? t('returnDetail.issuing')
+                        : t('returnDetail.issueCreditNote')}
+                    </Button>
+                  )}
+                  {canCancel && (
+                    <Button
+                      variant="danger"
+                      busy={busy === 'cancel'}
+                      disabled={Boolean(busy)}
+                      onClick={() => {
+                        void (async () => {
+                          const reason = await ask.prompt({
+                            title: t('returnDetail.cancelTitle'),
+                            description: t('returnDetail.cancelBody'),
+                            label: t('actions.reason'),
+                            multiline: true,
+                            confirmLabel: t('returnDetail.cancelConfirm'),
+                            danger: true,
+                            validate: requireReason(),
+                          });
+                          if (reason && reason.trim().length >= 5) {
+                            await act(
+                              'cancel',
+                              { reason: reason.trim() },
+                              t('returnDetail.cancelled'),
+                            );
+                          }
+                        })();
+                      }}
+                    >
+                      {busy === 'cancel'
+                        ? t('returnDetail.cancelling')
+                        : t('returnDetail.cancelReturn')}
+                    </Button>
+                  )}
+                  {!canCollect && !canCredit && !canCancel && !canReview && !canReceive && (
+                    <p className="text-text-muted">{t('returnDetail.noActions')}</p>
+                  )}
+                </div>
+              </Card>
+
+              <ActivityTimeline entityType={ActivityEntityType.RETURN} entityId={data._id} />
+            </>
+          );
+        }}
+      </Resource>
     </main>
   );
 }

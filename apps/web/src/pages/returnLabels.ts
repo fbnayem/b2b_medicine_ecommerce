@@ -1,37 +1,26 @@
-import { ReturnReason, ReturnStatus } from '@medsupply/shared-types';
+import { ReturnStatus } from '@medsupply/shared-types';
 
 /**
- * Shared return vocabulary. Kept out of the page components so the constants
- * can be imported without dragging a component module along with them.
+ * Which statuses the returns filter offers, and in which order.
+ *
+ * The **words** are gone from here. This file used to carry its own status
+ * labels, which made it a third wording of the same set — `StatusPill` said
+ * "Received" where this said "Awaiting credit" for the identical status, and
+ * the reasons list restated the nine `ReturnReason` members a second time. Both
+ * now come from the translation catalogue, which is also the only way they can
+ * ever be read in Bangla.
+ *
+ * What is genuinely local is the *order* a person scanning the filter expects:
+ * the live states first, the finished ones last.
  */
-export const RETURN_STATUS_FILTERS: Array<{ value: string; label: string }> = [
-  { value: '', label: 'All' },
-  { value: ReturnStatus.REQUESTED, label: 'Requested' },
-  { value: ReturnStatus.UNDER_REVIEW, label: 'Under review' },
-  { value: ReturnStatus.APPROVED, label: 'Approved' },
-  { value: ReturnStatus.PARTIALLY_APPROVED, label: 'Partly approved' },
-  { value: ReturnStatus.COLLECTED, label: 'Collected' },
-  { value: ReturnStatus.RECEIVED, label: 'Awaiting credit' },
-  { value: ReturnStatus.COMPLETED, label: 'Completed' },
-  { value: ReturnStatus.REJECTED, label: 'Rejected' },
-  { value: ReturnStatus.CANCELLED, label: 'Cancelled' },
-];
-
-export function statusLabel(status: string) {
-  return (
-    RETURN_STATUS_FILTERS.find((entry) => entry.value === status)?.label ??
-    status.replaceAll('_', ' ')
-  );
-}
-
-export const RETURN_REASONS: Array<{ value: ReturnReason; label: string }> = [
-  { value: ReturnReason.DAMAGED_IN_TRANSIT, label: 'Damaged in transit' },
-  { value: ReturnReason.EXPIRED, label: 'Expired' },
-  { value: ReturnReason.NEAR_EXPIRY, label: 'Too close to expiry' },
-  { value: ReturnReason.WRONG_ITEM, label: 'Wrong item supplied' },
-  { value: ReturnReason.EXCESS_QUANTITY, label: 'Excess quantity' },
-  { value: ReturnReason.QUALITY_COMPLAINT, label: 'Quality complaint' },
-  { value: ReturnReason.COLD_CHAIN_BREACH, label: 'Cold chain breach' },
-  { value: ReturnReason.ORDER_ERROR, label: 'Ordering error' },
-  { value: ReturnReason.OTHER, label: 'Other' },
+export const RETURN_STATUS_FILTER_ORDER: readonly ReturnStatus[] = [
+  ReturnStatus.REQUESTED,
+  ReturnStatus.UNDER_REVIEW,
+  ReturnStatus.APPROVED,
+  ReturnStatus.PARTIALLY_APPROVED,
+  ReturnStatus.COLLECTED,
+  ReturnStatus.RECEIVED,
+  ReturnStatus.COMPLETED,
+  ReturnStatus.REJECTED,
+  ReturnStatus.CANCELLED,
 ];

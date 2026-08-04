@@ -7,7 +7,14 @@
  * `@medsupply/design-tokens` — the values — and in `@medsupply/navigation` —
  * the policy.
  */
-export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './Button';
+export {
+  Button,
+  LinkButton,
+  type ButtonProps,
+  type ButtonSize,
+  type ButtonVariant,
+  type LinkButtonProps,
+} from './Button';
 export { Field, Input, Select, Textarea, type FieldProps } from './Field';
 export {
   EmptyState,

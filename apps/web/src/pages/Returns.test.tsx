@@ -10,9 +10,16 @@ import { ReturnList } from './ReturnList';
 import { ReturnDetail } from './ReturnDetail';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
 
-vi.mock('../api/client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() },
-}));
+// Only the transport is replaced. `errorMessage` and `failureReference` are
+// pure helpers over the caught value, and stubbing them out would mean the
+// tests never see the sentence a user actually reads.
+vi.mock('../api/client', async () => {
+  const actual = await vi.importActual<typeof import('../api/client')>('../api/client');
+  return {
+    ...actual,
+    apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() },
+  };
+});
 vi.mock('../realtime/socket', () => ({
   onRealtime: () => () => {},
   connectRealtime: vi.fn(),
@@ -131,7 +138,7 @@ describe('Return list', () => {
       },
     });
 
-    render(
+    renderWithUi(
       <MemoryRouter>
         <ReturnList />
       </MemoryRouter>,
@@ -146,13 +153,13 @@ describe('Return list', () => {
     signIn(UserRole.MANAGER);
     get.mockResolvedValue({ data: { data: [], meta: { pages: 1 } } });
 
-    render(
+    renderWithUi(
       <MemoryRouter>
         <ReturnList />
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('No returns have been requested yet.')).toBeTruthy();
+    expect(await screen.findByText('No returns yet')).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Request a return' })).toBeNull();
   });
 
@@ -160,15 +167,20 @@ describe('Return list', () => {
     signIn(UserRole.MANAGER);
     get.mockRejectedValue({ response: { status: 403 } });
 
-    render(
+    renderWithUi(
       <MemoryRouter>
         <ReturnList />
       </MemoryRouter>,
     );
 
+    // A refusal is explained as a refusal. The page used to hand-code this
+    // sentence; it now comes from the catalogue, so every screen says the same
+    // thing and it is available in Bangla.
     expect(await screen.findByRole('alert')).toHaveProperty(
       'textContent',
-      expect.stringContaining('Your role cannot view returns.') as unknown as string,
+      expect.stringContaining(
+        'Your account does not have permission to do that.',
+      ) as unknown as string,
     );
   });
 });
@@ -181,7 +193,7 @@ describe('Return detail', () => {
 
     renderDetail();
 
-    const issue = await screen.findByRole('button', { name: 'Issue credit note' });
+    const issue = await screen.findByRole('button', { name: 'Issue the credit note' });
     fireEvent.click(issue);
 
     // Posting a credit note to a customer's ledger is irreversible, so it is
@@ -204,11 +216,9 @@ describe('Return detail', () => {
 
     // The reference is split across text nodes by the surrounding label.
     await screen.findByText(/RET-2026-000001/);
-    expect(screen.queryByRole('button', { name: 'Issue credit note' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Confirm receipt' })).toBeNull();
-    expect(
-      screen.getByText('No further action is available to your role at this stage.'),
-    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Issue the credit note' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Confirm what arrived' })).toBeNull();
+    expect(screen.getByText('There is nothing for your role to do at this stage.')).toBeTruthy();
   });
 
   it('lets a storekeeper record dispositions on an approved return', async () => {
@@ -218,9 +228,9 @@ describe('Return detail', () => {
 
     renderDetail();
 
-    const damaged = await screen.findByLabelText('damaged quantity for Napa');
+    const damaged = await screen.findByLabelText('Damaged quantity for Napa');
     fireEvent.change(damaged, { target: { value: '2' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm receipt' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm what arrived' }));
 
     await waitFor(() => expect(post).toHaveBeenCalled());
     const [path, body] = post.mock.calls[0];
@@ -239,13 +249,15 @@ describe('Return detail', () => {
 
     renderDetail();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Issue credit note' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue the credit note' }));
     fireEvent.click(await screen.findByTestId('dialog-confirm'));
 
-    // The reload must not clear the message, or the reviewer sees values change
-    // with no explanation of why their action was refused.
-    const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toContain('Someone else updated this return');
+    // The reload must not swallow the explanation, or the reviewer sees values
+    // change with no reason given. The wording now comes from the catalogue's
+    // STALE_RETURN entry rather than from a sentence typed into this page.
+    expect(
+      await screen.findByText('Somebody else updated this return while you were looking at it.'),
+    ).toBeTruthy();
     expect(detailCalls()).toHaveLength(2);
   });
 });

@@ -1,18 +1,33 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { RealtimeEvent, UserRole, type ReturnStatus } from '@medsupply/shared-types';
-import { apiClient } from '../api/client';
+import { RealtimeEvent, ReturnReason, UserRole, type ReturnStatus } from '@medsupply/shared-types';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/useAuth';
 import { useRealtimeEvent } from '../realtime/useRealtime';
+import {
+  Button,
+  DataTable,
+  EmptyState,
+  Field,
+  Input,
+  LinkButton,
+  PageHeader,
+  Pagination,
+  Resource,
+  Select,
+  StatusPill,
+  type Column,
+} from '../components/ui';
+import { useApiCollection } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
-import { RETURN_STATUS_FILTERS, statusLabel } from './returnLabels';
-import './inventory.css';
+import { RETURN_STATUS_FILTER_ORDER } from './returnLabels';
 
 export interface ReturnRow {
   _id: string;
   reference: string;
   status: ReturnStatus;
-  primaryReason: string;
+  primaryReason: ReturnReason;
   requestedAt: string;
   requestedTotalMinor: number;
   approvedTotalMinor: number;
@@ -25,183 +40,161 @@ const named = (value: ReturnRow['shopId']) =>
   typeof value === 'object' && value ? value : undefined;
 
 export function ReturnList() {
+  const { t } = useLanguage();
   const role = useAuthStore((state) => state.user?.role);
-  const [rows, setRows] = useState<ReturnRow[]>([]);
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState('');
-  const [query, setQuery] = useState('');
+  const [reference, setReference] = useState('');
   const [applied, setApplied] = useState({ status: '', q: '' });
   const [page, setPage] = useState(1);
-  const [pages, setPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.get('/returns', {
-        params: {
-          page,
-          limit: 20,
-          ...(applied.status ? { status: applied.status } : {}),
-          ...(applied.q ? { q: applied.q } : {}),
-        },
-      });
-      setRows(response.data.data as ReturnRow[]);
-      setPages(response.data.meta?.pages ?? 1);
-      setError('');
-    } catch (caught) {
-      const failure = caught as { response?: { status?: number } };
-      setError(
-        failure.response?.status === 403
-          ? 'Your role cannot view returns.'
-          : 'Unable to load returns.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [applied, page]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  // A colleague approving or receiving a return should not require a refresh.
-  useRealtimeEvent(RealtimeEvent.RETURN_UPDATED, () => {
-    void load();
-  });
 
   const isOwner = role === UserRole.SHOP_OWNER;
 
-  return (
-    <main className="inventory-page">
-      <header className="page-heading">
+  const search = new URLSearchParams({ page: String(page), limit: '20' });
+  if (applied.status) search.set('status', applied.status);
+  if (applied.q) search.set('q', applied.q);
+  const returns = useApiCollection<ReturnRow>(
+    ['returns', applied.status, applied.q, page],
+    `/returns?${search.toString()}`,
+  );
+
+  // A colleague approving or receiving a return should not require a refresh.
+  useRealtimeEvent(RealtimeEvent.RETURN_UPDATED, () => {
+    void queryClient.invalidateQueries({ queryKey: ['returns'] });
+  });
+
+  const columns: ReadonlyArray<Column<ReturnRow>> = [
+    {
+      key: 'reference',
+      header: t('returns.columnReturn'),
+      cell: (row) => (
         <div>
-          <p className="eyebrow">Returns</p>
-          <h1>{isOwner ? 'My returns' : 'Customer returns'}</h1>
-          <p>
-            {isOwner
-              ? 'Request a return against a delivered invoice and follow it through to the credit note.'
-              : 'Review, receive and credit returned goods.'}
-          </p>
-        </div>
-        {isOwner ? (
-          <Link className="primary-button" to="/returns/new">
-            Request a return
+          <Link className="font-medium text-brand underline" to={`/returns/${row._id}`}>
+            {row.reference}
           </Link>
-        ) : null}
-      </header>
+          {row.creditNoteReference && (
+            <p className="text-sm text-text-muted">{row.creditNoteReference}</p>
+          )}
+        </div>
+      ),
+    },
+    ...(isOwner
+      ? []
+      : [
+          {
+            key: 'shop',
+            header: t('fields.shop'),
+            cell: (row: ReturnRow) => (
+              <div>
+                <p className="text-text">{named(row.shopId)?.name ?? '—'}</p>
+                <p className="text-sm text-text-muted">{named(row.shopId)?.reference}</p>
+              </div>
+            ),
+          },
+        ]),
+    {
+      key: 'invoice',
+      header: t('returns.columnInvoice'),
+      cell: (row) => named(row.invoiceId)?.reference ?? '—',
+    },
+    {
+      key: 'requested',
+      header: t('returns.columnRequested'),
+      cell: (row) => formatFinanceDate(row.requestedAt),
+    },
+    {
+      key: 'reason',
+      header: t('returns.columnReason'),
+      cell: (row) => t(`returnReason.${row.primaryReason}`),
+    },
+    {
+      key: 'status',
+      header: t('fields.status'),
+      cell: (row) => <StatusPill kind="return" status={row.status} />,
+    },
+    {
+      key: 'value',
+      header: t('returns.columnValue'),
+      numeric: true,
+      cell: (row) =>
+        formatMinor(row.approvedTotalMinor > 0 ? row.approvedTotalMinor : row.requestedTotalMinor),
+    },
+  ];
+
+  const filtered = Boolean(applied.status || applied.q);
+
+  return (
+    <main>
+      <PageHeader
+        routeId="returns"
+        title={isOwner ? t('returns.titleOwner') : t('returns.titleStaff')}
+        description={isOwner ? t('returns.subtitleOwner') : t('returns.subtitleStaff')}
+        actions={
+          isOwner && (
+            <LinkButton variant="primary" to="/returns/new">
+              {t('returns.request')}
+            </LinkButton>
+          )
+        }
+      />
 
       <form
-        className="panel data-form finance-filters"
+        className="mb-6 flex flex-wrap items-end gap-3"
         onSubmit={(event) => {
           event.preventDefault();
           setPage(1);
-          setApplied({ status, q: query.trim() });
+          setApplied({ status, q: reference.trim() });
         }}
       >
-        <div className="form-grid">
-          <label>
-            Status
-            <select value={status} onChange={(event) => setStatus(event.target.value)}>
-              {RETURN_STATUS_FILTERS.map((entry) => (
-                <option key={entry.value || 'all'} value={entry.value}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Reference
-            <input
-              value={query}
-              placeholder="RET-2026-000001"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
-        </div>
-        <button className="secondary-button">Apply filters</button>
+        <Field label={t('fields.status')} className="min-w-48">
+          <Select value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="">{t('returns.allStatuses')}</option>
+            {RETURN_STATUS_FILTER_ORDER.map((value) => (
+              <option key={value} value={value}>
+                {t(`returnStatus.${value}`)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={t('fields.reference')} className="min-w-56">
+          <Input
+            value={reference}
+            placeholder={t('returns.referenceHint')}
+            onChange={(event) => setReference(event.target.value)}
+          />
+        </Field>
+        <Button type="submit">{t('actions.apply')}</Button>
       </form>
 
-      {error ? (
-        <section className="state error" role="alert">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
-
-      {loading ? (
-        <section className="state">Loading returns...</section>
-      ) : rows.length === 0 ? (
-        <section className="state">
-          {applied.status || applied.q
-            ? 'No returns match these filters.'
-            : 'No returns have been requested yet.'}
-        </section>
-      ) : (
-        <section className="panel">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Return</th>
-                  {isOwner ? null : <th>Shop</th>}
-                  <th>Invoice</th>
-                  <th>Requested</th>
-                  <th>Reason</th>
-                  <th>Status</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row._id}>
-                    <td>
-                      <Link to={`/returns/${row._id}`}>{row.reference}</Link>
-                      {row.creditNoteReference ? <small>{row.creditNoteReference}</small> : null}
-                    </td>
-                    {isOwner ? null : (
-                      <td>
-                        {named(row.shopId)?.name ?? '—'}
-                        <small>{named(row.shopId)?.reference}</small>
-                      </td>
-                    )}
-                    <td>{named(row.invoiceId)?.reference ?? '—'}</td>
-                    <td>{formatFinanceDate(row.requestedAt)}</td>
-                    <td>{row.primaryReason.replaceAll('_', ' ').toLowerCase()}</td>
-                    <td>
-                      <span className={`return-status ${row.status.toLowerCase()}`}>
-                        {statusLabel(row.status)}
-                      </span>
-                    </td>
-                    <td>
-                      <strong>
-                        {formatMinor(
-                          row.approvedTotalMinor > 0
-                            ? row.approvedTotalMinor
-                            : row.requestedTotalMinor,
-                        )}
-                      </strong>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {pages > 1 ? (
-            <nav className="pagination" aria-label="Return pages">
-              <button disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
-                Previous
-              </button>
-              <span>
-                Page {page} of {pages}
-              </span>
-              <button disabled={page >= pages} onClick={() => setPage((value) => value + 1)}>
-                Next
-              </button>
-            </nav>
-          ) : null}
-        </section>
-      )}
+      <Resource
+        query={returns}
+        loadingLabel={t('returns.loading')}
+        errorMessageFallback={t('returns.couldNotLoad')}
+        empty={
+          <EmptyState
+            title={filtered ? t('returns.noneFiltered') : t('returns.none')}
+            description={filtered ? t('lists.noResultsBody') : t('returns.noneBody')}
+          />
+        }
+      >
+        {(result) => (
+          <>
+            <DataTable
+              caption={isOwner ? t('returns.titleOwner') : t('returns.titleStaff')}
+              columns={columns}
+              rows={result.items}
+              rowKey={(row) => row._id}
+              rowTest={(row) => row.reference}
+            />
+            <Pagination
+              page={result.page}
+              limit={result.limit}
+              total={result.total}
+              onPage={setPage}
+            />
+          </>
+        )}
+      </Resource>
     </main>
   );
 }

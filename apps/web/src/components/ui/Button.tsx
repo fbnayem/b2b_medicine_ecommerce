@@ -1,4 +1,5 @@
-import { forwardRef, type ButtonHTMLAttributes } from 'react';
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { Link, type LinkProps } from 'react-router-dom';
 import clsx from 'clsx';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -34,6 +35,16 @@ const SIZES: Record<ButtonSize, string> = {
   lg: 'min-h-12 px-5 text-lg gap-2',
 };
 
+function buttonClass(variant: ButtonVariant, size: ButtonSize, className?: string): string {
+  return clsx(
+    'inline-flex items-center justify-center rounded-md font-medium',
+    'transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+    VARIANTS[variant],
+    SIZES[size],
+    className,
+  );
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { variant = 'secondary', size = 'md', busy, label, className, children, disabled, ...rest },
   ref,
@@ -45,16 +56,41 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || busy}
       aria-busy={busy || undefined}
       aria-label={label}
-      className={clsx(
-        'inline-flex items-center justify-center rounded-md font-medium',
-        'transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-        VARIANTS[variant],
-        SIZES[size],
-        className,
-      )}
+      className={buttonClass(variant, size, className)}
       {...rest}
     >
       {children}
     </button>
   );
 });
+
+export interface LinkButtonProps extends LinkProps {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  children: ReactNode;
+}
+
+/**
+ * A navigation that looks like a button, and stays a link.
+ *
+ * "Create order", "Back to the catalogue", "Track the delivery" — every one of
+ * these goes somewhere, so it must be a real `<a>`: middle-click, open in a new
+ * tab, copy the address, and a screen reader announcing "link" rather than
+ * "button" all depend on it. The pages this replaces used
+ * `className="primary-button"` from `inventory.css` and got the styling from a
+ * stylesheet that is being deleted; sharing the class computation with `Button`
+ * is what stops the two drifting apart once it is gone.
+ */
+export function LinkButton({
+  variant = 'secondary',
+  size = 'md',
+  className,
+  children,
+  ...rest
+}: LinkButtonProps) {
+  return (
+    <Link className={buttonClass(variant, size, className)} {...rest}>
+      {children}
+    </Link>
+  );
+}

@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../api/client';
+import { renderWithUi } from '../testing/render';
 import { CustomerStatement } from './CustomerStatement';
 import { OutstandingReport } from './FinancialReports';
 
@@ -36,16 +37,19 @@ describe('Phase 8 finance views', () => {
         },
       },
     });
-    render(
+    renderWithUi(
       <MemoryRouter>
         <CustomerStatement ownerMode />
       </MemoryRouter>,
     );
-    expect(await screen.findByText('Dhaka Pharmacy')).toBeTruthy();
+    // The name reaches the page header as well as the statement body, so it is
+    // read from the statement's own heading block.
+    expect((await screen.findAllByText('Dhaka Pharmacy')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('৳250.00').length).toBeGreaterThan(0);
-    expect(get).toHaveBeenCalledWith('/finance/my/statement', {
-      params: expect.objectContaining({ from: expect.any(String), to: expect.any(String) }),
-    });
+    // The date range is now part of the request URL rather than an axios
+    // `params` object, because the range is also the query's cache key.
+    const [url] = get.mock.calls[0] as [string];
+    expect(url).toMatch(/^\/finance\/my\/statement\?from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}$/);
   });
 
   it('renders server-aggregated outstanding balances with a ledger link', async () => {

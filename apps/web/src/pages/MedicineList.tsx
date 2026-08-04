@@ -1,135 +1,149 @@
-import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { UserRole } from '@medsupply/shared-types';
 import type { Medicine } from '@medsupply/shared-types';
-import { apiClient } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
 import { useCart } from '../store/useCart';
-import './inventory.css';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Input,
+  LinkButton,
+  PageHeader,
+  Resource,
+} from '../components/ui';
+import { useApiCollection } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
 
-const money = (minor: number) => formatMinor(minor);
-
+/**
+ * The catalogue, browsed as cards rather than rows because what a shop owner is
+ * doing here is choosing, not reconciling.
+ *
+ * One structural fix beyond the migration: the whole card used to be a `<Link>`
+ * with an "Add to cart" `<button>` nested inside it. A button inside a link is
+ * invalid, and a keyboard or screen-reader user met one control claiming to be
+ * two things — the code even called `preventDefault()` to stop the navigation
+ * it had created. The card is now a card, the name is the link, and adding is
+ * its own button.
+ */
 export function MedicineList() {
+  const { t } = useLanguage();
   const user = useAuthStore((state) => state.user);
   const addToCart = useCart((state) => state.add);
-  const [items, setItems] = useState<Medicine[]>([]);
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+
+  const medicines = useApiCollection<Medicine>(
+    ['medicines', query],
+    `/inventory/medicines?limit=100&search=${encodeURIComponent(query)}`,
+  );
+
   const canManage =
     user &&
     ([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER] as UserRole[]).includes(user.role);
 
-  async function load() {
-    setLoading(true);
-    setError('');
-    try {
-      setItems(
-        (await apiClient.get('/inventory/medicines', { params: { search: query, limit: 100 } }))
-          .data.data,
-      );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to load medicines');
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => {
-    void load();
-  }, [query]);
   function submit(event: FormEvent) {
     event.preventDefault();
     setQuery(search.trim());
   }
 
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Catalogue</p>
-          <h1>Medicines</h1>
-          <p>Browse current medicines and general stock availability.</p>
-        </div>
-        <div className="actions">
-          {canManage && (
-            <Link className="primary-button" to="/medicines/new">
-              Add medicine
-            </Link>
-          )}{' '}
-          {user?.role !== UserRole.SHOP_OWNER && (
-            <Link className="secondary-button" to="/inventory">
-              Inventory
-            </Link>
-          )}
-        </div>
-      </header>
-      <form className="search-bar" onSubmit={submit}>
-        <label htmlFor="medicine-search">Search catalogue</label>
-        <div>
-          <input
-            id="medicine-search"
+    <main>
+      <PageHeader
+        routeId="medicines"
+        title={t('catalogue.title')}
+        description={t('catalogue.subtitle')}
+        actions={
+          <>
+            {canManage && (
+              <LinkButton variant="primary" to="/medicines/new">
+                {t('catalogue.addMedicine')}
+              </LinkButton>
+            )}
+            {user?.role !== UserRole.SHOP_OWNER && (
+              <LinkButton to="/inventory">{t('catalogue.stock')}</LinkButton>
+            )}
+          </>
+        }
+      />
+
+      <form className="mb-6 flex flex-wrap items-end gap-2" onSubmit={submit} role="search">
+        <Field label={t('catalogue.searchLabel')} className="min-w-64 flex-1">
+          <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Brand, generic, manufacturer, SKU or barcode"
+            placeholder={t('catalogue.searchPlaceholder')}
           />
-          <button>Search</button>
-        </div>
+        </Field>
+        <Button type="submit" variant="primary">
+          {t('common.search')}
+        </Button>
       </form>
-      {error && (
-        <section className="state error" role="alert">
-          <p>{error}</p>
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      )}
-      {loading ? (
-        <section className="state">Loading medicines…</section>
-      ) : !error && items.length === 0 ? (
-        <section className="state">
-          <h2>No medicines found</h2>
-          <p>Try a broader search.</p>
-        </section>
-      ) : (
-        <section className="catalogue-grid">
-          {items.map((medicine) => (
-            <Link className="medicine-card" to={`/medicines/${medicine._id}`} key={medicine._id}>
-              <div className="card-top">
-                <span className="reference">{medicine.reference}</span>
-                <span className={medicine.isActive ? 'status active' : 'status'}>
-                  {medicine.isActive ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-              <h2>
-                {medicine.brandName} {medicine.strength}
-              </h2>
-              <p>
-                {medicine.genericName} · {medicine.dosageForm}
-              </p>
-              <p className="muted">
-                {medicine.manufacturer} · {medicine.packSize}
-              </p>
-              <div className="card-bottom">
-                <strong>{money(medicine.defaultSellingPriceMinor)}</strong>
-                <span>{(medicine.totalAvailable ?? 0) > 0 ? 'Available' : 'Out of stock'}</span>
-              </div>
-              {user?.role === UserRole.SHOP_OWNER && (
-                <button
-                  className="primary-button"
-                  disabled={(medicine.totalAvailable ?? 0) === 0}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    addToCart(medicine);
-                  }}
-                >
-                  Add to cart
-                </button>
-              )}
-            </Link>
-          ))}
-        </section>
-      )}
+
+      <Resource
+        query={medicines}
+        loadingLabel={t('catalogue.loading')}
+        errorMessageFallback={t('catalogue.couldNotLoad')}
+        empty={<EmptyState title={t('catalogue.none')} description={t('catalogue.noneBody')} />}
+      >
+        {(page) => (
+          <ul className="grid list-none grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-4 p-0">
+            {page.items.map((medicine) => {
+              const inStock = (medicine.totalAvailable ?? 0) > 0;
+              return (
+                <li key={medicine._id}>
+                  <Card
+                    data-test={`row-${medicine.reference}`}
+                    className="flex h-full flex-col gap-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-sm text-text-muted">{medicine.reference}</span>
+                      <Badge tone={medicine.isActive ? 'success' : 'neutral'}>
+                        {medicine.isActive
+                          ? t('catalogue.listedActive')
+                          : t('catalogue.listedInactive')}
+                      </Badge>
+                    </div>
+                    <h2 className="text-lg font-semibold text-text">
+                      <Link className="text-brand underline" to={`/medicines/${medicine._id}`}>
+                        {medicine.brandName} {medicine.strength}
+                      </Link>
+                    </h2>
+                    <p className="text-text-muted">
+                      {medicine.genericName} · {medicine.dosageForm}
+                    </p>
+                    <p className="text-sm text-text-muted">
+                      {medicine.manufacturer} · {medicine.packSize}
+                    </p>
+                    <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+                      <strong className="tabular-nums text-text">
+                        {formatMinor(medicine.defaultSellingPriceMinor)}
+                      </strong>
+                      <Badge tone={inStock ? 'success' : 'warning'}>
+                        {inStock ? t('catalogue.available') : t('catalogue.outOfStock')}
+                      </Badge>
+                    </div>
+                    {user?.role === UserRole.SHOP_OWNER && (
+                      <Button
+                        variant="primary"
+                        disabled={!inStock}
+                        label={`${t('catalogue.addToOrder')} — ${medicine.brandName}`}
+                        onClick={() => addToCart(medicine)}
+                      >
+                        {t('catalogue.addToOrder')}
+                      </Button>
+                    )}
+                  </Card>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Resource>
     </main>
   );
 }

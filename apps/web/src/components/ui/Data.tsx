@@ -1,5 +1,6 @@
 import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from 'react';
 import clsx from 'clsx';
+import { useLanguage } from '../../lib/useLanguage';
 
 /**
  * Cards, tables, badges and page headers.
@@ -147,18 +148,22 @@ export interface PaginationProps {
 }
 
 export function Pagination({ page, limit, total, onPage }: PaginationProps) {
+  const { t } = useLanguage();
   const pages = Math.max(1, Math.ceil(total / limit));
   const first = total === 0 ? 0 : (page - 1) * limit + 1;
   const last = Math.min(page * limit, total);
 
   return (
-    <nav aria-label="Pagination" className="mt-4 flex flex-wrap items-center justify-between gap-3">
+    <nav
+      aria-label={t('lists.pagination')}
+      className="mt-4 flex flex-wrap items-center justify-between gap-3"
+    >
       {/*
         Says what is on screen rather than only which page number it is. "51 to
         100 of 384" is answerable; "page 2" is not.
       */}
       <p aria-live="polite" className="text-sm text-text-muted">
-        Showing {first}–{last} of {total}
+        {t('lists.showing', { first, last, total })}
       </p>
       <div className="flex gap-2">
         <button
@@ -167,7 +172,7 @@ export function Pagination({ page, limit, total, onPage }: PaginationProps) {
           onClick={() => onPage(page - 1)}
           className="min-h-11 rounded-md border border-border px-3 disabled:opacity-50"
         >
-          Previous
+          {t('lists.previous')}
         </button>
         <button
           type="button"
@@ -175,7 +180,7 @@ export function Pagination({ page, limit, total, onPage }: PaginationProps) {
           onClick={() => onPage(page + 1)}
           className="min-h-11 rounded-md border border-border px-3 disabled:opacity-50"
         >
-          Next
+          {t('lists.next')}
         </button>
       </div>
     </nav>

@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import type {
   NotificationCategory,
   NotificationChannel,
@@ -7,13 +6,32 @@ import type {
   NotificationPriority,
 } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
-import './inventory.css';
+import {
+  Button,
+  Card,
+  Field,
+  Input,
+  LinkButton,
+  PageHeader,
+  Resource,
+  Table,
+  Td,
+  Th,
+  toast,
+} from '../components/ui';
+import { useApiResource } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 
 interface CatalogueEntry {
   event: NotificationEvent;
   category: NotificationCategory;
   priority: NotificationPriority;
   defaultChannels: NotificationChannel[];
+}
+
+interface CatalogueResponse {
+  channels: NotificationChannel[];
+  events: CatalogueEntry[];
 }
 
 interface Preference {
@@ -23,76 +41,88 @@ interface Preference {
   mutedEvents: NotificationEvent[];
 }
 
+/**
+ * A grid of checkboxes, and the one screen in this sweep that keeps a raw
+ * `<table>` on purpose.
+ *
+ * `DataTable` stacks a row into labelled blocks below the breakpoint, which is
+ * right for a list of records and wrong here: this is a matrix, and its meaning
+ * lives in the intersection of a row and a column. Stacked, "Email — checked"
+ * repeated five times per event says almost nothing. So it uses the `Table`,
+ * `Th` and `Td` primitives — which carry the sticky header, the scopes and the
+ * focus styling — inside the scrolling wrapper they already provide.
+ *
+ * **The event names are not translated, and that is deliberate rather than
+ * missed.** The catalogue is served by the API, and the words for an event
+ * belong beside its notification template on the server, not in a client
+ * catalogue that would silently drift from the message the user actually
+ * receives. Recorded here so the gap is a decision with an owner.
+ */
+function humanise(value: string): string {
+  const words = value.replaceAll('_', ' ').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export function NotificationPreferences() {
-  const [channels, setChannels] = useState<NotificationChannel[]>([]);
-  const [catalogue, setCatalogue] = useState<CatalogueEntry[]>([]);
-  const [preference, setPreference] = useState<Preference | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [status, setStatus] = useState('');
+  const { t } = useLanguage();
+  const catalogue = useApiResource<CatalogueResponse>(
+    ['notification-catalogue'],
+    '/notifications/catalogue',
+  );
+  const saved = useApiResource<Partial<Preference>>(
+    ['notification-preferences'],
+    '/notifications/preferences',
+  );
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [catalogueResponse, preferenceResponse] = await Promise.all([
-        apiClient.get('/notifications/catalogue'),
-        apiClient.get('/notifications/preferences'),
-      ]);
-      setChannels(catalogueResponse.data.data.channels);
-      setCatalogue(catalogueResponse.data.data.events);
-      const saved = preferenceResponse.data.data;
-      setPreference({
-        defaultChannels: saved.defaultChannels ?? null,
-        overrides: saved.overrides ?? [],
-        quietHours: saved.quietHours ?? { enabled: false, start: '22:00', end: '07:00' },
-        mutedEvents: saved.mutedEvents ?? [],
-      });
-      setError('');
-    } catch {
-      setError('Unable to load notification preferences.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [preference, setPreference] = useState<Preference>();
 
+  // The server's answer is the starting point, not the live state: every
+  // checkbox edits a local copy until "Save" is pressed, and "Undo my changes"
+  // is simply this effect running again after a refetch.
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!saved.data) return;
+    setPreference({
+      defaultChannels: saved.data.defaultChannels ?? null,
+      overrides: saved.data.overrides ?? [],
+      quietHours: saved.data.quietHours ?? { enabled: false, start: '22:00', end: '07:00' },
+      mutedEvents: saved.data.mutedEvents ?? [],
+    });
+  }, [saved.data]);
 
-  /** Falls back to the template defaults when no override exists for the event. */
-  const channelsFor = (entry: CatalogueEntry) => {
+  function channelsFor(entry: CatalogueEntry): NotificationChannel[] {
     const override = preference?.overrides.find((item) => item.event === entry.event);
     if (override) return override.channels;
     if (preference?.defaultChannels) return preference.defaultChannels;
     return entry.defaultChannels;
-  };
+  }
 
-  const toggleChannel = (entry: CatalogueEntry, channel: NotificationChannel) => {
+  function toggleChannel(entry: CatalogueEntry, channel: NotificationChannel) {
     if (!preference) return;
     const current = channelsFor(entry);
     const next = current.includes(channel)
       ? current.filter((value) => value !== channel)
       : [...current, channel];
-    const others = preference.overrides.filter((item) => item.event !== entry.event);
     setPreference({
       ...preference,
-      overrides: [...others, { event: entry.event, channels: next }],
+      overrides: [
+        ...preference.overrides.filter((item) => item.event !== entry.event),
+        { event: entry.event, channels: next },
+      ],
     });
-    setStatus('');
-  };
+  }
 
-  const toggleMute = (entry: CatalogueEntry) => {
+  function toggleMute(entry: CatalogueEntry) {
     if (!preference) return;
-    const muted = preference.mutedEvents.includes(entry.event)
-      ? preference.mutedEvents.filter((value) => value !== entry.event)
-      : [...preference.mutedEvents, entry.event];
-    setPreference({ ...preference, mutedEvents: muted });
-    setStatus('');
-  };
+    setPreference({
+      ...preference,
+      mutedEvents: preference.mutedEvents.includes(entry.event)
+        ? preference.mutedEvents.filter((value) => value !== entry.event)
+        : [...preference.mutedEvents, entry.event],
+    });
+  }
 
-  const save = async () => {
+  async function save() {
     if (!preference) return;
-    setStatus('Saving...');
     try {
       await apiClient.put('/notifications/preferences', {
         ...(preference.defaultChannels ? { defaultChannels: preference.defaultChannels } : {}),
@@ -100,159 +130,171 @@ export function NotificationPreferences() {
         quietHours: preference.quietHours,
         mutedEvents: preference.mutedEvents,
       });
-      setStatus('Preferences saved.');
-      setError('');
+      toast.success(t('notifications.saved'));
     } catch {
-      setStatus('');
-      setError('Unable to save preferences. Please try again.');
+      toast.error(t('notifications.saveFailed'));
     }
-  };
+  }
 
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Activity</p>
-          <h1>Notification preferences</h1>
-          <p>
-            In-app notifications are always delivered. These settings control the extra channels and
-            when they are allowed to interrupt you.
-          </p>
-        </div>
-        <Link className="secondary-button" to="/notifications">
-          Back to notifications
-        </Link>
-      </header>
+    <main>
+      <PageHeader
+        routeId="notification-preferences"
+        title={t('notifications.preferencesTitle')}
+        description={t('notifications.preferencesSubtitle')}
+        actions={<LinkButton to="/notifications">{t('actions.back')}</LinkButton>}
+      />
 
-      {error ? (
-        <section className="state error">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
-      {status ? <p className="state success">{status}</p> : null}
+      <Resource
+        query={catalogue}
+        loadingLabel={t('notifications.loadingPreferences')}
+        errorMessageFallback={t('notifications.couldNotLoadPreferences')}
+      >
+        {(data) => (
+          <Resource
+            query={saved}
+            loadingLabel={t('notifications.loadingPreferences')}
+            errorMessageFallback={t('notifications.couldNotLoadPreferences')}
+          >
+            {() =>
+              preference ? (
+                <div className="flex flex-col gap-4">
+                  <Card>
+                    <h2 className="mb-1 text-lg font-semibold text-text">
+                      {t('notifications.quietHours')}
+                    </h2>
+                    <p className="mb-3 max-w-prose text-text-muted">
+                      {t('notifications.quietHoursBody')}
+                    </p>
+                    <div className="flex flex-wrap items-end gap-4">
+                      <label className="flex min-h-11 items-center gap-2 text-text">
+                        <input
+                          type="checkbox"
+                          checked={preference.quietHours.enabled}
+                          onChange={(event) =>
+                            setPreference({
+                              ...preference,
+                              quietHours: {
+                                ...preference.quietHours,
+                                enabled: event.target.checked,
+                              },
+                            })
+                          }
+                        />
+                        {t('notifications.quietHoursEnable')}
+                      </label>
+                      <Field label={t('notifications.quietFrom')}>
+                        <Input
+                          type="time"
+                          value={preference.quietHours.start}
+                          onChange={(event) =>
+                            setPreference({
+                              ...preference,
+                              quietHours: { ...preference.quietHours, start: event.target.value },
+                            })
+                          }
+                        />
+                      </Field>
+                      <Field label={t('notifications.quietTo')}>
+                        <Input
+                          type="time"
+                          value={preference.quietHours.end}
+                          onChange={(event) =>
+                            setPreference({
+                              ...preference,
+                              quietHours: { ...preference.quietHours, end: event.target.value },
+                            })
+                          }
+                        />
+                      </Field>
+                    </div>
+                  </Card>
 
-      {loading ? (
-        <section className="state">Loading preferences...</section>
-      ) : !preference ? (
-        <section className="state">Preferences are unavailable.</section>
-      ) : (
-        <>
-          <section className="preference-block">
-            <h2>Quiet hours (Asia/Dhaka)</h2>
-            <p>
-              Push, SMS and WhatsApp are held during these hours. Email still arrives, and critical
-              alerts such as delivery verification codes always come through.
-            </p>
-            <div className="preference-row">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={preference.quietHours.enabled}
-                  onChange={(event) =>
-                    setPreference({
-                      ...preference,
-                      quietHours: { ...preference.quietHours, enabled: event.target.checked },
-                    })
-                  }
-                />
-                Enable quiet hours
-              </label>
-              <label htmlFor="quiet-start">From</label>
-              <input
-                id="quiet-start"
-                type="time"
-                value={preference.quietHours.start}
-                onChange={(event) =>
-                  setPreference({
-                    ...preference,
-                    quietHours: { ...preference.quietHours, start: event.target.value },
-                  })
-                }
-              />
-              <label htmlFor="quiet-end">To</label>
-              <input
-                id="quiet-end"
-                type="time"
-                value={preference.quietHours.end}
-                onChange={(event) =>
-                  setPreference({
-                    ...preference,
-                    quietHours: { ...preference.quietHours, end: event.target.value },
-                  })
-                }
-              />
-            </div>
-          </section>
+                  <Card>
+                    <h2 className="mb-1 text-lg font-semibold text-text">
+                      {t('notifications.channelsByEvent')}
+                    </h2>
+                    <p className="mb-3 max-w-prose text-text-muted">
+                      {t('notifications.inAppAlways')}
+                    </p>
+                    <Table>
+                      <caption className="sr-only">{t('notifications.channelsByEvent')}</caption>
+                      <thead>
+                        <tr>
+                          <Th>{t('notifications.event')}</Th>
+                          {data.channels.map((channel) => (
+                            <Th key={channel}>{t(`notificationChannel.${channel}`)}</Th>
+                          ))}
+                          <Th>{t('notifications.mute')}</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.events.map((entry) => {
+                          const muted = preference.mutedEvents.includes(entry.event);
+                          const active = channelsFor(entry);
+                          return (
+                            <tr key={entry.event} className={muted ? 'opacity-60' : undefined}>
+                              <Th scope="row" className="text-start font-normal">
+                                <span className="text-text">{humanise(entry.event)}</span>
+                                <span className="block text-sm text-text-muted">
+                                  {t(`notificationCategory.${entry.category}`)}
+                                </span>
+                              </Th>
+                              {data.channels.map((channel) => (
+                                <Td key={channel}>
+                                  <label className="flex min-h-11 items-center">
+                                    <span className="sr-only">
+                                      {t('notifications.channelForEvent', {
+                                        channel: t(`notificationChannel.${channel}`),
+                                        event: humanise(entry.event),
+                                      })}
+                                    </span>
+                                    <input
+                                      type="checkbox"
+                                      disabled={muted}
+                                      checked={active.includes(channel)}
+                                      onChange={() => toggleChannel(entry, channel)}
+                                    />
+                                  </label>
+                                </Td>
+                              ))}
+                              <Td>
+                                <label className="flex min-h-11 items-center">
+                                  <span className="sr-only">
+                                    {t('notifications.muteEvent', {
+                                      event: humanise(entry.event),
+                                    })}
+                                  </span>
+                                  <input
+                                    type="checkbox"
+                                    checked={muted}
+                                    onChange={() => toggleMute(entry)}
+                                  />
+                                </label>
+                              </Td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </Table>
+                  </Card>
 
-          <section className="preference-block">
-            <h2>Channels by event</h2>
-            <table className="preference-table">
-              <thead>
-                <tr>
-                  <th scope="col">Event</th>
-                  {channels.map((channel) => (
-                    <th scope="col" key={channel}>
-                      {channel.replaceAll('_', ' ')}
-                    </th>
-                  ))}
-                  <th scope="col">Mute</th>
-                </tr>
-              </thead>
-              <tbody>
-                {catalogue.map((entry) => {
-                  const muted = preference.mutedEvents.includes(entry.event);
-                  const active = channelsFor(entry);
-                  return (
-                    <tr key={entry.event} className={muted ? 'muted' : ''}>
-                      <th scope="row">
-                        <span>{entry.event.replaceAll('_', ' ')}</span>
-                        <small>
-                          {entry.category} · {entry.priority}
-                        </small>
-                      </th>
-                      {channels.map((channel) => (
-                        <td key={channel}>
-                          <label>
-                            <span className="visually-hidden">
-                              {`${channel} for ${entry.event}`}
-                            </span>
-                            <input
-                              type="checkbox"
-                              disabled={muted}
-                              checked={active.includes(channel)}
-                              onChange={() => toggleChannel(entry, channel)}
-                            />
-                          </label>
-                        </td>
-                      ))}
-                      <td>
-                        <label>
-                          <span className="visually-hidden">{`Mute ${entry.event}`}</span>
-                          <input
-                            type="checkbox"
-                            checked={muted}
-                            onChange={() => toggleMute(entry)}
-                          />
-                        </label>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </section>
-
-          <div className="preference-actions">
-            <button type="button" onClick={() => void save()}>
-              Save preferences
-            </button>
-            <button type="button" className="secondary-button" onClick={() => void load()}>
-              Discard changes
-            </button>
-          </div>
-        </>
-      )}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button onClick={() => void saved.refetch()}>
+                      {t('notifications.discard')}
+                    </Button>
+                    <Button variant="primary" onClick={() => void save()}>
+                      {t('notifications.save')}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-text-muted">{t('notifications.unavailable')}</p>
+              )
+            }
+          </Resource>
+        )}
+      </Resource>
     </main>
   );
 }

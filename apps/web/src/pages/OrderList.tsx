@@ -1,78 +1,101 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Order } from '@medsupply/shared-types';
-import { apiClient } from '../api/client';
-import './inventory.css';
+import {
+  DataTable,
+  EmptyState,
+  LinkButton,
+  PageHeader,
+  Resource,
+  StatusPill,
+  type Column,
+} from '../components/ui';
+import { useApiCollection } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
+
+/**
+ * The list a shop owner opens most often.
+ *
+ * It was a hand-rolled `useEffect` fetch with its own loading boolean, its own
+ * error sentence and a raw `<table>` that became a horizontal scroll strip on a
+ * phone — the same shape as thirty-four other pages. What it says has not
+ * changed; what has is that the wait, the failure and the empty list are now
+ * the ones every other screen shows, the row stacks into a readable block below
+ * the table breakpoint, and the status reads "Awaiting approval" rather than
+ * `SUBMITTED`.
+ */
 export function OrderList() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  async function load() {
-    setLoading(true);
-    setError('');
-    try {
-      setOrders((await apiClient.get('/orders')).data.data);
-    } catch {
-      setError('Unable to load orders.');
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => {
-    void load();
-  }, []);
-  return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Ordering</p>
-          <h1>Orders</h1>
-        </div>
-        <Link className="primary-button" to="/medicines">
-          Create order
+  const { t } = useLanguage();
+  const query = useApiCollection<Order>(['orders'], '/orders');
+
+  const columns: ReadonlyArray<Column<Order>> = [
+    {
+      key: 'reference',
+      header: t('fields.reference'),
+      cell: (order) => (
+        <Link className="font-medium text-brand underline" to={`/orders/${order._id}`}>
+          {order.reference}
         </Link>
-      </header>
-      {error && (
-        <section className="state error">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      )}
-      {loading ? (
-        <section className="state">Loading orders…</section>
-      ) : orders.length === 0 ? (
-        <section className="state">No orders yet.</section>
-      ) : (
-        <section className="panel">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Reference</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th>Items</th>
-                  <th>Estimate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => (
-                  <tr key={order._id}>
-                    <td>
-                      <Link to={`/orders/${order._id}`}>{order.reference}</Link>
-                    </td>
-                    <td>{formatFinanceDate(order.createdAt)}</td>
-                    <td>{order.status.replaceAll('_', ' ')}</td>
-                    <td>{order.items.length}</td>
-                    <td>{formatMinor(order.estimatedTotalMinor)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+      ),
+    },
+    { key: 'date', header: t('fields.date'), cell: (order) => formatFinanceDate(order.createdAt) },
+    {
+      key: 'status',
+      header: t('fields.status'),
+      cell: (order) => <StatusPill kind="order" status={order.status} />,
+    },
+    {
+      key: 'items',
+      header: t('orders.itemCount'),
+      numeric: true,
+      cell: (order) => order.items.length,
+    },
+    {
+      key: 'estimate',
+      header: t('orders.estimate'),
+      numeric: true,
+      cell: (order) => formatMinor(order.estimatedTotalMinor),
+    },
+  ];
+
+  return (
+    <main>
+      <PageHeader
+        routeId="orders"
+        title={t('orders.title')}
+        description={t('orders.subtitle')}
+        actions={
+          <LinkButton variant="primary" to="/medicines">
+            {t('orders.start')}
+          </LinkButton>
+        }
+      />
+      <Resource
+        query={query}
+        loadingLabel={t('orders.loading')}
+        errorMessageFallback={t('orders.couldNotLoad')}
+        empty={
+          <EmptyState
+            title={t('orders.none')}
+            description={t('orders.noneBody')}
+            action={
+              <LinkButton variant="primary" to="/medicines">
+                {t('orders.start')}
+              </LinkButton>
+            }
+          />
+        }
+      >
+        {(orders) => (
+          <DataTable
+            caption={t('orders.title')}
+            columns={columns}
+            rows={orders.items}
+            rowKey={(order) => order._id}
+            rowTest={(order) => order.reference}
+          />
+        )}
+      </Resource>
     </main>
   );
 }

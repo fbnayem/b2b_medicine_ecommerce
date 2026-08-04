@@ -79,7 +79,26 @@ export function apiFailure(caught: unknown): ApiFailure {
   if (error?.response === undefined) {
     return { code: 'NETWORK', message: error?.message };
   }
-  return { code: 'UNKNOWN', message: error?.message, status: error?.response?.status };
+
+  /*
+   * A response with no error body still says something useful in its status,
+   * and "you are not allowed to do that" must not be rendered as "something
+   * went wrong" — those lead to different next actions. Pages used to hand-code
+   * this per screen ("Your role cannot view returns."), which is why the same
+   * refusal was worded differently on every page that bothered.
+   */
+  const status = error?.response?.status;
+  const byStatus: Record<number, string> = {
+    401: 'UNAUTHORIZED',
+    403: 'FORBIDDEN',
+    404: 'NOT_FOUND',
+    429: 'RATE_LIMITED',
+  };
+  return {
+    code: (status === undefined ? undefined : byStatus[status]) ?? 'UNKNOWN',
+    message: error?.message,
+    status,
+  };
 }
 
 /** The correlation identifier, so a person can quote it. */

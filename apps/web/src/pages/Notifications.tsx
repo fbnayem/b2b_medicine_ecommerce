@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   NotificationCategory,
   RealtimeEvent,
@@ -8,218 +9,207 @@ import {
 import { apiClient } from '../api/client';
 import { useNotificationStore } from '../store/useNotifications';
 import { useRealtimeEvent } from '../realtime/useRealtime';
-import './inventory.css';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  FilterTabs,
+  LinkButton,
+  PageHeader,
+  Pagination,
+  Resource,
+  toast,
+} from '../components/ui';
+import { useApiCollection } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime } from '../lib/finance';
 
-const categories = ['', ...Object.values(NotificationCategory)] as const;
 const PAGE_SIZE = 20;
 
 export function Notifications() {
-  const [items, setItems] = useState<NotificationRecord[]>([]);
+  const { t } = useLanguage();
+  const queryClient = useQueryClient();
+  const loadUnread = useNotificationStore((state) => state.loadUnread);
   const [category, setCategory] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState('');
-  const loadUnread = useNotificationStore((state) => state.loadUnread);
 
-  const load = useCallback(
-    async (silent = false) => {
-      if (!silent) setLoading(true);
-      try {
-        const response = await apiClient.get('/notifications', {
-          params: {
-            page,
-            limit: PAGE_SIZE,
-            ...(category ? { category } : {}),
-            ...(unreadOnly ? { unreadOnly: true } : {}),
-          },
-        });
-        setItems(response.data.data);
-        setTotal(response.data.meta.total);
-        setError('');
-      } catch {
-        setError('Unable to load notifications.');
-      } finally {
-        if (!silent) setLoading(false);
-      }
-    },
-    [category, page, unreadOnly],
+  const search = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+  if (category) search.set('category', category);
+  if (unreadOnly) search.set('unreadOnly', 'true');
+
+  const notifications = useApiCollection<NotificationRecord>(
+    ['notifications', category, unreadOnly, page],
+    `/notifications?${search.toString()}`,
   );
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useRealtimeEvent(RealtimeEvent.NOTIFICATION_CREATED, () => {
+    void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+  });
 
-  useRealtimeEvent(RealtimeEvent.NOTIFICATION_CREATED, () => void load(true));
+  async function refreshBoth() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      loadUnread(),
+    ]);
+  }
 
-  const changeFilter = (next: string) => {
-    setCategory(next);
-    setPage(1);
-  };
-
-  const markRead = async (ids: string[]) => {
-    if (!ids.length) return;
-    setBusy('Marking as read...');
+  async function act(request: Promise<unknown>, done: string) {
     try {
-      await apiClient.post('/notifications/read', { notificationIds: ids });
-      await Promise.all([load(true), loadUnread()]);
-      setBusy('Marked as read.');
+      await request;
+      await refreshBoth();
+      toast.success(done);
     } catch {
-      setBusy('');
-      setError('Unable to update these notifications.');
+      toast.error(t('notifications.updateFailed'));
     }
-  };
+  }
 
-  const markAllRead = async () => {
-    setBusy('Marking all as read...');
-    try {
-      await apiClient.post('/notifications/read-all', {
+  const markRead = (ids: string[]) =>
+    ids.length
+      ? act(
+          apiClient.post('/notifications/read', { notificationIds: ids }),
+          t('notifications.markedRead'),
+        )
+      : Promise.resolve();
+
+  const markAllRead = () =>
+    act(
+      apiClient.post('/notifications/read-all', {
         ...(category ? { category } : {}),
         before: new Date().toISOString(),
-      });
-      await Promise.all([load(true), loadUnread()]);
-      setBusy('All notifications marked as read.');
-    } catch {
-      setBusy('');
-      setError('Unable to mark notifications as read.');
-    }
-  };
+      }),
+      t('notifications.markedRead'),
+    );
 
-  const archive = async (id: string) => {
-    setBusy('Archiving...');
-    try {
-      await apiClient.post('/notifications/archive', { notificationIds: [id] });
-      await Promise.all([load(true), loadUnread()]);
-      setBusy('Notification archived.');
-    } catch {
-      setBusy('');
-      setError('Unable to archive this notification.');
-    }
-  };
+  const archive = (id: string) =>
+    act(
+      apiClient.post('/notifications/archive', { notificationIds: [id] }),
+      t('notifications.archived'),
+    );
 
-  const unreadIds = items.filter((item) => !item.readAt).map((item) => item._id);
-  const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const options = [
+    { value: '', label: t('notifications.allCategories') },
+    ...Object.values(NotificationCategory).map((value) => ({
+      value,
+      label: t(`notificationCategory.${value}`),
+    })),
+  ];
 
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Activity</p>
-          <h1>Notifications</h1>
-          <p>Everything the system has told you, newest first.</p>
-        </div>
-        <Link className="secondary-button" to="/notifications/preferences">
-          Preferences
-        </Link>
-      </header>
+    <main>
+      <PageHeader
+        routeId="notifications"
+        title={t('notifications.title')}
+        description={t('notifications.subtitle')}
+        actions={
+          <LinkButton to="/notifications/preferences">{t('notifications.preferences')}</LinkButton>
+        }
+      />
 
-      <nav className="filter-tabs" aria-label="Notification category">
-        {categories.map((value) => (
-          <button
-            key={value || 'all'}
-            className={category === value ? 'selected' : ''}
-            onClick={() => changeFilter(value)}
+      <div className="mb-4 flex flex-col gap-3">
+        <FilterTabs
+          label={t('notifications.category')}
+          options={options}
+          value={category}
+          onChange={(value) => {
+            setCategory(value);
+            setPage(1);
+          }}
+        />
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex min-h-11 items-center gap-2 text-text">
+            <input
+              type="checkbox"
+              checked={unreadOnly}
+              onChange={(event) => {
+                setUnreadOnly(event.target.checked);
+                setPage(1);
+              }}
+            />
+            {t('notifications.unreadOnly')}
+          </label>
+          <Button
+            disabled={!(notifications.data?.items ?? []).some((item) => !item.readAt)}
+            onClick={() =>
+              void markRead(
+                (notifications.data?.items ?? [])
+                  .filter((item) => !item.readAt)
+                  .map((item) => item._id),
+              )
+            }
           >
-            {value ? value.replaceAll('_', ' ') : 'All'}
-          </button>
-        ))}
-      </nav>
-
-      <div className="notification-actions">
-        <label>
-          <input
-            type="checkbox"
-            checked={unreadOnly}
-            onChange={(event) => {
-              setUnreadOnly(event.target.checked);
-              setPage(1);
-            }}
-          />
-          Unread only
-        </label>
-        <button
-          type="button"
-          className="secondary-button"
-          disabled={!unreadIds.length}
-          onClick={() => void markRead(unreadIds)}
-        >
-          Mark this page read
-        </button>
-        <button type="button" className="secondary-button" onClick={() => void markAllRead()}>
-          Mark all read
-        </button>
+            {t('notifications.markPageRead')}
+          </Button>
+          <Button onClick={() => void markAllRead()}>{t('notifications.markAllRead')}</Button>
+        </div>
       </div>
 
-      {busy ? <p className="state success">{busy}</p> : null}
-      {error ? (
-        <section className="state error">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
-
-      {loading ? (
-        <section className="state">Loading notifications...</section>
-      ) : items.length === 0 ? (
-        <section className="state">
-          {unreadOnly ? 'You have read everything here.' : 'No notifications in this category yet.'}
-        </section>
-      ) : (
-        <section className="notification-list">
-          {items.map((notification) => (
-            <article
-              key={notification._id}
-              className={`notification-row ${notification.readAt ? '' : 'unread'}`}
-            >
-              <div>
-                <p className="notification-title">
-                  {notification.link ? (
-                    <Link to={notification.link}>{notification.title}</Link>
-                  ) : (
-                    notification.title
-                  )}
-                </p>
-                <p>{notification.body}</p>
-                <p className="notification-meta">
-                  {notification.category} · {notification.priority} ·{' '}
-                  {formatFinanceDateTime(notification.createdAt)}
-                </p>
-              </div>
-              <div className="notification-row-actions">
-                {notification.readAt ? (
-                  <span className="status">Read</span>
-                ) : (
-                  <button type="button" onClick={() => void markRead([notification._id])}>
-                    Mark read
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => void archive(notification._id)}
-                >
-                  Archive
-                </button>
-              </div>
-            </article>
-          ))}
-        </section>
-      )}
-
-      <nav className="pagination" aria-label="Notification pages">
-        <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-          Previous
-        </button>
-        <span>
-          Page {page} of {lastPage}
-        </span>
-        <button type="button" disabled={page >= lastPage} onClick={() => setPage(page + 1)}>
-          Next
-        </button>
-      </nav>
+      <Resource
+        query={notifications}
+        loadingLabel={t('notifications.loading')}
+        errorMessageFallback={t('notifications.couldNotLoad')}
+        empty={
+          <EmptyState
+            title={unreadOnly ? t('notifications.allCaughtUp') : t('notifications.noneInCategory')}
+            description={t('notifications.noneBody')}
+          />
+        }
+      >
+        {(result) => (
+          <>
+            <ul className="m-0 flex list-none flex-col gap-3 p-0">
+              {result.items.map((notification) => (
+                <li key={notification._id}>
+                  <Card
+                    data-test={`row-${notification._id}`}
+                    className={
+                      notification.readAt
+                        ? 'flex flex-wrap items-start justify-between gap-4'
+                        : 'flex flex-wrap items-start justify-between gap-4 border-s-4 border-s-brand'
+                    }
+                  >
+                    <div className="min-w-64 flex-1">
+                      <p className="font-medium text-text">
+                        {notification.link ? (
+                          <Link className="text-brand underline" to={notification.link}>
+                            {notification.title}
+                          </Link>
+                        ) : (
+                          notification.title
+                        )}
+                      </p>
+                      <p className="text-text-muted">{notification.body}</p>
+                      <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-text-muted">
+                        <Badge>{t(`notificationCategory.${notification.category}`)}</Badge>
+                        {formatFinanceDateTime(notification.createdAt)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {notification.readAt ? (
+                        <Badge tone="success">{t('notifications.read')}</Badge>
+                      ) : (
+                        <Button size="sm" onClick={() => void markRead([notification._id])}>
+                          {t('notifications.markRead')}
+                        </Button>
+                      )}
+                      <Button size="sm" onClick={() => void archive(notification._id)}>
+                        {t('notifications.archive')}
+                      </Button>
+                    </div>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+            <Pagination
+              page={result.page}
+              limit={result.limit}
+              total={result.total}
+              onPage={setPage}
+            />
+          </>
+        )}
+      </Resource>
     </main>
   );
 }
