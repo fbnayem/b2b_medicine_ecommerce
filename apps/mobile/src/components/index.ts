@@ -20,5 +20,6 @@ export type { ButtonProps, ButtonVariant, FieldProps, FilterOption, InputProps }
 export { Badge, StatusPill, statusLabel } from './Status';
 export type { BadgeTone, StatusKind } from './Status';
 export { AskProvider, useAsk, requireReason } from './Ask';
+export type { ChoiceOption } from './Ask';
 export { Toaster, toast, resetToasts } from './Toast';
 export type { ToastMessage, ToastTone } from './Toast';

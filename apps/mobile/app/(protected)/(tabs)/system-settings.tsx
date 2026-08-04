@@ -1,21 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Text } from 'react-native';
+import { errorMessage } from '@medsupply/api-client';
 import {
   fetchEffectiveSettings,
-  SOURCE_LABELS,
+  groupLabel,
+  SETTING_GROUPS,
+  sourceLabel,
   toRows,
   type EffectiveSettings,
 } from '../../../src/settings/api';
-
-const GROUP_LABELS: Record<string, string> = {
-  business: 'Business identity',
-  finance: 'Finance and credit',
-  inventory: 'Inventory thresholds',
-  delivery: 'Delivery proof',
-  notifications: 'Notification defaults',
-  localisation: 'Localisation',
-  security: 'Security policy',
-};
+import { useLanguage } from '../../../src/i18n/useLanguage';
+import {
+  Button,
+  Card,
+  ErrorState,
+  ListRow,
+  LoadingState,
+  Screen,
+  SectionTitle,
+} from '../../../src/components';
+import { colour, layout } from '../../../src/theme';
 
 /**
  * Read-only view of what is actually in force. Editing lives on the web
@@ -24,6 +28,7 @@ const GROUP_LABELS: Record<string, string> = {
  * without guessing.
  */
 export default function SystemSettingsScreen() {
+  const { t, language } = useLanguage();
   const [data, setData] = useState<EffectiveSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -34,16 +39,16 @@ export default function SystemSettingsScreen() {
       setData(await fetchEffectiveSettings());
       setError('');
     } catch (caught) {
-      const failure = caught as { response?: { status?: number } };
+      const status = (caught as { response?: { status?: number } }).response?.status;
       setError(
-        failure.response?.status === 403
-          ? 'Your role cannot view system settings.'
-          : 'Unable to load system settings.',
+        status === 403
+          ? t('errorPages.forbiddenBody')
+          : errorMessage(caught, language, t('settings.couldNotLoad')),
       );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [language, t]);
 
   useEffect(() => {
     void load();
@@ -51,80 +56,45 @@ export default function SystemSettingsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-        <Text style={styles.muted}>Loading system settings...</Text>
-      </View>
+      <Screen>
+        <LoadingState label={t('settings.loading')} />
+      </Screen>
     );
   }
 
-  if (error || !data) {
+  if (!data) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.error}>{error || 'System settings are unavailable.'}</Text>
-        <Pressable style={styles.secondary} onPress={() => void load()}>
-          <Text style={styles.secondaryText}>Retry</Text>
-        </Pressable>
-      </View>
+      <Screen>
+        <ErrorState message={error || t('settings.couldNotLoad')} onRetry={() => void load()} />
+      </Screen>
     );
   }
+
+  const groups = data.settings as unknown as Record<string, Record<string, unknown>>;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.muted}>
-        These values are in force now. Change them on the web application.
-      </Text>
-      {Object.entries(GROUP_LABELS).map(([group, label]) => {
-        const values = (data.settings as unknown as Record<string, Record<string, unknown>>)[group];
+    <Screen>
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+
+      <Text style={{ color: colour.textMuted }}>{t('settings.subtitle')}</Text>
+
+      {SETTING_GROUPS.map((group) => {
+        const values = groups[group];
         if (!values) return null;
         return (
-          <View key={group} style={styles.card}>
-            <Text style={styles.heading}>{label}</Text>
-            <Text style={styles.source}>
-              {SOURCE_LABELS[data.sources[group]] ?? data.sources[group]}
+          <Card key={group}>
+            <SectionTitle>{groupLabel(t, group)}</SectionTitle>
+            <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>
+              {t('settings.sourceLabel')}: {sourceLabel(t, data.sources[group])}
             </Text>
-            {toRows(values).map((row) => (
-              <View key={row.label} style={styles.row}>
-                <Text style={styles.rowLabel}>{row.label}</Text>
-                <Text style={styles.rowValue}>{row.value}</Text>
-              </View>
+            {toRows(t, values).map((row) => (
+              <ListRow key={row.label} label={row.label} value={row.value} />
             ))}
-          </View>
+          </Card>
         );
       })}
-      <Pressable style={styles.secondary} onPress={() => void load()}>
-        <Text style={styles.secondaryText}>Reload</Text>
-      </Pressable>
-    </ScrollView>
+
+      <Button variant="secondary" label={t('settings.reload')} onPress={() => void load()} />
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  content: { padding: 14, gap: 12, paddingBottom: 40 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 12 },
-  card: { backgroundColor: '#fff', padding: 16, borderRadius: 12, gap: 6 },
-  heading: { fontWeight: '700', fontSize: 17 },
-  source: { color: '#718077', fontSize: 12, marginBottom: 4 },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f4f2',
-  },
-  rowLabel: { color: '#4b5a52', flexShrink: 1 },
-  rowValue: { fontWeight: '600', textAlign: 'right', flexShrink: 1 },
-  muted: { color: '#718077' },
-  error: { color: '#8b2525' },
-  secondary: {
-    borderWidth: 1,
-    borderColor: '#d9e3dd',
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  secondaryText: { color: '#16724a', fontWeight: '700' },
-});

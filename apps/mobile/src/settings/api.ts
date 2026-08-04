@@ -23,70 +23,62 @@ export interface SettingsRow {
   value: string;
 }
 
-const LABELS: Record<string, string> = {
-  name: 'Display name',
-  legalName: 'Legal name',
-  logoUrl: 'Logo URL',
-  address: 'Address',
-  phone: 'Phone',
-  email: 'Email',
-  website: 'Website',
-  tradeLicenceNumber: 'Trade licence',
-  drugLicenceNumber: 'Drug licence',
-  invoiceFooter: 'Invoice footer',
-  taxBasisPoints: 'Tax (basis points)',
-  defaultPaymentTermsDays: 'Default payment terms (days)',
-  creditBlockOnLimitExceeded: 'Block over credit limit',
-  creditBlockOverdueThresholdMinor: 'Overdue block threshold (poisha)',
-  creditOverdueGraceDays: 'Overdue grace (days)',
-  customerAdvanceEnabled: 'Customer advances',
-  deliveryCollectionRequiresVerification: 'Collections need verification',
-  nearExpiryDays: 'Near-expiry window (days)',
-  lowStockThreshold: 'Low-stock threshold',
-  requiredProofs: 'Required delivery proofs',
-  otpExpiryMinutes: 'OTP lifetime (minutes)',
-  defaultQuietHours: 'Default quiet hours',
-  overdueDigestEnabled: 'Overdue digest',
-  nearExpiryDigestEnabled: 'Near-expiry digest',
-  timezone: 'Time zone',
-  locale: 'Locale',
-  dateFormat: 'Date format',
-  currencyCode: 'Currency code',
-  currencySymbol: 'Currency symbol',
-  passwordMinLength: 'Minimum password length',
-  maxLoginAttempts: 'Attempts before lockout',
-  lockoutMinutes: 'Lockout duration (minutes)',
-  forcePasswordChangeOnCreate: 'Force change on first sign-in',
-};
+type Translate = (path: string, values?: Record<string, string | number>) => string;
 
-/**
- * Flattens one settings group into display rows. Values are rendered as the
- * operator would read them, so an empty optional field reads "Not set" rather
- * than disappearing and looking like a missing feature.
- */
-export function toRows(group: Record<string, unknown>): SettingsRow[] {
-  return Object.entries(group).map(([key, value]) => ({
-    label: LABELS[key] ?? key,
-    value: formatValue(value),
-  }));
+/** The seven groups the server returns, in the order an operator reads them. */
+export const SETTING_GROUPS = [
+  'business',
+  'finance',
+  'inventory',
+  'delivery',
+  'notifications',
+  'localisation',
+  'security',
+] as const;
+
+export function groupLabel(t: Translate, group: string): string {
+  return t(`settings.group${group.charAt(0).toUpperCase()}${group.slice(1)}`);
 }
 
-export function formatValue(value: unknown): string {
-  if (value === undefined || value === null || value === '') return 'Not set';
-  if (typeof value === 'boolean') return value ? 'Enabled' : 'Disabled';
-  if (Array.isArray(value)) return value.length ? value.join(', ') : 'None';
+export function sourceLabel(t: Translate, source: string): string {
+  const label = t(`settings.source${source}`);
+  return label.startsWith('settings.') ? source : label;
+}
+
+/**
+ * Flattens one settings group into display rows.
+ *
+ * The labels used to live here, in English, and two of them said things
+ * `AGENTS.md` bans outright: "Overdue block threshold (poisha)" and "Tax (basis
+ * points)". The catalogue already carries these — the web settings screen uses
+ * them — and its wording explains the number rather than naming the unit:
+ * "Tax rate, in hundredths of a percent (750 = 7.50%)".
+ *
+ * An empty optional field reads "Not set" rather than disappearing, which would
+ * look like a missing feature rather than an unset value.
+ */
+export function toRows(t: Translate, group: Record<string, unknown>): SettingsRow[] {
+  return Object.entries(group).map(([key, value]) => {
+    const label = t(`settings.field${key.charAt(0).toUpperCase()}${key.slice(1)}`);
+    return {
+      label: label.startsWith('settings.') ? key : label,
+      value: formatValue(t, value),
+    };
+  });
+}
+
+export function formatValue(t: Translate, value: unknown): string {
+  if (value === undefined || value === null || value === '') return t('common.notSet');
+  if (typeof value === 'boolean') return value ? t('common.on') : t('common.off');
+  if (Array.isArray(value)) return value.length ? value.join(', ') : t('common.nothing');
   if (typeof value === 'object') {
     const quiet = value as { enabled?: boolean; start?: string; end?: string };
     if (typeof quiet.enabled === 'boolean') {
-      return quiet.enabled ? `${quiet.start} to ${quiet.end}` : 'Disabled';
+      return quiet.enabled
+        ? t('common.between', { from: quiet.start ?? '', to: quiet.end ?? '' })
+        : t('common.off');
     }
     return JSON.stringify(value);
   }
   return String(value);
 }
-
-export const SOURCE_LABELS: Record<string, string> = {
-  PERSISTED: 'Saved in system settings',
-  ENVIRONMENT: 'From the deployment environment',
-  DEFAULT: 'Built-in default',
-};

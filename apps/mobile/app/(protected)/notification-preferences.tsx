@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, Switch, Text, View } from 'react-native';
 import type { NotificationChannel } from '@medsupply/shared-types';
+import { errorMessage } from '@medsupply/api-client';
+import { formatSettings, humaniseEnum } from '@medsupply/utilities';
 import {
   effectiveChannels,
   fetchCatalogue,
@@ -20,14 +14,27 @@ import {
   type PreferencePayload,
 } from '../../src/notifications/api';
 import { registerForPush } from '../../src/notifications/push';
+import { useLanguage } from '../../src/i18n/useLanguage';
+import {
+  Button,
+  Card,
+  ErrorState,
+  ListRow,
+  LoadingState,
+  Screen,
+  SectionTitle,
+  toast,
+} from '../../src/components';
+import { colour, layout } from '../../src/theme';
 
 export default function NotificationPreferencesScreen() {
+  const { t, language } = useLanguage();
   const [channels, setChannels] = useState<NotificationChannel[]>([]);
   const [catalogue, setCatalogue] = useState<CatalogueEntry[]>([]);
   const [preference, setPreference] = useState<PreferencePayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState('');
   const [pushState, setPushState] = useState('');
 
   const load = useCallback(async () => {
@@ -41,12 +48,12 @@ export default function NotificationPreferencesScreen() {
       setCatalogue(catalogueData.events);
       setPreference(preferenceData);
       setError('');
-    } catch {
-      setError('Unable to load notification preferences.');
+    } catch (caught) {
+      setError(errorMessage(caught, language, t('notifications.couldNotLoadPreferences')));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [language, t]);
 
   useEffect(() => {
     void load();
@@ -54,71 +61,75 @@ export default function NotificationPreferencesScreen() {
 
   const save = async () => {
     if (!preference) return;
-    setStatus('Saving...');
+    setSaving(true);
     try {
       await savePreferences(preference);
-      setStatus('Preferences saved.');
+      toast.success(t('notifications.saved'));
       setError('');
-    } catch {
-      setStatus('');
-      setError('Unable to save preferences.');
+    } catch (caught) {
+      toast.error(errorMessage(caught, language, t('notifications.saveFailed')));
+    } finally {
+      setSaving(false);
     }
   };
 
   const enablePush = async () => {
-    setPushState('Requesting permission...');
+    setPushState(t('common.loading'));
     const outcome = await registerForPush();
-    if (outcome.status === 'REGISTERED') setPushState('This device is registered for push.');
-    else if (outcome.status === 'DENIED')
-      setPushState('Push permission was declined. Enable it in the device settings.');
+    if (outcome.status === 'REGISTERED') setPushState(t('notifications.pushRegistered'));
+    else if (outcome.status === 'DENIED') setPushState(t('notifications.pushDenied'));
     else setPushState(outcome.reason);
   };
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-        <Text style={styles.muted}>Loading preferences...</Text>
-      </View>
+      <Screen>
+        <LoadingState label={t('notifications.loadingPreferences')} />
+      </Screen>
     );
   }
 
   if (!preference) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.error}>{error || 'Preferences are unavailable.'}</Text>
-        <Pressable style={styles.secondary} onPress={() => void load()}>
-          <Text style={styles.secondaryText}>Retry</Text>
-        </Pressable>
-      </View>
+      <Screen>
+        <ErrorState message={error || t('notifications.unavailable')} onRetry={() => void load()} />
+      </Screen>
     );
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {status ? <Text style={styles.success}>{status}</Text> : null}
+    <Screen>
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
 
-      <View style={styles.card}>
-        <Text style={styles.heading}>Push on this device</Text>
-        <Text style={styles.muted}>
-          Registering stores this device's push token against your account. Signing out removes it.
-        </Text>
-        <Pressable style={styles.primary} onPress={() => void enablePush()}>
-          <Text style={styles.primaryText}>Enable push on this device</Text>
-        </Pressable>
-        {pushState ? <Text style={styles.muted}>{pushState}</Text> : null}
-      </View>
+      <Card>
+        <SectionTitle>{t('notifications.pushOnThisDevice')}</SectionTitle>
+        <Text style={{ color: colour.textMuted }}>{t('notifications.pushOnThisDeviceBody')}</Text>
+        <Button label={t('notifications.enablePush')} onPress={() => void enablePush()} />
+        {pushState ? (
+          <Text accessibilityLiveRegion="polite" style={{ color: colour.textMuted }}>
+            {pushState}
+          </Text>
+        ) : null}
+      </Card>
 
-      <View style={styles.card}>
-        <Text style={styles.heading}>Quiet hours (Asia/Dhaka)</Text>
-        <Text style={styles.muted}>
-          Push, SMS and WhatsApp are held during quiet hours. Email still arrives and critical
-          alerts such as delivery verification codes always come through.
-        </Text>
-        <View style={styles.row}>
-          <Text>Enable quiet hours</Text>
+      <Card>
+        <SectionTitle>{t('notifications.quietHours')}</SectionTitle>
+        <Text style={{ color: colour.textMuted }}>{t('notifications.quietHoursBody')}</Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            minHeight: layout.minTapTarget,
+            gap: layout.space[3],
+          }}
+        >
+          <Text style={{ flexShrink: 1, color: colour.text }}>
+            {t('notifications.quietHoursEnable')}
+          </Text>
           <Switch
+            accessibilityLabel={t('notifications.quietHoursEnable')}
+            trackColor={{ true: colour.brand, false: colour.disabled }}
             value={preference.quietHours.enabled}
             onValueChange={(value) =>
               setPreference({
@@ -128,30 +139,67 @@ export default function NotificationPreferencesScreen() {
             }
           />
         </View>
-        <Text style={styles.muted}>
-          {preference.quietHours.start} to {preference.quietHours.end}. Adjust the exact window on
-          the web application.
-        </Text>
-      </View>
+        {/*
+         * The heading read "Quiet hours (Asia/Dhaka)" with the zone typed in.
+         * Phase 12 made the zone a setting, so a deployment that changes it had
+         * this screen still telling people their evenings were Dhaka's.
+         */}
+        <ListRow label={t('notifications.quietFrom')} value={preference.quietHours.start} />
+        <ListRow label={t('notifications.quietTo')} value={preference.quietHours.end} />
+        <ListRow label={t('settings.fieldTimezone')} value={formatSettings().timeZone} />
+      </Card>
 
-      <Text style={styles.heading}>Channels by event</Text>
+      <SectionTitle>{t('notifications.channelsByEvent')}</SectionTitle>
+      <Text style={{ color: colour.textMuted }}>{t('notifications.inAppAlways')}</Text>
+
       {catalogue.map((entry) => {
         const muted = preference.mutedEvents.includes(entry.event);
         const active = effectiveChannels(entry, preference);
+        /*
+         * The event names are not translated, and that is a decision rather
+         * than an omission — the same one recorded on the web screen. The
+         * catalogue is served by the API, so the words for an event belong
+         * beside its notification template on the server; putting them in a
+         * client catalogue would let them drift from the message that actually
+         * arrives. `humaniseEnum` at least stops it reading
+         * `DELIVERY_OTP_REQUESTED`.
+         */
         return (
-          <View key={entry.event} style={[styles.card, muted ? styles.mutedCard : null]}>
-            <View style={styles.row}>
-              <Text style={styles.eventTitle}>{entry.event.replaceAll('_', ' ')}</Text>
+          <Card key={entry.event} style={muted ? { opacity: 0.6 } : undefined}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                minHeight: layout.minTapTarget,
+                gap: layout.space[3],
+              }}
+            >
+              <Text
+                style={{
+                  flexShrink: 1,
+                  fontSize: layout.fontSize.base,
+                  fontWeight: '600',
+                  color: colour.text,
+                }}
+              >
+                {humaniseEnum(entry.event)}
+              </Text>
               <Switch
                 value={!muted}
-                accessibilityLabel={`Notifications for ${entry.event}`}
+                accessibilityLabel={t('notifications.muteEvent', {
+                  event: humaniseEnum(entry.event),
+                })}
+                trackColor={{ true: colour.brand, false: colour.disabled }}
                 onValueChange={() => setPreference(toggleMuted(entry, preference))}
               />
             </View>
-            <Text style={styles.muted}>
-              {entry.category} · {entry.priority}
+
+            <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>
+              {t(`notificationCategory.${entry.category}`)}
             </Text>
-            <View style={styles.chips}>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: layout.space[2] }}>
               {channels.map((channel) => {
                 const on = active.includes(channel);
                 return (
@@ -159,72 +207,47 @@ export default function NotificationPreferencesScreen() {
                     key={channel}
                     disabled={muted}
                     accessibilityRole="button"
-                    accessibilityLabel={`${channel} for ${entry.event}`}
+                    accessibilityLabel={t('notifications.channelForEvent', {
+                      channel: t(`notificationChannel.${channel}`),
+                      event: humaniseEnum(entry.event),
+                    })}
                     accessibilityState={{ selected: on, disabled: muted }}
-                    style={[styles.chip, on ? styles.chipOn : null, muted ? styles.chipOff : null]}
                     onPress={() => setPreference(toggleChannel(entry, preference, channel))}
+                    style={{
+                      minHeight: layout.minTapTarget,
+                      justifyContent: 'center',
+                      paddingHorizontal: layout.space[3],
+                      borderRadius: layout.radius.full,
+                      borderWidth: 1,
+                      borderColor: on ? colour.brand : colour.border,
+                      backgroundColor: on ? colour.brand : colour.surface,
+                      opacity: muted ? 0.5 : 1,
+                    }}
                   >
-                    <Text style={on ? styles.chipOnText : styles.chipText}>{channel}</Text>
+                    <Text
+                      style={{
+                        color: on ? colour.onBrand : colour.text,
+                        fontWeight: '600',
+                        fontSize: layout.fontSize.sm,
+                      }}
+                    >
+                      {t(`notificationChannel.${channel}`)}
+                    </Text>
                   </Pressable>
                 );
               })}
             </View>
-          </View>
+          </Card>
         );
       })}
 
-      <Text style={styles.muted}>
-        In-app notifications are always delivered and cannot be switched off.
-      </Text>
-      <Pressable style={styles.primary} onPress={() => void save()}>
-        <Text style={styles.primaryText}>Save preferences</Text>
-      </Pressable>
-      <Pressable style={styles.secondary} onPress={() => void load()}>
-        <Text style={styles.secondaryText}>Discard changes</Text>
-      </Pressable>
-    </ScrollView>
+      <Button label={t('notifications.save')} busy={saving} onPress={() => void save()} />
+      <Button
+        variant="secondary"
+        label={t('notifications.discard')}
+        disabled={saving}
+        onPress={() => void load()}
+      />
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  content: { padding: 14, gap: 12, paddingBottom: 40 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 12 },
-  card: { backgroundColor: '#fff', padding: 16, borderRadius: 12, gap: 8 },
-  mutedCard: { opacity: 0.6 },
-  heading: { fontWeight: '700', fontSize: 17 },
-  eventTitle: { fontWeight: '700', fontSize: 15, flexShrink: 1 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  chip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#d9e3dd',
-    backgroundColor: '#fff',
-  },
-  chipOn: { backgroundColor: '#16724a', borderColor: '#16724a' },
-  chipOff: { opacity: 0.5 },
-  chipText: { color: '#17211b', fontWeight: '600' },
-  chipOnText: { color: '#fff', fontWeight: '700' },
-  primary: {
-    backgroundColor: '#16724a',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  primaryText: { color: '#fff', fontWeight: '700' },
-  secondary: {
-    borderWidth: 1,
-    borderColor: '#d9e3dd',
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  secondaryText: { color: '#16724a', fontWeight: '700' },
-  muted: { color: '#718077' },
-  error: { color: '#8b2525' },
-  success: { color: '#16724a' },
-});

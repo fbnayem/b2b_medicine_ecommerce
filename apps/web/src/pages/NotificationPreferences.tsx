@@ -21,6 +21,7 @@ import {
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
+import { humaniseEnum } from '@medsupply/utilities';
 
 interface CatalogueEntry {
   event: NotificationEvent;
@@ -58,11 +59,6 @@ interface Preference {
  * catalogue that would silently drift from the message the user actually
  * receives. Recorded here so the gap is a decision with an owner.
  */
-function humanise(value: string): string {
-  const words = value.replaceAll('_', ' ').toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
 export function NotificationPreferences() {
   const { t } = useLanguage();
   const catalogue = useApiResource<CatalogueResponse>(
@@ -235,7 +231,7 @@ export function NotificationPreferences() {
                           return (
                             <tr key={entry.event} className={muted ? 'opacity-60' : undefined}>
                               <Th scope="row" className="text-start font-normal">
-                                <span className="text-text">{humanise(entry.event)}</span>
+                                <span className="text-text">{humaniseEnum(entry.event)}</span>
                                 <span className="block text-sm text-text-muted">
                                   {t(`notificationCategory.${entry.category}`)}
                                 </span>
@@ -246,7 +242,7 @@ export function NotificationPreferences() {
                                     <span className="sr-only">
                                       {t('notifications.channelForEvent', {
                                         channel: t(`notificationChannel.${channel}`),
-                                        event: humanise(entry.event),
+                                        event: humaniseEnum(entry.event),
                                       })}
                                     </span>
                                     <input
@@ -262,7 +258,7 @@ export function NotificationPreferences() {
                                 <label className="flex min-h-11 items-center">
                                   <span className="sr-only">
                                     {t('notifications.muteEvent', {
-                                      event: humanise(entry.event),
+                                      event: humaniseEnum(entry.event),
                                     })}
                                   </span>
                                   <input

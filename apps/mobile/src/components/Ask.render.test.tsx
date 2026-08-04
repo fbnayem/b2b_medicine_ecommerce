@@ -128,6 +128,32 @@ describe('prompt', () => {
   });
 });
 
+describe('choose', () => {
+  it('resolves the chosen option, in the words the storekeeper read', async () => {
+    await open((ask) =>
+      ask.choose({
+        title: 'Record a change to batch B-114',
+        options: [
+          { value: 'ADDITION', label: 'Added' },
+          { value: 'QUARANTINE', label: 'Held back', danger: true },
+        ],
+      }),
+    );
+    // The value posted is the enum; the button says what it means. The stock
+    // screen this replaces rendered `QUARANTINE_RELEASE` at the storekeeper.
+    await fireEvent.press(screen.getByRole('button', { name: 'Held back' }));
+    await waitFor(() => expect(screen.getByText('answer:QUARANTINE')).toBeTruthy());
+  });
+
+  it('resolves null when cancelled, so no movement is recorded', async () => {
+    await open((ask) =>
+      ask.choose({ title: 'Pick one', options: [{ value: 'ADDITION', label: 'Added' }] }),
+    );
+    await fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.getByText('answer:null')).toBeTruthy());
+  });
+});
+
 describe('without a provider', () => {
   it('rejects rather than resolving, so nothing reads as confirmed', async () => {
     // Silently resolving would be the worst outcome: the action would look

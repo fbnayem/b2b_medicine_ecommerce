@@ -45,18 +45,44 @@ interface PromptRequest {
   hint?: string;
   confirmLabel: string;
   multiline?: boolean;
+  /** Opens the number pad — a quantity should not need the whole keyboard. */
+  numeric?: boolean;
   initialValue?: string;
   danger?: boolean;
   /** Returns a message to show, or null when the value is acceptable. */
   validate?: (value: string) => string | null;
 }
 
-type Request = ConfirmRequest | PromptRequest;
+export interface ChoiceOption {
+  value: string;
+  label: string;
+  danger?: boolean;
+}
+
+/**
+ * One of several actions, each its own button.
+ *
+ * The alternative a screen reaches for is a row of chips on every card, or —
+ * as the stock screen actually did — a hand-built `Modal` with five
+ * `Pressable`s showing `QUARANTINE_RELEASE` verbatim. A storekeeper picking
+ * one of five stock movements needs a 44px target with words on it, not a
+ * number to type.
+ */
+interface ChooseRequest {
+  kind: 'choose';
+  title: string;
+  description?: string;
+  options: readonly ChoiceOption[];
+}
+
+type Request = ConfirmRequest | PromptRequest | ChooseRequest;
 
 interface AskApi {
   confirm(request: Omit<ConfirmRequest, 'kind'>): Promise<boolean>;
   /** Resolves to the value, or `null` when the person cancels. */
   prompt(request: Omit<PromptRequest, 'kind'>): Promise<string | null>;
+  /** Resolves to the chosen option's value, or `null` when the person cancels. */
+  choose(request: Omit<ChooseRequest, 'kind'>): Promise<string | null>;
 }
 
 const MISSING_PROVIDER =
@@ -76,6 +102,9 @@ const NO_PROVIDER: AskApi = {
     return Promise.reject(new Error(MISSING_PROVIDER));
   },
   prompt() {
+    return Promise.reject(new Error(MISSING_PROVIDER));
+  },
+  choose() {
     return Promise.reject(new Error(MISSING_PROVIDER));
   },
 };
@@ -130,12 +159,18 @@ export function AskProvider({ children }: { children: ReactNode }) {
           setRequest({ ...next, kind: 'prompt' });
         });
       },
+      choose(next) {
+        return new Promise<string | null>((resolve) => {
+          resolver.current = (answer) => resolve(typeof answer === 'string' ? answer : null);
+          setRequest({ ...next, kind: 'choose' });
+        });
+      },
     }),
     [],
   );
 
   function submit() {
-    if (!request) return;
+    if (!request || request.kind === 'choose') return;
     if (request.kind === 'confirm') {
       settle(true);
       return;
@@ -148,7 +183,8 @@ export function AskProvider({ children }: { children: ReactNode }) {
     settle(value);
   }
 
-  const isPrompt = request?.kind === 'prompt';
+  /** A cancelled prompt or choice answers `null`; a cancelled confirm answers no. */
+  const cancelled = request?.kind === 'confirm' ? false : null;
 
   return (
     <AskContext.Provider value={api}>
@@ -159,7 +195,7 @@ export function AskProvider({ children }: { children: ReactNode }) {
         animationType="fade"
         // Android's hardware back button is this platform's Escape, and a
         // dialog that ignores it traps the person inside it.
-        onRequestClose={() => settle(isPrompt ? null : false)}
+        onRequestClose={() => settle(cancelled)}
       >
         <View
           style={{
@@ -220,6 +256,7 @@ export function AskProvider({ children }: { children: ReactNode }) {
                       value={value}
                       invalid={Boolean(error)}
                       multiline={request.multiline}
+                      keyboardType={request.numeric ? 'number-pad' : 'default'}
                       autoFocus
                       onChangeText={(next) => {
                         setValue(next);
@@ -235,6 +272,18 @@ export function AskProvider({ children }: { children: ReactNode }) {
                     />
                   </Field>
                 ) : null}
+
+                {request.kind === 'choose'
+                  ? request.options.map((option) => (
+                      <Button
+                        key={option.value}
+                        variant={option.danger ? 'danger' : 'secondary'}
+                        style={{ marginTop: layout.space[2] }}
+                        label={option.label}
+                        onPress={() => settle(option.value)}
+                      />
+                    ))
+                  : null}
               </ScrollView>
 
               <View style={{ flexDirection: 'row', gap: layout.space[2] }}>
@@ -245,14 +294,16 @@ export function AskProvider({ children }: { children: ReactNode }) {
                     (request.kind === 'confirm' ? request.cancelLabel : undefined) ??
                     t('common.cancel')
                   }
-                  onPress={() => settle(isPrompt ? null : false)}
+                  onPress={() => settle(cancelled)}
                 />
-                <Button
-                  variant={request.danger ? 'danger' : 'primary'}
-                  style={{ flex: 1 }}
-                  label={request.confirmLabel}
-                  onPress={submit}
-                />
+                {request.kind === 'choose' ? null : (
+                  <Button
+                    variant={request.danger ? 'danger' : 'primary'}
+                    style={{ flex: 1 }}
+                    label={request.confirmLabel}
+                    onPress={submit}
+                  />
+                )}
               </View>
             </View>
           ) : null}

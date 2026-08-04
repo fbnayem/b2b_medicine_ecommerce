@@ -14,6 +14,7 @@ import {
 import { useApiCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime } from '../lib/finance';
+import { humaniseEnum } from '@medsupply/utilities';
 
 const PAGE_SIZE = 25;
 
@@ -32,12 +33,6 @@ function actorLabel(actor: AuditRow['actorId'], unknown: string) {
 function summarise(row: AuditRow, none: string) {
   const changed = row.after && typeof row.after === 'object' ? Object.keys(row.after) : [];
   return changed.length ? changed.slice(0, 6).join(', ') : none;
-}
-
-/** Human words for a `SNAKE_CASE` action; the list is server-supplied. */
-function humanise(value: string): string {
-  const words = value.replaceAll('_', ' ').toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 export function AuditLogViewer() {
@@ -85,7 +80,7 @@ export function AuditLogViewer() {
             <option value="">{t('audit.allActions')}</option>
             {(actions.data?.items ?? []).map((value) => (
               <option key={value} value={value}>
-                {humanise(value)}
+                {humaniseEnum(value)}
               </option>
             ))}
           </Select>
@@ -135,7 +130,7 @@ export function AuditLogViewer() {
                 <li key={row._id}>
                   <Card className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-64 flex-1">
-                      <p className="font-medium text-text">{humanise(row.action)}</p>
+                      <p className="font-medium text-text">{humaniseEnum(row.action)}</p>
                       <p className="text-text-muted">
                         {row.entityType} · {String(row.entityId)}
                       </p>

@@ -53,6 +53,11 @@ export const en = {
     loadMore: 'Load more',
     loadingMore: 'Loading…',
     view: 'View',
+    notSet: 'Not set',
+    on: 'On',
+    off: 'Off',
+    nothing: 'None',
+    between: '{{from}} to {{to}}',
   },
 
   auth: {
@@ -1671,6 +1676,13 @@ export const en = {
     updateFailed: 'Those notifications could not be updated.',
     allCaughtUp: 'You have read everything here',
     noneInCategory: 'Nothing in this category yet',
+    pushOnThisDevice: 'Phone alerts on this device',
+    pushOnThisDeviceBody:
+      'Turning this on stores this phone against your account so alerts can reach it. Signing out removes it again.',
+    enablePush: 'Turn on alerts for this phone',
+    pushRegistered: 'This phone will now receive alerts.',
+    pushDenied:
+      'The phone refused permission. Turn notifications on for MedSupply in your phone’s settings.',
     quietHours: 'Quiet hours',
     quietHoursBody:
       'Phone alerts, SMS and WhatsApp are held back during these hours. Email still arrives, and anything urgent — a delivery code, for instance — always comes through.',

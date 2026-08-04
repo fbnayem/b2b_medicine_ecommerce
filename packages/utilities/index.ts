@@ -633,3 +633,18 @@ export function revocationReason(reason: string | null | undefined): RevocationR
       return 'signedOut';
   }
 }
+
+/**
+ * A `SCREAMING_SNAKE` identifier as a sentence.
+ *
+ * For values the server owns and this build has no words for — notification
+ * event names, audit actions. Three files wrote this inline, and the ~40 sites
+ * the original audit counted did it without the capitalisation, so the same
+ * value read `READY FOR DELIVERY` on one screen and `Ready for delivery` on the
+ * next. Anything with a fixed vocabulary belongs in `@medsupply/i18n` instead;
+ * this is the fallback for what does not.
+ */
+export function humaniseEnum(value: string): string {
+  const words = value.replaceAll('_', ' ').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
