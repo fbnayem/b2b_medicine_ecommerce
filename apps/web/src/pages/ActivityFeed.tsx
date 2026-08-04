@@ -1,125 +1,109 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   NotificationCategory,
   RealtimeEvent,
   type ActivityEventRecord,
 } from '@medsupply/shared-types';
-import { apiClient } from '../api/client';
 import { useRealtimeEvent } from '../realtime/useRealtime';
-import './inventory.css';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  FilterTabs,
+  PageHeader,
+  Pagination,
+  Resource,
+} from '../components/ui';
+import { useApiCollection } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime } from '../lib/finance';
 
-const categories = ['', ...Object.values(NotificationCategory)] as const;
 const PAGE_SIZE = 30;
 
 /**
  * Organisation-wide activity stream. The server filters each record by the
- * viewer's role, so a Shop Owner sees only their own shop's shop-visible events.
+ * viewer's role, so a shop owner sees only their own shop's visible events.
  */
 export function ActivityFeed() {
-  const [items, setItems] = useState<ActivityEventRecord[]>([]);
+  const { t } = useLanguage();
+  const queryClient = useQueryClient();
   const [category, setCategory] = useState('');
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  const load = useCallback(
-    async (silent = false) => {
-      if (!silent) setLoading(true);
-      try {
-        const response = await apiClient.get('/activity', {
-          params: { page, limit: PAGE_SIZE, ...(category ? { category } : {}) },
-        });
-        setItems(response.data.data);
-        setTotal(response.data.meta.total);
-        setError('');
-      } catch {
-        setError('Unable to load the activity feed.');
-      } finally {
-        if (!silent) setLoading(false);
-      }
-    },
-    [category, page],
+  const search = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+  if (category) search.set('category', category);
+  const activity = useApiCollection<ActivityEventRecord>(
+    ['activity', category, page],
+    `/activity?${search.toString()}`,
   );
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
   useRealtimeEvent(RealtimeEvent.ACTIVITY_CREATED, () => {
-    if (page === 1) void load(true);
+    // Only the first page: appending to page 7 while somebody is reading it
+    // would shuffle rows out from under them.
+    if (page === 1) void queryClient.invalidateQueries({ queryKey: ['activity'] });
   });
 
-  const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Activity</p>
-          <h1>Activity feed</h1>
-          <p>Live business events across orders, fulfilment, delivery and finance.</p>
-        </div>
-        <button className="secondary-button" onClick={() => void load()}>
-          Refresh now
-        </button>
-      </header>
+    <main>
+      <PageHeader
+        routeId="activity"
+        title={t('activity.title')}
+        description={t('activity.subtitle')}
+        actions={<Button onClick={() => void activity.refetch()}>{t('activity.refresh')}</Button>}
+      />
 
-      <nav className="filter-tabs" aria-label="Activity category">
-        {categories.map((value) => (
-          <button
-            key={value || 'all'}
-            className={category === value ? 'selected' : ''}
-            onClick={() => {
-              setCategory(value);
-              setPage(1);
-            }}
-          >
-            {value ? value.replaceAll('_', ' ') : 'All'}
-          </button>
-        ))}
-      </nav>
+      <div className="mb-4">
+        <FilterTabs
+          label={t('activity.categoryLabel')}
+          options={[
+            { value: '', label: t('activity.all') },
+            ...Object.values(NotificationCategory).map((value) => ({
+              value,
+              label: t(`notificationCategory.${value}`),
+            })),
+          ]}
+          value={category}
+          onChange={(value) => {
+            setCategory(value);
+            setPage(1);
+          }}
+        />
+      </div>
 
-      {error ? (
-        <section className="state error">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
-
-      {loading ? (
-        <section className="state">Loading activity...</section>
-      ) : items.length === 0 ? (
-        <section className="state">No activity has been recorded for this filter.</section>
-      ) : (
-        <section className="activity-timeline">
-          <ol>
-            {items.map((item) => (
-              <li key={item._id}>
-                <p className="timeline-summary">{item.summary}</p>
-                {item.detail ? <p className="timeline-detail">{item.detail}</p> : null}
-                <p className="timeline-meta">
-                  {formatFinanceDateTime(item.occurredAt)}
-                  {item.actorName ? ` · ${item.actorName}` : ''} · {item.category}
-                </p>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
-
-      <nav className="pagination" aria-label="Activity pages">
-        <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-          Previous
-        </button>
-        <span>
-          Page {page} of {lastPage}
-        </span>
-        <button type="button" disabled={page >= lastPage} onClick={() => setPage(page + 1)}>
-          Next
-        </button>
-      </nav>
+      <Resource
+        query={activity}
+        loadingLabel={t('activity.loading')}
+        errorMessageFallback={t('activity.couldNotLoad')}
+        empty={<EmptyState title={t('activity.none')} description={t('activity.noneBody')} />}
+      >
+        {(result) => (
+          <>
+            <ol className="m-0 flex list-none flex-col gap-3 p-0">
+              {result.items.map((item) => (
+                <li key={item._id}>
+                  <Card>
+                    <p className="font-medium text-text">{item.summary}</p>
+                    {item.detail && <p className="text-text-muted">{item.detail}</p>}
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-text-muted">
+                      <Badge>{t(`notificationCategory.${item.category}`)}</Badge>
+                      {formatFinanceDateTime(item.occurredAt)}
+                      {item.actorName ? ` · ${item.actorName}` : ''}
+                    </p>
+                  </Card>
+                </li>
+              ))}
+            </ol>
+            <Pagination
+              page={result.page}
+              limit={result.limit}
+              total={result.total}
+              onPage={setPage}
+            />
+          </>
+        )}
+      </Resource>
     </main>
   );
 }

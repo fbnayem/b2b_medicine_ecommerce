@@ -30,12 +30,20 @@ describe('the Bangla catalogue', () => {
     // A Bangla catalogue that is a copy of the English one type-checks
     // perfectly and helps nobody. Proper nouns and the app name legitimately
     // stay the same; nothing else should.
+    /*
+     * A string with no letters in it has nothing to translate. `1–30`, `90+`
+     * and `—` are the same in every language, and listing each one by hand
+     * would turn a real rule into a growing list of exceptions nobody reads.
+     * Anything carrying a letter still has to be translated or waived below.
+     */
+    const hasLetters = (value: string) => /\p{L}/u.test(value);
+
     const untranslated = catalogueKeys(en).filter((path) => {
       const read = (catalogue: object) =>
         path.split('.').reduce<unknown>((node, key) => (node as never)?.[key], catalogue);
       const english = read(en);
       const bangla = read(bn);
-      return typeof english === 'string' && english === bangla;
+      return typeof english === 'string' && english === bangla && hasLetters(english);
     });
 
     expect(untranslated, `these are still in English: ${untranslated.join(', ')}`).toEqual([

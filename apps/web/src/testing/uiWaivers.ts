@@ -26,11 +26,6 @@
 
 /** Still importing the 1,104-line legacy stylesheet. Deleted when this empties. */
 export const LEGACY_STYLESHEET: readonly string[] = [
-  'ActivityFeed.tsx',
-  'AnalyticsDashboard.tsx',
-  'AnalyticsReports.tsx',
-  'ApprovalQueue.tsx',
-  'ApprovalReview.tsx',
   'AuditLogViewer.tsx',
   'SecurityCentre.tsx',
   'ShopDetail.tsx',
@@ -47,13 +42,7 @@ export const LEGACY_STYLESHEET: readonly string[] = [
  * strip to be dragged sideways, and delivery riders read these on phones.
  * `DataTable` stacks each row into a labelled block instead.
  */
-export const RAW_TABLE: readonly string[] = [
-  'AnalyticsReports.tsx',
-  'ApprovalQueue.tsx',
-  'ApprovalReview.tsx',
-  'SecurityCentre.tsx',
-  'ShopList.tsx',
-];
+export const RAW_TABLE: readonly string[] = ['SecurityCentre.tsx', 'ShopList.tsx'];
 
 /**
  * Hand-rolling a wait.
@@ -63,13 +52,6 @@ export const RAW_TABLE: readonly string[] = [
  * renders all three states from one place.
  */
 export const HAND_ROLLED_STATE: readonly string[] = [
-  'ActivityFeed.tsx',
-  'AnalyticsDashboard.tsx',
-  'AnalyticsReports.tsx',
-  'ApprovalQueue.tsx',
-  // `{error || 'Loading review...'}` — the failure and the wait rendered
-  // through one expression, so neither can be told from the other.
-  'ApprovalReview.tsx',
   'AuditLogViewer.tsx',
   'SecurityCentre.tsx',
   'SystemSettings.tsx',
@@ -84,11 +66,6 @@ export const HAND_ROLLED_STATE: readonly string[] = [
  * back to `getByRole` and are more brittle than the document describes.
  */
 export const NO_PAGE_HEADER: readonly string[] = [
-  'ActivityFeed.tsx',
-  'AnalyticsDashboard.tsx',
-  'AnalyticsReports.tsx',
-  'ApprovalQueue.tsx',
-  'ApprovalReview.tsx',
   'AuditLogViewer.tsx',
   'Login.tsx',
   'NotFound.tsx',
@@ -113,11 +90,6 @@ export const NO_PAGE_HEADER: readonly string[] = [
  * nothing inside it.
  */
 export const UNTRANSLATED: readonly string[] = [
-  'ActivityFeed.tsx',
-  'AnalyticsDashboard.tsx',
-  'AnalyticsReports.tsx',
-  'ApprovalQueue.tsx',
-  'ApprovalReview.tsx',
   'AuditLogViewer.tsx',
   'ChangePassword.tsx',
   'Dashboard.tsx',

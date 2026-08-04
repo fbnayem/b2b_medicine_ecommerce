@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithUi } from '../testing/render';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -365,7 +365,7 @@ describe('Analytics dashboard', () => {
     signIn(UserRole.MANAGER);
     get.mockResolvedValue({ data: { data: overview } });
 
-    render(
+    renderWithUi(
       <MemoryRouter>
         <AnalyticsDashboard />
       </MemoryRouter>,
@@ -376,8 +376,8 @@ describe('Analytics dashboard', () => {
     // Scoped to the metric card's own label; the same words appear again as a
     // chart legend entry.
     const card = (label: string) =>
-      screen.getByText(label, { selector: 'article > span' }).closest('article');
-    await screen.findByText('Net sales', { selector: 'article > span' });
+      screen.getByText(label, { selector: 'p.text-sm' }).closest('div');
+    await screen.findByText('Net sales', { selector: 'p.text-sm' });
     expect(card('Net sales')?.textContent).toContain('৳250.00');
     expect(card('After returns')?.textContent).toContain('৳200.00');
     expect(card('Overdue')?.textContent).toContain('৳75.00');
@@ -392,13 +392,15 @@ describe('Analytics dashboard', () => {
     signIn(UserRole.MANAGER);
     get.mockRejectedValue({ response: { status: 403 } });
 
-    render(
+    renderWithUi(
       <MemoryRouter>
         <AnalyticsDashboard />
       </MemoryRouter>,
     );
 
+    // The refusal comes from the catalogue rather than a sentence typed into
+    // this page, so it reads the same everywhere and exists in Bangla.
     const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toContain('Your role cannot view business analytics.');
+    expect(alert.textContent).toContain('Your account does not have permission to do that.');
   });
 });

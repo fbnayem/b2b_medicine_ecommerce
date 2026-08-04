@@ -1,292 +1,271 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import type { AnalyticsOverview } from '@medsupply/shared-types';
-import { apiClient } from '../api/client';
+import { formatQuantity } from '@medsupply/utilities';
 import { LineChart, ShareBars } from '../components/Chart';
+import { RangeControls } from '../components/RangeControls';
+import { Card, EmptyState, LinkButton, PageHeader, Resource } from '../components/ui';
+import { useApiResource } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
 import { useReportRange } from './reportRange';
-import { RangeControls } from '../components/RangeControls';
-import './inventory.css';
-import { formatQuantity } from '@medsupply/utilities';
 
 const percent = (basisPoints: number) => `${(basisPoints / 100).toFixed(1)}%`;
-const hours = (value: number | null) => (value === null ? '—' : `${value} h`);
 
-const AGEING_LABELS: Record<string, string> = {
-  CURRENT: 'Not yet due',
-  DAYS_1_30: '1–30 days',
-  DAYS_31_60: '31–60 days',
-  DAYS_61_90: '61–90 days',
-  DAYS_90_PLUS: 'Over 90 days',
-};
+/** A figure with its name above it. Six of these are the top of the page. */
+function Metric({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <Card>
+      <p className="text-sm text-text-muted">{label}</p>
+      <p className="text-xl font-semibold tabular-nums text-text">{value}</p>
+    </Card>
+  );
+}
+
+/** A labelled figure inside a panel. */
+function Stat({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border py-2 last:border-b-0">
+      <dt className="text-text-muted">{label}</dt>
+      <dd className="tabular-nums text-text">{value}</dd>
+    </div>
+  );
+}
 
 export function AnalyticsDashboard() {
+  const { t } = useLanguage();
   const range = useReportRange();
-  const [data, setData] = useState<AnalyticsOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.get('/reports/overview', { params: range.applied });
-      setData(response.data.data as AnalyticsOverview);
-      setError('');
-    } catch (caught) {
-      const failure = caught as { response?: { status?: number } };
-      setError(
-        failure.response?.status === 403
-          ? 'Your role cannot view business analytics.'
-          : 'Unable to load the analytics overview.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [range.applied]);
+  const search = new URLSearchParams(
+    Object.entries(range.applied).filter(([, value]) => Boolean(value)) as [string, string][],
+  );
+  const overview = useApiResource<AnalyticsOverview>(
+    ['analytics-overview', search.toString()],
+    `/reports/overview?${search.toString()}`,
+  );
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const hours = (value: number | null) =>
+    value === null ? t('analytics.notKnown') : t('analytics.hours', { hours: value });
+
+  const ageingLabel = (bucket: string) =>
+    ({
+      CURRENT: t('analytics.notYetDue'),
+      DAYS_1_30: t('analytics.days1to30'),
+      DAYS_31_60: t('analytics.days31to60'),
+      DAYS_61_90: t('analytics.days61to90'),
+      DAYS_90_PLUS: t('analytics.over90'),
+    })[bucket] ?? bucket;
 
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Analytics</p>
-          <h1>Business overview</h1>
-          <p>Sales, orders, delivery, returns and receivables for the selected period.</p>
-        </div>
-        <Link className="secondary-button" to="/analytics/sales">
-          Detailed reports
-        </Link>
-      </header>
+    <main>
+      <PageHeader
+        routeId="analytics"
+        title={t('analytics.title')}
+        description={t('analytics.subtitle')}
+        actions={<LinkButton to="/analytics/sales">{t('analytics.detailedReports')}</LinkButton>}
+      />
 
       <RangeControls range={range} />
 
-      {error ? (
-        <section className="state error" role="alert">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
-
-      {loading ? (
-        <section className="state">Loading analytics...</section>
-      ) : !data ? (
-        <section className="state">No analytics are available for this period.</section>
-      ) : (
-        <>
-          <section className="metric-grid finance-metrics">
-            <article>
-              <span>Net sales</span>
-              <strong>{formatMinor(data.sales.netMinor)}</strong>
-            </article>
-            <article>
-              <span>After returns</span>
-              <strong>{formatMinor(data.sales.netAfterReturnsMinor)}</strong>
-            </article>
-            <article>
-              <span>Invoices</span>
-              <strong>{formatQuantity(data.sales.invoiceCount)}</strong>
-            </article>
-            <article>
-              <span>Average invoice</span>
-              <strong>{formatMinor(data.sales.averageInvoiceMinor)}</strong>
-            </article>
-            <article>
-              <span>Outstanding</span>
-              <strong>{formatMinor(data.receivables.outstandingMinor)}</strong>
-            </article>
-            <article>
-              <span>Overdue</span>
-              <strong>{formatMinor(data.receivables.overdueMinor)}</strong>
-            </article>
-          </section>
-
-          <section className="panel">
-            <h2>Sales trend</h2>
-            <LineChart
-              title="Net sales and returns by period"
-              money
-              labels={data.salesSeries.map((point) => point.bucket)}
-              series={[
-                {
-                  key: 'net',
-                  label: 'Net sales',
-                  values: data.salesSeries.map((point) => point.netMinor),
-                },
-                {
-                  key: 'returned',
-                  label: 'Credited returns',
-                  values: data.salesSeries.map((point) => point.returnedMinor),
-                },
-              ]}
-              emptyMessage="No invoices were issued in this period."
-            />
-          </section>
-
-          <div className="analytics-columns">
-            <section className="panel">
-              <h2>Order pipeline</h2>
-              <dl className="stat-list">
-                <div>
-                  <dt>Submitted</dt>
-                  <dd>{data.orders.submitted}</dd>
-                </div>
-                <div>
-                  <dt>Approved</dt>
-                  <dd>{data.orders.approved}</dd>
-                </div>
-                <div>
-                  <dt>Invoiced</dt>
-                  <dd>{data.orders.invoiced}</dd>
-                </div>
-                <div>
-                  <dt>Delivered</dt>
-                  <dd>{data.orders.delivered}</dd>
-                </div>
-                <div>
-                  <dt>Rejected</dt>
-                  <dd>{data.orders.rejected}</dd>
-                </div>
-                <div>
-                  <dt>Cancelled</dt>
-                  <dd>{data.orders.cancelled}</dd>
-                </div>
-              </dl>
-              <p className="muted">
-                Submission to review {hours(data.orderCycleHours.submitToReview)} · review to
-                invoice {hours(data.orderCycleHours.reviewToInvoice)} · invoice to delivery{' '}
-                {hours(data.orderCycleHours.invoiceToDelivery)}.
-              </p>
-            </section>
-
-            <section className="panel">
-              <h2>Delivery performance</h2>
-              <dl className="stat-list">
-                <div>
-                  <dt>Deliveries</dt>
-                  <dd>{data.delivery.total}</dd>
-                </div>
-                <div>
-                  <dt>Completed</dt>
-                  <dd>{data.delivery.delivered + data.delivery.partiallyDelivered}</dd>
-                </div>
-                <div>
-                  <dt>Failed</dt>
-                  <dd>{data.delivery.failed}</dd>
-                </div>
-                <div>
-                  <dt>Success rate</dt>
-                  <dd>{percent(data.delivery.successBasisPoints)}</dd>
-                </div>
-                <div>
-                  <dt>On time</dt>
-                  <dd>{percent(data.delivery.onTimeBasisPoints)}</dd>
-                </div>
-                <div>
-                  <dt>Average cycle</dt>
-                  <dd>{hours(data.delivery.averageCycleHours)}</dd>
-                </div>
-              </dl>
-            </section>
-
-            <section className="panel">
-              <h2>Returns</h2>
-              <dl className="stat-list">
-                <div>
-                  <dt>Requests</dt>
-                  <dd>{data.returns.returnCount}</dd>
-                </div>
-                <div>
-                  <dt>Open</dt>
-                  <dd>{data.returns.pendingCount}</dd>
-                </div>
-                <div>
-                  <dt>Credited</dt>
-                  <dd>{formatMinor(data.returns.creditedMinor)}</dd>
-                </div>
-                <div>
-                  <dt>Awaiting credit</dt>
-                  <dd>{formatMinor(data.returns.pendingCreditMinor)}</dd>
-                </div>
-                <div>
-                  <dt>Return rate</dt>
-                  <dd>{percent(data.returns.returnRateBasisPoints)}</dd>
-                </div>
-                <div>
-                  <dt>Units restocked</dt>
-                  <dd>{data.returns.unitsRestocked}</dd>
-                </div>
-              </dl>
-            </section>
-
-            <section className="panel">
-              <h2>Inventory</h2>
-              <dl className="stat-list">
-                <div>
-                  <dt>Stock at cost</dt>
-                  <dd>{formatMinor(data.inventory.costValueMinor)}</dd>
-                </div>
-                <div>
-                  <dt>Available units</dt>
-                  <dd>{formatQuantity(data.inventory.available)}</dd>
-                </div>
-                <div>
-                  <dt>Expiring or expired</dt>
-                  <dd>{data.inventory.expiringSoonBatches} batches</dd>
-                </div>
-                <div>
-                  <dt>Low stock</dt>
-                  <dd>{data.inventory.lowStockCount} medicines</dd>
-                </div>
-              </dl>
-            </section>
-          </div>
-
-          <div className="analytics-columns">
-            <section className="panel">
-              <h2>Receivables ageing</h2>
-              <ShareBars
-                title="Receivables ageing"
-                money
-                slices={data.receivables.ageing.map((bucket) => ({
-                  key: bucket.bucket,
-                  label: AGEING_LABELS[bucket.bucket] ?? bucket.bucket,
-                  value: bucket.amountMinor,
-                }))}
-                emptyMessage="Nothing is outstanding."
+      <Resource
+        query={overview}
+        loadingLabel={t('analytics.loading')}
+        errorMessageFallback={t('analytics.couldNotLoad')}
+        empty={<EmptyState title={t('analytics.none')} description={t('analytics.noneBody')} />}
+      >
+        {(data) => (
+          <>
+            <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <Metric label={t('analytics.netSales')} value={formatMinor(data.sales.netMinor)} />
+              <Metric
+                label={t('analytics.afterReturns')}
+                value={formatMinor(data.sales.netAfterReturnsMinor)}
               />
-            </section>
-            <section className="panel">
-              <h2>Top medicines</h2>
-              <ShareBars
-                title="Top medicines by net sales"
-                money
-                slices={data.topMedicines.map((row) => ({
-                  key: row.key,
-                  label: row.label,
-                  value: row.netMinor,
-                }))}
-                emptyMessage="No sales in this period."
+              <Metric
+                label={t('analytics.invoices')}
+                value={formatQuantity(data.sales.invoiceCount)}
               />
-            </section>
-            <section className="panel">
-              <h2>Top customers</h2>
-              <ShareBars
-                title="Top customers by net sales"
-                money
-                slices={data.topShops.map((row) => ({
-                  key: row.key,
-                  label: row.label,
-                  value: row.netMinor,
-                }))}
-                emptyMessage="No sales in this period."
+              <Metric
+                label={t('analytics.averageInvoice')}
+                value={formatMinor(data.sales.averageInvoiceMinor)}
               />
-            </section>
-          </div>
-        </>
-      )}
+              <Metric
+                label={t('analytics.outstanding')}
+                value={formatMinor(data.receivables.outstandingMinor)}
+              />
+              <Metric
+                label={t('analytics.overdue')}
+                value={formatMinor(data.receivables.overdueMinor)}
+              />
+            </div>
+
+            <Card className="mb-4">
+              <h2 className="mb-2 text-lg font-semibold text-text">{t('analytics.salesTrend')}</h2>
+              <LineChart
+                title={t('analytics.salesChartTitle')}
+                money
+                labels={data.salesSeries.map((point) => point.bucket)}
+                series={[
+                  {
+                    key: 'net',
+                    label: t('analytics.netSales'),
+                    values: data.salesSeries.map((point) => point.netMinor),
+                  },
+                  {
+                    key: 'returned',
+                    label: t('analytics.creditedReturns'),
+                    values: data.salesSeries.map((point) => point.returnedMinor),
+                  },
+                ]}
+                emptyMessage={t('analytics.noInvoices')}
+              />
+            </Card>
+
+            <div className="mb-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+              <Card>
+                <h2 className="mb-2 text-lg font-semibold text-text">
+                  {t('analytics.orderPipeline')}
+                </h2>
+                <dl className="m-0">
+                  <Stat label={t('analytics.submitted')} value={data.orders.submitted} />
+                  <Stat label={t('analytics.approved')} value={data.orders.approved} />
+                  <Stat label={t('analytics.invoiced')} value={data.orders.invoiced} />
+                  <Stat label={t('analytics.delivered')} value={data.orders.delivered} />
+                  <Stat label={t('analytics.rejected')} value={data.orders.rejected} />
+                  <Stat label={t('analytics.cancelled')} value={data.orders.cancelled} />
+                </dl>
+                <p className="mt-2 text-sm text-text-muted">
+                  {t('analytics.cycleTimes', {
+                    submitToReview: hours(data.orderCycleHours.submitToReview),
+                    reviewToInvoice: hours(data.orderCycleHours.reviewToInvoice),
+                    invoiceToDelivery: hours(data.orderCycleHours.invoiceToDelivery),
+                  })}
+                </p>
+              </Card>
+
+              <Card>
+                <h2 className="mb-2 text-lg font-semibold text-text">
+                  {t('analytics.deliveryPerformance')}
+                </h2>
+                <dl className="m-0">
+                  <Stat label={t('analytics.deliveries')} value={data.delivery.total} />
+                  <Stat
+                    label={t('analytics.completed')}
+                    value={data.delivery.delivered + data.delivery.partiallyDelivered}
+                  />
+                  <Stat label={t('analytics.failed')} value={data.delivery.failed} />
+                  <Stat
+                    label={t('analytics.successRate')}
+                    value={percent(data.delivery.successBasisPoints)}
+                  />
+                  <Stat
+                    label={t('analytics.onTime')}
+                    value={percent(data.delivery.onTimeBasisPoints)}
+                  />
+                  <Stat
+                    label={t('analytics.averageCycle')}
+                    value={hours(data.delivery.averageCycleHours)}
+                  />
+                </dl>
+              </Card>
+
+              <Card>
+                <h2 className="mb-2 text-lg font-semibold text-text">
+                  {t('analytics.returnsTitle')}
+                </h2>
+                <dl className="m-0">
+                  <Stat label={t('analytics.requests')} value={data.returns.returnCount} />
+                  <Stat label={t('analytics.open')} value={data.returns.pendingCount} />
+                  <Stat
+                    label={t('analytics.credited')}
+                    value={formatMinor(data.returns.creditedMinor)}
+                  />
+                  <Stat
+                    label={t('analytics.awaitingCredit')}
+                    value={formatMinor(data.returns.pendingCreditMinor)}
+                  />
+                  <Stat
+                    label={t('analytics.returnRate')}
+                    value={percent(data.returns.returnRateBasisPoints)}
+                  />
+                  <Stat label={t('analytics.unitsRestocked')} value={data.returns.unitsRestocked} />
+                </dl>
+              </Card>
+
+              <Card>
+                <h2 className="mb-2 text-lg font-semibold text-text">
+                  {t('analytics.inventoryTitle')}
+                </h2>
+                <dl className="m-0">
+                  <Stat
+                    label={t('analytics.stockAtCost')}
+                    value={formatMinor(data.inventory.costValueMinor)}
+                  />
+                  <Stat
+                    label={t('analytics.availableUnits')}
+                    value={formatQuantity(data.inventory.available)}
+                  />
+                  <Stat
+                    label={t('analytics.expiringOrExpired')}
+                    value={t('analytics.expiringBatches', {
+                      count: data.inventory.expiringSoonBatches,
+                    })}
+                  />
+                  <Stat
+                    label={t('analytics.lowStock')}
+                    value={t('analytics.lowStockCount', { count: data.inventory.lowStockCount })}
+                  />
+                </dl>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Card>
+                <h2 className="mb-2 text-lg font-semibold text-text">{t('analytics.ageing')}</h2>
+                <ShareBars
+                  title={t('analytics.ageing')}
+                  money
+                  slices={data.receivables.ageing.map((bucket) => ({
+                    key: bucket.bucket,
+                    label: ageingLabel(bucket.bucket),
+                    value: bucket.amountMinor,
+                  }))}
+                  emptyMessage={t('analytics.nothingOutstanding')}
+                />
+              </Card>
+              <Card>
+                <h2 className="mb-2 text-lg font-semibold text-text">
+                  {t('analytics.topMedicines')}
+                </h2>
+                <ShareBars
+                  title={t('analytics.topMedicinesTitle')}
+                  money
+                  slices={data.topMedicines.map((row) => ({
+                    key: row.key,
+                    label: row.label,
+                    value: row.netMinor,
+                  }))}
+                  emptyMessage={t('analytics.noSales')}
+                />
+              </Card>
+              <Card>
+                <h2 className="mb-2 text-lg font-semibold text-text">
+                  {t('analytics.topCustomers')}
+                </h2>
+                <ShareBars
+                  title={t('analytics.topCustomersTitle')}
+                  money
+                  slices={data.topShops.map((row) => ({
+                    key: row.key,
+                    label: row.label,
+                    value: row.netMinor,
+                  }))}
+                  emptyMessage={t('analytics.noSales')}
+                />
+              </Card>
+            </div>
+          </>
+        )}
+      </Resource>
     </main>
   );
 }
