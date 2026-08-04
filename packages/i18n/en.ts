@@ -13,6 +13,7 @@ import {
   ReturnReason,
   ReturnStatus,
   ShopStatus,
+  StocktakeStatus,
   StockMovementType,
   UserRole,
   UserStatus,
@@ -1726,6 +1727,81 @@ export const en = {
    * `Record<StockMovementType, string>` — a new movement type fails the build
    * here rather than reaching a storekeeper as `PACKING_REVERSAL`.
    */
+  /**
+   * Physical stock counts.
+   *
+   * The screen is built around one rule: **the counter never sees the expected
+   * figure.** The server withholds it while the sheet is open, so this is a
+   * property of the system rather than of the layout.
+   */
+  stocktake: {
+    title: 'Stock counts',
+    subtitle: 'What was actually on the shelf, who counted it, and what was agreed.',
+    loading: 'Loading stock counts',
+    couldNotLoad: 'The stock counts could not be loaded.',
+    none: 'No counts yet',
+    noneBody: 'Open one to count an aisle or a set of medicines.',
+    open: 'Start a count',
+    openTitle: 'Start a stock count',
+    openSubtitle:
+      'Everything in scope goes on the sheet at the figures the system holds now. Those figures are hidden until counting is finished.',
+    location: 'Which part of the warehouse',
+    locationHint: 'Leave this empty to count everything.',
+    notes: 'Notes',
+    opened: 'Count {{reference}} is open.',
+    openFailed: 'That count could not be opened.',
+    openedOn: 'Opened',
+    postedOn: 'Posted',
+    progress: 'Counted',
+    ofLines: '{{counted}} of {{total}}',
+    uncounted: 'Not counted',
+    differing: 'Differ',
+    short: 'Short',
+    over: 'Over',
+
+    sheetLoading: 'Loading this count',
+    sheetCouldNotLoad: 'This count could not be loaded.',
+    back: 'Back to stock counts',
+    blindNotice:
+      'You cannot see what the system expects. Count what is on the shelf and enter that. The difference appears once you finish.',
+    countedQuantity: 'How many are there',
+    countedFor: 'How many {{brand}} are on the shelf',
+    reasonFor: 'Why {{brand}} differs',
+    saveCounts: 'Save what I have counted',
+    saved: 'Saved.',
+    saveFailed: 'That could not be saved.',
+    nothingEntered: 'Enter at least one count first.',
+    finishCounting: 'Finished counting',
+    submitted: 'Sent for review. The differences are now visible.',
+    submitFailed: 'That could not be sent for review.',
+
+    reviewTitle: 'What the count found',
+    reviewBody:
+      'Every line that differs needs an explanation before it can be posted. Uncounted lines post nothing.',
+    expected: 'System says',
+    counted: 'Counted',
+    difference: 'Difference',
+    reason: 'Explanation',
+    notCounted: 'Nobody counted this',
+    postCount: 'Approve and post',
+    postTitle: 'Post this count?',
+    postBody:
+      'Every difference becomes a stock adjustment, in one go. It cannot be undone — a further correction would be a new count or a batch adjustment.',
+    postConfirm: 'Post the count',
+    posted: 'Posted. The shelf figures now match the count.',
+    postFailed: 'That count could not be posted.',
+    needReasons: 'Explain every line that differs before posting.',
+    abandon: 'Abandon this count',
+    abandonTitle: 'Abandon this count?',
+    abandonBody: 'Nothing is posted and the sheet is kept, marked as abandoned, with your reason.',
+    abandonLabel: 'Why is it being abandoned?',
+    abandonConfirm: 'Abandon it',
+    abandoned: 'Abandoned. Nothing was posted.',
+    abandonFailed: 'That count could not be abandoned.',
+    abandonedBecause: 'Abandoned: {{reason}}',
+    cannotPostYet: 'This count is still being counted.',
+  },
+
   movementType: {
     [StockMovementType.RECEIPT]: 'Booked in',
     [StockMovementType.ADDITION]: 'Added',
@@ -2055,6 +2131,9 @@ export const en = {
     'medicine-detail': 'Medicine',
     'medicine-new': 'Add a medicine',
     inventory: 'Stock',
+    stocktakes: 'Stock counts',
+    'stocktake-new': 'Start a count',
+    'stocktake-detail': 'Stock count',
     cart: 'Cart',
     checkout: 'Checkout',
     payments: 'Payments',
@@ -2195,6 +2274,14 @@ export const en = {
     [PurchaseOrderStatus.RECEIVED]: 'All of it has arrived',
     [PurchaseOrderStatus.CANCELLED]: 'Called off',
   } as Record<PurchaseOrderStatus, string>,
+
+  /** `Record<StocktakeStatus, string>`. */
+  stocktakeStatus: {
+    [StocktakeStatus.COUNTING]: 'Being counted',
+    [StocktakeStatus.REVIEW]: 'Waiting to be approved',
+    [StocktakeStatus.POSTED]: 'Posted',
+    [StocktakeStatus.ABANDONED]: 'Abandoned',
+  } as Record<StocktakeStatus, string>,
 
   shopStatus: {
     [ShopStatus.PENDING]: 'Awaiting approval',

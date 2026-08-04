@@ -230,6 +230,40 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: 'warehouse',
   },
   {
+    /*
+     * Counting is warehouse work; approving is not. The route is open to both,
+     * and the server refuses a storekeeper who tries to post their own sheet —
+     * because the whole value of a count as a control is that somebody else
+     * accepts it.
+     */
+    id: 'stocktakes',
+    label: 'Stock counts',
+    path: '/inventory/stocktakes',
+    roles: WAREHOUSE,
+    group: 'catalogue',
+    icon: 'warehouse',
+  },
+  {
+    id: 'stocktake-new',
+    label: 'Start a count',
+    path: '/inventory/stocktakes/new',
+    roles: WAREHOUSE,
+    group: 'catalogue',
+    icon: 'warehouse',
+    hidden: true,
+    parent: 'stocktakes',
+  },
+  {
+    id: 'stocktake-detail',
+    label: 'Stock count',
+    path: '/inventory/stocktakes/:id',
+    roles: WAREHOUSE,
+    group: 'catalogue',
+    icon: 'warehouse',
+    hidden: true,
+    parent: 'stocktakes',
+  },
+  {
     id: 'cart',
     label: 'Cart',
     path: '/cart',

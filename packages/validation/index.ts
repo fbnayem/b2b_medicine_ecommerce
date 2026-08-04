@@ -976,3 +976,44 @@ export const ReceiveGoodsSchema = z.object({
     )
     .min(1),
 });
+
+/*
+ * ── Stocktake ───────────────────────────────────────────────────────────────
+ *
+ * `POST /batches/:id/adjust` corrects one batch at a time and cannot express a
+ * physical count: one event, many batches, approved once and posted once.
+ */
+
+export const OpenStocktakeSchema = z.object({
+  warehouseLocation: z.string().trim().min(1).max(100).optional(),
+  medicineIds: z.array(z.string().min(1)).max(500).optional(),
+  notes: z.string().trim().max(1000).optional(),
+});
+
+export const RecordCountsSchema = z.object({
+  version: z.number().int().min(0),
+  counts: z
+    .array(
+      z.object({
+        lineId: z.string().min(1),
+        // Whole units, and zero is a real answer — "there are none there" is
+        // exactly the finding a count exists to make.
+        countedQuantity: z.number().int().min(0),
+        varianceReason: z.string().trim().max(500).optional(),
+      }),
+    )
+    .min(1)
+    .max(500),
+});
+
+export const SubmitStocktakeSchema = z.object({ version: z.number().int().min(0) });
+
+export const PostStocktakeSchema = z.object({
+  version: z.number().int().min(0),
+  idempotencyKey: z.string().trim().min(8).max(120),
+});
+
+export const AbandonStocktakeSchema = z.object({
+  version: z.number().int().min(0),
+  reason: z.string().trim().min(5).max(500),
+});

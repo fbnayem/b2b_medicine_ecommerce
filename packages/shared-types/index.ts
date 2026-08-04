@@ -1482,3 +1482,79 @@ export interface ControlledRegister {
   rows: ControlledRegisterRow[];
   byShop: ControlledByShopRow[];
 }
+
+/*
+ * ── Stocktake ───────────────────────────────────────────────────────────────
+ *
+ * `POST /batches/:id/adjust` corrects one batch with one reason. A physical
+ * count is one event over many batches, approved once and posted once, and for
+ * an inspected operation it is a document rather than a series of edits.
+ */
+
+export const StocktakeStatus = {
+  COUNTING: 'COUNTING',
+  REVIEW: 'REVIEW',
+  POSTED: 'POSTED',
+  ABANDONED: 'ABANDONED',
+} as const;
+export type StocktakeStatus = (typeof StocktakeStatus)[keyof typeof StocktakeStatus];
+
+export interface StocktakeLine {
+  _id: string;
+  batchId: string;
+  medicineId: string;
+  snapshot: {
+    brandName?: string;
+    genericName?: string;
+    strength?: string;
+    batchNumber?: string;
+    warehouseLocation?: string;
+    expiryDate?: string;
+  };
+  /**
+   * **Absent while the count is open.** The server strips it, because a blind
+   * count that ships the answer in the response is not blind whatever the
+   * screen shows.
+   */
+  systemQuantity?: number;
+  /** `null` until somebody counts it, which is not the same as zero. */
+  countedQuantity: number | null;
+  countedAt?: string;
+  varianceReason?: string;
+}
+
+export interface StocktakeSummary {
+  linesTotal: number;
+  linesCounted: number;
+  linesUncounted: number;
+  linesDiffering: number;
+  unitsOver: number;
+  unitsShort: number;
+}
+
+export interface Stocktake {
+  _id: string;
+  reference: string;
+  status: StocktakeStatus;
+  scope: { warehouseLocation?: string; medicineIds?: string[] };
+  lines: StocktakeLine[];
+  notes?: string;
+  openedAt: string;
+  postedAt?: string;
+  abandonedAt?: string;
+  abandonedReason?: string;
+  version: number;
+  /** Withheld with the expected quantities while the count is open. */
+  summary?: StocktakeSummary;
+}
+
+/** A row in the index: progress, never the sheet. */
+export interface StocktakeListRow {
+  _id: string;
+  reference: string;
+  status: StocktakeStatus;
+  scope: { warehouseLocation?: string };
+  openedAt: string;
+  postedAt?: string;
+  summary: StocktakeSummary;
+}

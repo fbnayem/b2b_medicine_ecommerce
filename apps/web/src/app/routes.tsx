@@ -91,6 +91,15 @@ export const ROUTES: readonly RouteNode[] = [
     id: 'inventory',
     element: page(() => import('../pages/InventoryDashboard'), 'InventoryDashboard'),
   },
+  { id: 'stocktakes', element: page(() => import('../pages/StocktakeList'), 'StocktakeList') },
+  {
+    id: 'stocktake-new',
+    element: page(() => import('../pages/StocktakeForm'), 'StocktakeForm'),
+  },
+  {
+    id: 'stocktake-detail',
+    element: page(() => import('../pages/StocktakeSheet'), 'StocktakeSheet'),
+  },
   { id: 'cart', element: page(() => import('../pages/Cart'), 'Cart') },
   { id: 'checkout', element: page(() => import('../pages/Checkout'), 'Checkout') },
 
