@@ -59,6 +59,10 @@ describe('the Bangla catalogue', () => {
       // A paper size and a file format. Neither is a word in either language,
       // and a storekeeper looking for the A4 button is looking for "A4".
       'picking.a4Pdf',
+      // The literal pattern the date field accepts. Translating the letters
+      // would show somebody a shape the input then refuses — the same trap as
+      // rendering Bengali digits into a parser that only reads [0-9].
+      'statement.dateHint',
     ]);
   });
 
