@@ -1017,3 +1017,32 @@ export const AbandonStocktakeSchema = z.object({
   version: z.number().int().min(0),
   reason: z.string().trim().min(5).max(500),
 });
+
+/*
+ * ── Delivery rounds ─────────────────────────────────────────────────────────
+ *
+ * Deliveries are assigned one at a time and nothing groups them, so there is no
+ * stop sequence, no load summary and nothing to print and carry.
+ */
+
+export const PlanTripSchema = z.object({
+  deliveryPersonId: z.string().min(1),
+  /** `YYYY-MM-DD`; the day boundary is resolved in the business zone. */
+  tripDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Give the day as YYYY-MM-DD'),
+  deliveryIds: z.array(z.string().min(1)).min(1).max(60),
+  vehicleReference: z.string().trim().max(60).optional(),
+  notes: z.string().trim().max(1000).optional(),
+});
+
+export const ResequenceTripSchema = z.object({
+  version: z.number().int().min(0),
+  /** The whole list, in the new order — not a move instruction. */
+  deliveryIds: z.array(z.string().min(1)).min(1).max(60),
+});
+
+export const StartTripSchema = z.object({ version: z.number().int().min(0) });
+
+export const CancelTripSchema = z.object({
+  version: z.number().int().min(0),
+  reason: z.string().trim().min(5).max(500),
+});

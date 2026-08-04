@@ -13,6 +13,7 @@ import {
   ReturnReason,
   ReturnStatus,
   ShopStatus,
+  TripStatus,
   StocktakeStatus,
   StockMovementType,
   UserRole,
@@ -1304,6 +1305,74 @@ export const en = {
     expected: 'Expected',
   },
 
+  /**
+   * A rider's round for one day.
+   *
+   * Per-delivery capture was already good — the offline queue, the camera
+   * proof, the code — and the day's-work view was missing entirely, so a rider
+   * planned their round on paper and the office could not say where anybody
+   * was.
+   */
+  trips: {
+    title: 'Delivery rounds',
+    subtitle: 'Who is out today, where they are going, and in what order.',
+    myTitle: 'My round',
+    mySubtitle: 'Your stops for today, in the order to make them.',
+    loading: 'Loading rounds',
+    couldNotLoad: 'The rounds could not be loaded.',
+    none: 'No rounds planned',
+    noneBody: 'Plan one to group a rider’s deliveries for the day.',
+    plan: 'Plan a round',
+    planTitle: 'Plan a round',
+    planSubtitle:
+      'Pick a rider, a day, and the stops. The order you add them in is the order they will be made in.',
+    rider: 'Which rider',
+    chooseRider: 'Choose a rider',
+    day: 'Which day',
+    vehicle: 'Vehicle',
+    notes: 'Notes for the rider',
+    stops: 'Stops',
+    stopsCount: '{{count}} stops',
+    packages: 'Boxes',
+    remaining: 'Still to do',
+    settled: 'Done',
+    available: 'Waiting to be delivered',
+    availableNone: 'Nothing is waiting to go on a round.',
+    availableNoneBody: 'Deliveries appear here once a package has been assigned to a rider.',
+    addStop: 'Add to the round',
+    removeStop: 'Take off the round',
+    chosen: 'On this round',
+    chosenNone: 'No stops yet. Add them from the list on the left.',
+    needRiderAndStops: 'Choose a rider, a day, and at least one stop.',
+    planned: 'Round {{reference}} planned.',
+    planFailed: 'That round could not be planned.',
+    savePlan: 'Plan this round',
+
+    sheetLoading: 'Loading this round',
+    sheetCouldNotLoad: 'This round could not be loaded.',
+    back: 'Back to rounds',
+    sequence: 'Order',
+    moveUp: 'Move earlier',
+    moveDown: 'Move later',
+    saveOrder: 'Save this order',
+    orderSaved: 'Order saved.',
+    orderFailed: 'That order could not be saved.',
+    start: 'I have left',
+    started: 'You are on your way.',
+    startFailed: 'That could not be recorded.',
+    cancel: 'Call this round off',
+    cancelTitle: 'Call this round off?',
+    cancelBody:
+      'Nothing happens to the deliveries themselves — they stay assigned and can still be done one at a time. Only the plan is called off.',
+    cancelLabel: 'Why is it being called off?',
+    cancelConfirm: 'Call it off',
+    cancelled: 'Called off. The deliveries are untouched.',
+    cancelFailed: 'That round could not be called off.',
+    cancelledBecause: 'Called off: {{reason}}',
+    openDelivery: 'Open',
+    printSheet: 'Print the round sheet',
+  },
+
   deliveryDetail: {
     board: 'All deliveries',
     order: 'The order',
@@ -2122,6 +2191,9 @@ export const en = {
     fulfilment: 'Picking',
     'fulfilment-work': 'Pick list',
     'fulfilment-ready': 'Ready to hand over',
+    trips: 'Delivery rounds',
+    'trip-new': 'Plan a round',
+    'trip-detail': 'Delivery round',
     deliveries: 'Deliveries',
     'delivery-detail': 'Delivery',
     returns: 'Returns',
@@ -2282,6 +2354,14 @@ export const en = {
     [StocktakeStatus.POSTED]: 'Posted',
     [StocktakeStatus.ABANDONED]: 'Abandoned',
   } as Record<StocktakeStatus, string>,
+
+  /** `Record<TripStatus, string>`. */
+  tripStatus: {
+    [TripStatus.PLANNED]: 'Planned',
+    [TripStatus.IN_PROGRESS]: 'Out now',
+    [TripStatus.COMPLETED]: 'Finished',
+    [TripStatus.CANCELLED]: 'Called off',
+  } as Record<TripStatus, string>,
 
   shopStatus: {
     [ShopStatus.PENDING]: 'Awaiting approval',

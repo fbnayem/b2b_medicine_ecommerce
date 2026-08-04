@@ -1558,3 +1558,68 @@ export interface StocktakeListRow {
   postedAt?: string;
   summary: StocktakeSummary;
 }
+
+/*
+ * ── Delivery rounds ─────────────────────────────────────────────────────────
+ *
+ * A trip **groups and orders** deliveries; it does not own them. Cancelling one
+ * leaves every delivery exactly as it was, still assigned and still workable on
+ * its own — which is what makes adding this safe.
+ */
+
+export const TripStatus = {
+  PLANNED: 'PLANNED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+export type TripStatus = (typeof TripStatus)[keyof typeof TripStatus];
+
+export interface TripStop {
+  _id: string;
+  sequence: number;
+  settledAt?: string;
+  /** The live delivery, read rather than duplicated onto the stop. */
+  delivery: {
+    _id: string;
+    reference: string;
+    status: DeliveryStatus;
+    shopId?: string | { _id: string; reference: string; name: string };
+    addressSnapshot?: { line1: string; city: string; district?: string };
+    contactSnapshot?: { name: string; phone: string };
+    expectedDeliveryDate?: string;
+    packageId?: string | { _id: string; reference: string; packageCount: number };
+  } | null;
+}
+
+export interface Trip {
+  _id: string;
+  reference: string;
+  status: TripStatus;
+  deliveryPersonId: string | { _id: string; firstName: string; lastName: string };
+  /** Midnight on the day of the round, in the business zone. */
+  tripDate: string;
+  stops: TripStop[];
+  vehicleReference?: string;
+  notes?: string;
+  startedAt?: string;
+  completedAt?: string;
+  cancelledReason?: string;
+  version: number;
+  summary?: {
+    stopsTotal: number;
+    stopsSettled: number;
+    stopsRemaining: number;
+    packages: number;
+  };
+}
+
+/** A delivery that could go on a round and is not already on one. */
+export interface PlannableDelivery {
+  _id: string;
+  reference: string;
+  status: DeliveryStatus;
+  shopId?: string | { _id: string; reference: string; name: string };
+  addressSnapshot?: { line1: string; city: string; district?: string };
+  expectedDeliveryDate?: string;
+}

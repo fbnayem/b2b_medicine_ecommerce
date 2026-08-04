@@ -164,6 +164,39 @@ export const NAV_ITEMS: readonly NavItem[] = [
     parent: 'deliveries',
   },
   {
+    /*
+     * A rider reads their own round; the office plans it. The list is scoped
+     * server-side, so this one entry serves both — a rider opening it sees
+     * today's stops and nobody else's.
+     */
+    id: 'trips',
+    label: 'Delivery rounds',
+    path: '/deliveries/trips',
+    roles: [...MANAGEMENT, UserRole.DELIVERY_PERSON],
+    group: 'work',
+    icon: 'delivery',
+  },
+  {
+    id: 'trip-new',
+    label: 'Plan a round',
+    path: '/deliveries/trips/new',
+    roles: MANAGEMENT,
+    group: 'work',
+    icon: 'delivery',
+    hidden: true,
+    parent: 'trips',
+  },
+  {
+    id: 'trip-detail',
+    label: 'Delivery round',
+    path: '/deliveries/trips/:id',
+    roles: [...MANAGEMENT, UserRole.DELIVERY_PERSON],
+    group: 'work',
+    icon: 'delivery',
+    hidden: true,
+    parent: 'trips',
+  },
+  {
     id: 'returns',
     label: 'Returns',
     path: '/returns',
