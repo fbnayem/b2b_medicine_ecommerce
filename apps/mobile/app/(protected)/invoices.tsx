@@ -1,12 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { FinanceState, StatusBadge } from '../../src/finance/components';
-import { apiErrorMessage, getMyInvoices } from '../../src/finance/api';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
+import { getMyInvoices } from '../../src/finance/api';
+import { errorMessage } from '@medsupply/api-client';
 import { formatFinanceDate } from '../../src/finance/date';
 import { formatMoneyMinor } from '../../src/finance/money';
 import type { FinanceInvoice } from '../../src/finance/types';
+import { useLanguage } from '../../src/i18n/useLanguage';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  ListRow,
+  LoadingState,
+  Screen,
+} from '../../src/components';
+import { colour, layout } from '../../src/theme';
 
 export default function InvoicesScreen() {
+  const { t, language } = useLanguage();
   const [items, setItems] = useState<FinanceInvoice[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -15,36 +28,52 @@ export default function InvoicesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  const load = useCallback(async (targetPage = 1, append = false) => {
-    try {
-      const result = await getMyInvoices(targetPage);
-      setItems((current) => (append ? [...current, ...result.items] : result.items));
-      setPage(result.page);
-      setPages(result.pages);
-      setError('');
-    } catch (caught) {
-      setError(apiErrorMessage(caught, 'Unable to load invoices.'));
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (targetPage = 1, append = false) => {
+      try {
+        const result = await getMyInvoices(targetPage);
+        setItems((current) => (append ? [...current, ...result.items] : result.items));
+        setPage(result.page);
+        setPages(result.pages);
+        setError('');
+      } catch (caught) {
+        setError(errorMessage(caught, language, t('finance.couldNotLoadInvoices')));
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+        setRefreshing(false);
+      }
+    },
+    [language, t],
+  );
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (loading) return <FinanceState loading />;
-  if (!items.length && error) return <FinanceState error={error} onRetry={() => void load()} />;
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState label={t('finance.loadingInvoices')} />
+      </Screen>
+    );
+  }
+
+  if (!items.length && error) {
+    return (
+      <Screen>
+        <ErrorState message={error} onRetry={() => void load()} />
+      </Screen>
+    );
+  }
 
   return (
-    <View style={styles.screen}>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+    <Screen scroll={false}>
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
       <FlatList
         data={items}
         keyExtractor={(item) => item._id}
-        contentContainerStyle={items.length ? styles.list : styles.emptyList}
+        contentContainerStyle={{ gap: layout.space[3], paddingBottom: layout.space[6] }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -54,87 +83,72 @@ export default function InvoicesScreen() {
             }}
           />
         }
-        ListEmptyComponent={<FinanceState empty="No invoices have been issued yet." />}
+        ListEmptyComponent={
+          <EmptyState title={t('finance.noInvoices')} description={t('finance.noInvoicesBody')} />
+        }
         ListFooterComponent={
           page < pages ? (
-            <Pressable
-              disabled={loadingMore}
-              style={styles.more}
+            <Button
+              variant="secondary"
+              busy={loadingMore}
+              label={loadingMore ? t('common.loadingMore') : t('common.loadMore')}
               onPress={() => {
                 setLoadingMore(true);
                 void load(page + 1, true);
               }}
-            >
-              <Text style={styles.moreText}>{loadingMore ? 'Loading…' : 'Load more'}</Text>
-            </Pressable>
+            />
           ) : null
         }
         renderItem={({ item }) => {
           const overdue = item.amountDueMinor > 0 && new Date(item.dueDate).getTime() < Date.now();
           return (
-            <View style={styles.card}>
-              <View style={styles.row}>
-                <Text style={styles.reference}>{item.reference}</Text>
-                <StatusBadge value={overdue ? 'OVERDUE' : item.status} />
+            <Card>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: layout.space[2],
+                }}
+              >
+                <Text
+                  style={{ fontSize: layout.fontSize.lg, fontWeight: '600', color: colour.brand }}
+                >
+                  {item.reference}
+                </Text>
+                {/*
+                 * "OVERDUE" was passed through the same badge as a real status,
+                 * so an invented value rendered as though the server had said
+                 * it. Overdue is a separate fact about a real status, and reads
+                 * as one now.
+                 */}
+                {overdue ? (
+                  <Badge tone="danger">{t('finance.overdueBadge')}</Badge>
+                ) : (
+                  <Badge>{t(`invoiceStatus.${item.status}`)}</Badge>
+                )}
               </View>
-              <Text>Issued {formatFinanceDate(item.invoiceDate)}</Text>
-              <Text>Due {formatFinanceDate(item.dueDate)}</Text>
-              <View style={styles.amounts}>
-                <Amount label="Total" value={item.grandTotalMinor} />
-                <Amount label="Paid" value={item.amountPaidMinor} />
-                <Amount label="Due" value={item.amountDueMinor} warning={item.amountDueMinor > 0} />
-              </View>
-            </View>
+              <ListRow label={t('finance.issued')} value={formatFinanceDate(item.invoiceDate)} />
+              <ListRow label={t('finance.dueOnDate')} value={formatFinanceDate(item.dueDate)} />
+              <ListRow
+                label={t('finance.totalAmount')}
+                value={formatMoneyMinor(item.grandTotalMinor)}
+                numeric
+              />
+              <ListRow
+                label={t('finance.paidAmount')}
+                value={formatMoneyMinor(item.amountPaidMinor)}
+                numeric
+              />
+              <ListRow
+                label={t('finance.dueAmount')}
+                value={formatMoneyMinor(item.amountDueMinor)}
+                numeric
+              />
+            </Card>
           );
         }}
       />
-    </View>
+    </Screen>
   );
 }
-
-function Amount({
-  label,
-  value,
-  warning = false,
-}: {
-  label: string;
-  value: number;
-  warning?: boolean;
-}) {
-  return (
-    <View>
-      <Text style={styles.amountLabel}>{label}</Text>
-      <Text style={[styles.amount, warning && styles.due]}>{formatMoneyMinor(value)}</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  list: { padding: 14, gap: 10 },
-  emptyList: { flexGrow: 1 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 15, gap: 7 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  reference: { color: '#126b45', fontWeight: '900', fontSize: 17 },
-  amounts: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 7,
-    paddingTop: 9,
-    borderTopWidth: 1,
-    borderTopColor: '#e7ede9',
-  },
-  amountLabel: { color: '#66756d', fontSize: 11 },
-  amount: { fontWeight: '800', marginTop: 3 },
-  due: { color: '#9b2c2c' },
-  error: {
-    color: '#8b2525',
-    backgroundColor: '#fff0ee',
-    padding: 10,
-    margin: 14,
-    marginBottom: 0,
-    borderRadius: 8,
-  },
-  more: { padding: 13, alignItems: 'center' },
-  moreText: { color: '#126b45', fontWeight: '800' },
-});

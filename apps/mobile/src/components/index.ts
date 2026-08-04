@@ -13,7 +13,7 @@
  */
 export { EmptyState, ErrorState, LoadingState } from './Feedback';
 export type { EmptyStateProps, ErrorStateProps } from './Feedback';
-export { Card, CardLink, ListRow, Screen, SectionTitle } from './Layout';
+export { Card, CardLink, ListRow, Metric, Screen, SectionTitle } from './Layout';
 export type { ListRowProps } from './Layout';
 export { Button, Field, Input } from './Controls';
 export type { ButtonProps, ButtonVariant, FieldProps, InputProps } from './Controls';

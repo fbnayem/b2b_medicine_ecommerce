@@ -1,12 +1,28 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { FinanceCard, FinanceState } from '../../src/finance/components';
-import { apiErrorMessage, getMyStatement } from '../../src/finance/api';
+import { Text, View } from 'react-native';
+import { errorMessage } from '@medsupply/api-client';
+import { getMyStatement } from '../../src/finance/api';
 import { defaultStatementRange, formatFinanceDate, isDateOnly } from '../../src/finance/date';
 import { formatMoneyMinor } from '../../src/finance/money';
 import type { CustomerStatement } from '../../src/finance/types';
+import { useLanguage } from '../../src/i18n/useLanguage';
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Field,
+  Input,
+  ListRow,
+  LoadingState,
+  Metric,
+  Screen,
+  SectionTitle,
+} from '../../src/components';
+import { colour, layout } from '../../src/theme';
 
 export default function StatementScreen() {
+  const { t, language } = useLanguage();
   const initial = defaultStatementRange();
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
@@ -16,7 +32,7 @@ export default function StatementScreen() {
 
   async function load() {
     if (!isDateOnly(from) || !isDateOnly(to) || from > to) {
-      setError('Enter a valid date range in YYYY-MM-DD format.');
+      setError(t('statement.invalidRange'));
       return;
     }
     setLoading(true);
@@ -24,7 +40,7 @@ export default function StatementScreen() {
       setStatement(await getMyStatement(from, to));
       setError('');
     } catch (caught) {
-      setError(apiErrorMessage(caught, 'Unable to load the account statement.'));
+      setError(errorMessage(caught, language, t('statement.couldNotLoad')));
     } finally {
       setLoading(false);
     }
@@ -37,127 +53,94 @@ export default function StatementScreen() {
   }, []);
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-    >
-      <FinanceCard>
-        <Text style={styles.title}>Statement period</Text>
-        <View style={styles.range}>
-          <DateField label="From" value={from} onChangeText={setFrom} />
-          <DateField label="To" value={to} onChangeText={setTo} />
+    <Screen>
+      <Card>
+        <SectionTitle>{t('statement.period')}</SectionTitle>
+        <View style={{ flexDirection: 'row', gap: layout.space[3] }}>
+          <Field label={t('statement.from')} hint={t('statement.dateHint')} style={{ flex: 1 }}>
+            <Input
+              label={t('statement.from')}
+              value={from}
+              onChangeText={setFrom}
+              placeholder={t('statement.dateHint')}
+              autoCapitalize="none"
+              maxLength={10}
+            />
+          </Field>
+          <Field label={t('statement.to')} hint={t('statement.dateHint')} style={{ flex: 1 }}>
+            <Input
+              label={t('statement.to')}
+              value={to}
+              onChangeText={setTo}
+              placeholder={t('statement.dateHint')}
+              autoCapitalize="none"
+              maxLength={10}
+            />
+          </Field>
         </View>
-        <Pressable disabled={loading} style={styles.action} onPress={() => void load()}>
-          <Text style={styles.actionText}>{loading ? 'Loading…' : 'Apply date range'}</Text>
-        </Pressable>
-      </FinanceCard>
-      {error ? (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {error}
-        </Text>
-      ) : null}
-      {loading ? <FinanceState loading /> : null}
+        <Button busy={loading} label={t('statement.generate')} onPress={() => void load()} />
+      </Card>
+
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+      {loading ? <LoadingState label={t('statement.loading')} /> : null}
+
       {!loading && statement ? (
         <>
-          <View style={styles.balanceRow}>
-            <Balance label="Opening balance" value={statement.openingBalanceMinor} />
-            <Balance label="Closing balance" value={statement.closingBalanceMinor} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: layout.space[3] }}>
+            <Metric
+              label={t('statement.openingBalance')}
+              value={formatMoneyMinor(statement.openingBalanceMinor)}
+            />
+            <Metric
+              label={t('statement.closingBalance')}
+              value={formatMoneyMinor(statement.closingBalanceMinor)}
+            />
           </View>
-          <Text style={styles.period}>
-            {statement.from} to {statement.to}
+          <Text style={{ color: colour.textMuted, textAlign: 'center' }}>
+            {formatFinanceDate(statement.from)} – {formatFinanceDate(statement.to)}
           </Text>
+
           {!statement.entries.length ? (
-            <FinanceState empty="No ledger entries in this period." />
-          ) : null}
-          {statement.entries.map((entry) => (
-            <FinanceCard key={entry._id}>
-              <View style={styles.entryHeading}>
-                <Text style={styles.reference}>{entry.reference}</Text>
-                <Text>{formatFinanceDate(entry.date)}</Text>
-              </View>
-              <Text style={styles.entryType}>{entry.type.replaceAll('_', ' ')}</Text>
-              <Text>{entry.description}</Text>
-              <View style={styles.entryAmounts}>
-                <Text>Debit {formatMoneyMinor(entry.debitMinor)}</Text>
-                <Text>Credit {formatMoneyMinor(entry.creditMinor)}</Text>
-              </View>
-              <Text style={styles.entryBalance}>
-                Balance {formatMoneyMinor(entry.balanceMinor)}
-              </Text>
-            </FinanceCard>
-          ))}
+            <EmptyState title={t('statement.noEntries')} />
+          ) : (
+            statement.entries.map((entry) => (
+              <Card key={entry._id}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    gap: layout.space[2],
+                  }}
+                >
+                  <Text style={{ color: colour.brand, fontWeight: '600' }}>{entry.reference}</Text>
+                  <Text style={{ color: colour.textMuted }}>{formatFinanceDate(entry.date)}</Text>
+                </View>
+                <Text style={{ fontWeight: '600', color: colour.text }}>
+                  {t(`movementType.${entry.type}`) === `movementType.${entry.type}`
+                    ? entry.type.replaceAll('_', ' ').toLowerCase()
+                    : t(`movementType.${entry.type}`)}
+                </Text>
+                <Text style={{ color: colour.text }}>{entry.description}</Text>
+                <ListRow
+                  label={t('statement.debit')}
+                  value={formatMoneyMinor(entry.debitMinor)}
+                  numeric
+                />
+                <ListRow
+                  label={t('statement.credit')}
+                  value={formatMoneyMinor(entry.creditMinor)}
+                  numeric
+                />
+                <ListRow
+                  label={t('statement.balance')}
+                  value={formatMoneyMinor(entry.balanceMinor)}
+                  numeric
+                />
+              </Card>
+            ))
+          )}
         </>
       ) : null}
-    </ScrollView>
+    </Screen>
   );
 }
-
-function DateField({
-  label,
-  value,
-  onChangeText,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (value: string) => void;
-}) {
-  return (
-    <View style={styles.dateField}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        accessibilityLabel={`${label} date in YYYY-MM-DD format`}
-        style={styles.input}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder="YYYY-MM-DD"
-        autoCapitalize="none"
-        maxLength={10}
-      />
-    </View>
-  );
-}
-
-function Balance({ label, value }: { label: string; value: number }) {
-  return (
-    <View style={styles.balance}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.balanceValue}>{formatMoneyMinor(value)}</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  content: { padding: 14, gap: 10 },
-  title: { fontWeight: '900', fontSize: 17 },
-  range: { flexDirection: 'row', gap: 10 },
-  dateField: { flex: 1, gap: 5 },
-  label: { color: '#66756d', fontSize: 12 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#bdcbc2',
-    borderRadius: 8,
-    padding: 10,
-    backgroundColor: '#fff',
-  },
-  action: { backgroundColor: '#126b45', padding: 13, borderRadius: 8 },
-  actionText: { color: '#fff', textAlign: 'center', fontWeight: '900' },
-  error: { color: '#8b2525', backgroundColor: '#fff0ee', padding: 10, borderRadius: 8 },
-  balanceRow: { flexDirection: 'row', gap: 10 },
-  balance: { flex: 1, backgroundColor: '#fff', borderRadius: 11, padding: 13 },
-  balanceValue: { color: '#173f2e', fontWeight: '900', fontSize: 18, marginTop: 4 },
-  period: { color: '#66756d', textAlign: 'center' },
-  entryHeading: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
-  reference: { color: '#126b45', fontWeight: '900' },
-  entryType: { fontWeight: '800' },
-  entryAmounts: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-    paddingTop: 7,
-    borderTopWidth: 1,
-    borderTopColor: '#e7ede9',
-  },
-  entryBalance: { textAlign: 'right', color: '#173f2e', fontWeight: '900' },
-});

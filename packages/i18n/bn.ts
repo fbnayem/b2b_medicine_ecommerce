@@ -1,4 +1,5 @@
 import {
+  CollectionHandoverStatus,
   OrderStatus,
   DeliveryFailureReason,
   DeliveryPriority,
@@ -51,6 +52,9 @@ export const bn: Catalogue = {
     nothingHere: 'এখানে এখনও কিছু নেই',
     reference: 'রেফারেন্স',
     quoteReference: 'সহায়তার জন্য যোগাযোগ করলে এই রেফারেন্সটি জানাবেন',
+    loadMore: 'আরও দেখুন',
+    loadingMore: 'লোড হচ্ছে…',
+    view: 'দেখুন',
   },
 
   auth: {
@@ -1064,6 +1068,49 @@ export const bn: Catalogue = {
     overdueTotal: 'মোট মেয়াদোত্তীর্ণ',
     collectedTotal: 'মোট আদায়',
     exportCsv: 'CSV ডাউনলোড করুন',
+
+    couldNotLoadInvoices: 'আপনার চালান লোড করা যায়নি।',
+    noInvoices: 'এখনও কোনও চালান নেই',
+    noInvoicesBody: 'অর্ডার প্যাক হলে এখানে চালান দেখা যাবে।',
+    issued: 'ইস্যু হয়েছে',
+    dueOnDate: 'শেষ তারিখ',
+    totalAmount: 'মোট',
+    paidAmount: 'পরিশোধিত',
+    dueAmount: 'এখনও বাকি',
+    overdueBadge: 'মেয়াদোত্তীর্ণ',
+    daysOverdue: '{{count}} দিন পার হয়েছে',
+    noOverdueShops: 'কিছুই মেয়াদোত্তীর্ণ নয়',
+    noOverdueShopsBody: 'প্রতিটি দোকান নির্ধারিত সময়ের মধ্যে আছে।',
+    oldestDueDate: 'সবচেয়ে পুরনো শেষ তারিখ',
+    outstanding: 'বকেয়া',
+    overdue: 'মেয়াদোত্তীর্ণ',
+    couldNotLoadSummary: 'বকেয়া ও আদায়ের হিসাব লোড করা যায়নি।',
+    loadingSummary: 'হিসাব লোড হচ্ছে',
+    noSummary: 'এখনও কোনও হিসাব নেই',
+    noSummaryBody: 'চালান ইস্যু হলে এখানে হিসাব দেখা যাবে।',
+    totalOutstanding: 'মোট বকেয়া',
+    totalOverdue: 'মোট মেয়াদোত্তীর্ণ',
+    pendingCollections: 'পোস্টের অপেক্ষায়',
+    collectionsToReview: 'যাচাইয়ের অপেক্ষায়',
+    overdueShopCount: 'মেয়াদোত্তীর্ণ দোকান',
+    actions: 'আপনি যা করতে পারেন',
+    reviewOverdueShops: 'মেয়াদোত্তীর্ণ দোকান দেখুন',
+    verifyCollections: 'ডেলিভারি কালেকশন যাচাই করুন',
+    ledgerNotice: 'জের ও শেষ তারিখ সার্ভার ঢাকার সময় অনুযায়ী হিসাব করে।',
+    collectedToday: 'আজ আদায়',
+    pendingHandover: 'জমা দেওয়ার অপেক্ষায়',
+    handoverRecords: '{{count}}টি রেকর্ড',
+    dhakaBusinessDate: 'আজ বলতে সার্ভারের ঢাকা সময়ের কার্যদিবস বোঝানো হয়েছে।',
+    couldNotLoadMyCollections: 'আপনার আদায়ের ইতিহাস লোড করা যায়নি।',
+    noMyCollections: 'এখনও কিছু আদায় হয়নি',
+    noMyCollectionsBody: 'ডেলিভারিতে নেওয়া টাকা এখানে দেখা যাবে।',
+    handoverLabel: 'জমা',
+    confirmHandover: 'জমা নিশ্চিত করুন',
+    confirmingHandover: 'নিশ্চিত করা হচ্ছে…',
+    handoverTitle: 'এই জমা নিশ্চিত করবেন?',
+    handoverBody: '{{reference}}-এর জন্য {{amount}} জমা দিচ্ছেন।',
+    handoverDone: '{{reference}} জমা হয়েছে এবং সার্ভার নিশ্চিত করেছে।',
+    handoverFailed: 'জমা দিতে সার্ভারের সঙ্গে সংযোগ দরকার। সংযোগ দিয়ে আবার চেষ্টা করুন।',
   },
 
   delivery: {
@@ -1502,6 +1549,9 @@ export const bn: Catalogue = {
     debit: 'চার্জ',
     credit: 'জমা বা ক্রেডিট',
     balance: 'জের',
+    period: 'বিবরণীর সময়কাল',
+    invalidRange: 'তারিখ YYYY-MM-DD ভাবে লিখুন, প্রথমটি দ্বিতীয়টির আগে।',
+    dateHint: 'YYYY-MM-DD',
   },
 
   notifications: {
@@ -1696,6 +1746,17 @@ export const bn: Catalogue = {
     [ShopStatus.SUSPENDED]: 'স্থগিত',
     [ShopStatus.CREDIT_BLOCKED]: 'বাকি বন্ধ',
     [ShopStatus.LICENCE_EXPIRED]: 'লাইসেন্সের মেয়াদ শেষ',
+  },
+
+  handoverStatus: {
+    [CollectionHandoverStatus.NOT_REQUIRED]: 'প্রয়োজন নেই',
+    [CollectionHandoverStatus.PENDING]: 'জমা দেওয়ার অপেক্ষায়',
+    [CollectionHandoverStatus.HANDED_OVER]: 'জমা দেওয়া হয়েছে',
+  },
+
+  invoiceStatus: {
+    ISSUED: 'ইস্যু হয়েছে',
+    CANCELLED: 'বাতিল',
   },
 
   userStatus: {

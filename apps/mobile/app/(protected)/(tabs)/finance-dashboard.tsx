@@ -1,12 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { FinanceCard, FinanceState } from '../../../src/finance/components';
-import { apiErrorMessage, getFinanceReportSummary } from '../../../src/finance/api';
+import { errorMessage } from '@medsupply/api-client';
+import { getFinanceReportSummary } from '../../../src/finance/api';
 import { formatMoneyMinor } from '../../../src/finance/money';
 import type { FinanceReportSummary } from '../../../src/finance/types';
+import { useLanguage } from '../../../src/i18n/useLanguage';
+import {
+  Card,
+  CardLink,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  Metric,
+  Screen,
+  SectionTitle,
+} from '../../../src/components';
+import { colour, layout } from '../../../src/theme';
 
 export default function FinanceDashboardScreen() {
+  const { t, language } = useLanguage();
   const [summary, setSummary] = useState<FinanceReportSummary>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -17,26 +30,41 @@ export default function FinanceDashboardScreen() {
       setSummary(await getFinanceReportSummary());
       setError('');
     } catch (caught) {
-      setError(apiErrorMessage(caught, 'Unable to load due and collection totals.'));
+      setError(errorMessage(caught, language, t('finance.couldNotLoadSummary')));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [language, t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (loading || (!summary && error)) {
-    return <FinanceState loading={loading} error={error} onRetry={() => void load()} />;
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState label={t('finance.loadingSummary')} />
+      </Screen>
+    );
   }
-  if (!summary) return <FinanceState empty="No financial summary is available." />;
+
+  if (!summary) {
+    return (
+      <Screen>
+        {error ? (
+          <ErrorState message={error} onRetry={() => void load()} />
+        ) : (
+          <EmptyState title={t('finance.noSummary')} description={t('finance.noSummaryBody')} />
+        )}
+      </Screen>
+    );
+  }
 
   return (
     <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
+      style={{ flex: 1, backgroundColor: colour.canvas }}
+      contentContainerStyle={{ padding: layout.space[4], gap: layout.space[3] }}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -47,94 +75,53 @@ export default function FinanceDashboardScreen() {
         />
       }
     >
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <View style={styles.grid}>
-        <Metric label="Total outstanding" value={formatMoneyMinor(summary.totalOutstandingMinor)} />
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: layout.space[3] }}>
         <Metric
-          label="Total overdue"
-          value={formatMoneyMinor(summary.totalOverdueMinor)}
-          warning={summary.totalOverdueMinor > 0}
+          label={t('finance.totalOutstanding')}
+          value={formatMoneyMinor(summary.totalOutstandingMinor)}
         />
         <Metric
-          label="Pending collections"
+          label={t('finance.totalOverdue')}
+          value={formatMoneyMinor(summary.totalOverdueMinor)}
+          tone={summary.totalOverdueMinor > 0 ? 'warning' : 'normal'}
+        />
+        <Metric
+          label={t('finance.pendingCollections')}
           value={formatMoneyMinor(summary.pendingCollectionsMinor)}
         />
-        <Metric label="Collections to review" value={String(summary.pendingCollectionsCount)} />
+        <Metric label={t('finance.collectionsToReview')} value={summary.pendingCollectionsCount} />
         <Metric
-          label="Overdue shops"
-          value={String(summary.overdueShopCount)}
-          warning={summary.overdueShopCount > 0}
+          label={t('finance.overdueShopCount')}
+          value={summary.overdueShopCount}
+          tone={summary.overdueShopCount > 0 ? 'warning' : 'normal'}
         />
       </View>
-      <FinanceCard>
-        <Text style={styles.title}>Actions</Text>
-        <Link
-          label="Review overdue shops"
-          onPress={() => router.push('/(protected)/overdue-shops')}
-        />
-        <Link
-          label="Verify delivery collections"
-          onPress={() => router.push('/(protected)/collection-review')}
-        />
-      </FinanceCard>
-      <Text style={styles.notice}>
-        Balances and due dates are calculated by the server ledger in Asia/Dhaka time.
+
+      <Card>
+        <SectionTitle>{t('finance.actions')}</SectionTitle>
+      </Card>
+      <CardLink
+        accessibilityLabel={t('finance.reviewOverdueShops')}
+        onPress={() => router.push('/(protected)/overdue-shops')}
+      >
+        <Text style={{ color: colour.text, fontWeight: '600' }}>
+          {t('finance.reviewOverdueShops')}
+        </Text>
+      </CardLink>
+      <CardLink
+        accessibilityLabel={t('finance.verifyCollections')}
+        onPress={() => router.push('/(protected)/collection-review')}
+      >
+        <Text style={{ color: colour.text, fontWeight: '600' }}>
+          {t('finance.verifyCollections')}
+        </Text>
+      </CardLink>
+
+      <Text style={{ color: colour.textMuted, textAlign: 'center', lineHeight: 19 }}>
+        {t('finance.ledgerNotice')}
       </Text>
     </ScrollView>
   );
 }
-
-function Metric({
-  label,
-  value,
-  warning = false,
-}: {
-  label: string;
-  value: string;
-  warning?: boolean;
-}) {
-  return (
-    <View style={styles.metric}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={[styles.metricValue, warning && styles.warningValue]}>{value}</Text>
-    </View>
-  );
-}
-
-function Link({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="button" style={styles.link} onPress={onPress}>
-      <Text style={styles.linkText}>{label}</Text>
-      <Text style={styles.chevron}>›</Text>
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  content: { padding: 14, gap: 12 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  metric: {
-    width: '48%',
-    minWidth: 145,
-    flexGrow: 1,
-    backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 11,
-  },
-  metricLabel: { color: '#66756d', fontSize: 12 },
-  metricValue: { color: '#173f2e', fontWeight: '900', fontSize: 20, marginTop: 5 },
-  warningValue: { color: '#9b2c2c' },
-  title: { fontWeight: '900', fontSize: 17 },
-  link: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e7ede9',
-  },
-  linkText: { color: '#173f2e', fontWeight: '800' },
-  chevron: { color: '#126b45', fontSize: 20 },
-  notice: { color: '#66756d', textAlign: 'center', lineHeight: 19 },
-  error: { color: '#8b2525', backgroundColor: '#fff0ee', padding: 10, borderRadius: 8 },
-});

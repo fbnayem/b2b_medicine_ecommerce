@@ -1,4 +1,5 @@
 import {
+  CollectionHandoverStatus,
   OrderStatus,
   DeliveryFailureReason,
   DeliveryPriority,
@@ -49,6 +50,9 @@ export const en = {
     nothingHere: 'There is nothing here yet',
     reference: 'Reference',
     quoteReference: 'Quote this reference if you contact support',
+    loadMore: 'Load more',
+    loadingMore: 'Loading…',
+    view: 'View',
   },
 
   auth: {
@@ -1100,6 +1104,49 @@ export const en = {
     overdueTotal: 'Total overdue',
     collectedTotal: 'Total collected',
     exportCsv: 'Download as CSV',
+
+    couldNotLoadInvoices: 'Your invoices could not be loaded.',
+    noInvoices: 'No invoices yet',
+    noInvoicesBody: 'An invoice appears here once an order has been packed.',
+    issued: 'Issued',
+    dueOnDate: 'Due',
+    totalAmount: 'Total',
+    paidAmount: 'Paid',
+    dueAmount: 'Still due',
+    overdueBadge: 'Overdue',
+    daysOverdue: '{{count}} days overdue',
+    noOverdueShops: 'Nothing is overdue',
+    noOverdueShopsBody: 'Every shop is within its terms.',
+    oldestDueDate: 'Oldest due date',
+    outstanding: 'Outstanding',
+    overdue: 'Overdue',
+    couldNotLoadSummary: 'The due and collection totals could not be loaded.',
+    loadingSummary: 'Loading the totals',
+    noSummary: 'No totals are available yet',
+    noSummaryBody: 'Figures appear once invoices have been issued.',
+    totalOutstanding: 'Total outstanding',
+    totalOverdue: 'Total overdue',
+    pendingCollections: 'Waiting to post',
+    collectionsToReview: 'Collections to check',
+    overdueShopCount: 'Overdue shops',
+    actions: 'What you can do',
+    reviewOverdueShops: 'Review overdue shops',
+    verifyCollections: 'Check delivery collections',
+    ledgerNotice: 'Balances and due dates are worked out by the server, in Dhaka time.',
+    collectedToday: 'Collected today',
+    pendingHandover: 'Waiting to hand over',
+    handoverRecords: '{{count}} records',
+    dhakaBusinessDate: 'Today follows the server’s Dhaka business date.',
+    couldNotLoadMyCollections: 'Your collection history could not be loaded.',
+    noMyCollections: 'Nothing collected yet',
+    noMyCollectionsBody: 'Payments you take on a delivery appear here.',
+    handoverLabel: 'Handover',
+    confirmHandover: 'Confirm handover',
+    confirmingHandover: 'Confirming…',
+    handoverTitle: 'Confirm this handover?',
+    handoverBody: 'You are handing over {{amount}} for {{reference}}.',
+    handoverDone: '{{reference}} handed over and confirmed by the server.',
+    handoverFailed: 'Handing over needs a connection to the server. Reconnect and try again.',
   },
 
   delivery: {
@@ -1548,6 +1595,9 @@ export const en = {
     debit: 'Charged',
     credit: 'Paid or credited',
     balance: 'Balance',
+    period: 'Statement period',
+    invalidRange: 'Enter the dates as YYYY-MM-DD, with the first before the second.',
+    dateHint: 'YYYY-MM-DD',
   },
 
   notifications: {
@@ -1763,6 +1813,27 @@ export const en = {
     [ShopStatus.CREDIT_BLOCKED]: 'Credit blocked',
     [ShopStatus.LICENCE_EXPIRED]: 'Licence expired',
   } as Record<ShopStatus, string>,
+
+  /**
+   * The invoice's own two states.
+   *
+   * Not derived from a const-object the way the others are, because there is
+   * no `InvoiceStatus` in `@medsupply/shared-types` — the model declares the
+   * enum inline at `apps/api/src/models/Invoice.ts:32`. Recorded here rather
+   * than invented per screen; promoting it to a shared const-object would make
+   * this a compile-time record like the rest, and is worth doing when something
+   * else needs it.
+   */
+  handoverStatus: {
+    [CollectionHandoverStatus.NOT_REQUIRED]: 'Not needed',
+    [CollectionHandoverStatus.PENDING]: 'Waiting to hand over',
+    [CollectionHandoverStatus.HANDED_OVER]: 'Handed over',
+  } as Record<CollectionHandoverStatus, string>,
+
+  invoiceStatus: {
+    ISSUED: 'Issued',
+    CANCELLED: 'Cancelled',
+  } as Record<string, string>,
 
   userStatus: {
     [UserStatus.ACTIVE]: 'Active',

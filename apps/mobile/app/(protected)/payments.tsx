@@ -1,13 +1,26 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { FinanceState, StatusBadge } from '../../src/finance/components';
-import { apiErrorMessage, getPayments } from '../../src/finance/api';
+import { errorMessage } from '@medsupply/api-client';
+import { getPayments } from '../../src/finance/api';
 import { formatFinanceDate } from '../../src/finance/date';
 import { formatMoneyMinor } from '../../src/finance/money';
 import type { FinancePayment } from '../../src/finance/types';
+import { useLanguage } from '../../src/i18n/useLanguage';
+import {
+  Button,
+  CardLink,
+  EmptyState,
+  ErrorState,
+  ListRow,
+  LoadingState,
+  Screen,
+  StatusPill,
+} from '../../src/components';
+import { colour, layout } from '../../src/theme';
 
 export default function PaymentsScreen() {
+  const { t, language } = useLanguage();
   const [items, setItems] = useState<FinancePayment[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -16,36 +29,52 @@ export default function PaymentsScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
 
-  const load = useCallback(async (targetPage = 1, append = false) => {
-    try {
-      const result = await getPayments({ page: targetPage, limit: 30 });
-      setItems((current) => (append ? [...current, ...result.items] : result.items));
-      setPage(result.page);
-      setPages(result.pages);
-      setError('');
-    } catch (caught) {
-      setError(apiErrorMessage(caught, 'Unable to load payment history.'));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (targetPage = 1, append = false) => {
+      try {
+        const result = await getPayments({ page: targetPage, limit: 30 });
+        setItems((current) => (append ? [...current, ...result.items] : result.items));
+        setPage(result.page);
+        setPages(result.pages);
+        setError('');
+      } catch (caught) {
+        setError(errorMessage(caught, language, t('finance.couldNotLoadPayments')));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
+      }
+    },
+    [language, t],
+  );
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (loading) return <FinanceState loading />;
-  if (!items.length && error) return <FinanceState error={error} onRetry={() => void load()} />;
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState label={t('finance.loadingPayments')} />
+      </Screen>
+    );
+  }
+
+  if (!items.length && error) {
+    return (
+      <Screen>
+        <ErrorState message={error} onRetry={() => void load()} />
+      </Screen>
+    );
+  }
 
   return (
-    <View style={styles.screen}>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+    <Screen scroll={false}>
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
       <FlatList
         data={items}
         keyExtractor={(item) => item._id}
-        contentContainerStyle={items.length ? styles.list : styles.emptyList}
+        contentContainerStyle={{ gap: layout.space[3], paddingBottom: layout.space[6] }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -55,63 +84,65 @@ export default function PaymentsScreen() {
             }}
           />
         }
-        ListEmptyComponent={<FinanceState empty="No payment records yet." />}
+        ListEmptyComponent={
+          <EmptyState title={t('finance.noPayments')} description={t('finance.noPaymentsBody')} />
+        }
         ListFooterComponent={
           page < pages ? (
-            <Pressable
-              disabled={loadingMore}
-              style={styles.more}
+            <Button
+              variant="secondary"
+              busy={loadingMore}
+              label={loadingMore ? t('common.loadingMore') : t('common.loadMore')}
               onPress={() => {
                 setLoadingMore(true);
                 void load(page + 1, true);
               }}
-            >
-              <Text style={styles.moreText}>{loadingMore ? 'Loading…' : 'Load more'}</Text>
-            </Pressable>
+            />
           ) : null
         }
         renderItem={({ item }) => (
-          <Pressable
-            accessibilityRole="button"
-            style={styles.card}
+          <CardLink
+            accessibilityLabel={item.reference}
             onPress={() =>
               router.push({ pathname: '/(protected)/payment-detail', params: { id: item._id } })
             }
           >
-            <View style={styles.row}>
-              <Text style={styles.reference}>{item.reference}</Text>
-              <StatusBadge value={item.status} />
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: layout.space[2],
+              }}
+            >
+              <Text
+                style={{ fontSize: layout.fontSize.lg, fontWeight: '600', color: colour.brand }}
+              >
+                {item.reference}
+              </Text>
+              <StatusPill kind="payment" status={item.status} />
             </View>
-            <Text style={styles.amount}>{formatMoneyMinor(item.amountMinor)}</Text>
-            <Text>{item.method.replaceAll('_', ' ')}</Text>
-            <Text style={styles.muted}>
-              {formatFinanceDate(item.postingTime ?? item.collectionTime ?? item.createdAt)}
+            <Text
+              style={{
+                fontSize: layout.fontSize['2xl'],
+                fontWeight: '700',
+                color: colour.text,
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {formatMoneyMinor(item.amountMinor)}
             </Text>
-            {item.receiptReference ? <Text>Receipt {item.receiptReference}</Text> : null}
-          </Pressable>
+            <ListRow label={t('finance.method')} value={t(`paymentMethod.${item.method}`)} />
+            <ListRow
+              label={t('finance.collectedAt')}
+              value={formatFinanceDate(item.postingTime ?? item.collectionTime ?? item.createdAt)}
+            />
+            {item.receiptReference ? (
+              <ListRow label={t('finance.receipt')} value={item.receiptReference} />
+            ) : null}
+          </CardLink>
         )}
       />
-    </View>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  list: { padding: 14, gap: 10 },
-  emptyList: { flexGrow: 1 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 15, gap: 6 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  reference: { color: '#126b45', fontWeight: '900', fontSize: 17 },
-  amount: { fontWeight: '900', fontSize: 21, color: '#173f2e' },
-  muted: { color: '#66756d' },
-  error: {
-    color: '#8b2525',
-    backgroundColor: '#fff0ee',
-    padding: 10,
-    margin: 14,
-    marginBottom: 0,
-    borderRadius: 8,
-  },
-  more: { padding: 13, alignItems: 'center' },
-  moreText: { color: '#126b45', fontWeight: '800' },
-});

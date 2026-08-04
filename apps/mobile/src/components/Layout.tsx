@@ -118,6 +118,52 @@ export function ListRow({ label, value, numeric }: ListRowProps) {
   );
 }
 
+/**
+ * One number with its name, for the dashboards.
+ *
+ * Three screens each built their own — finance, analytics and account — with
+ * different label sizes, different value weights and their own idea of what
+ * "this one is bad" looks like. `tone` is the only variation that carries
+ * meaning, and it is drawn from the same tokens as everything else.
+ */
+export function Metric({
+  label,
+  value,
+  tone = 'normal',
+}: {
+  label: string;
+  value: string | number;
+  tone?: 'normal' | 'warning';
+}) {
+  return (
+    <View
+      style={{
+        width: '48%',
+        minWidth: 145,
+        flexGrow: 1,
+        backgroundColor: colour.surface,
+        borderColor: colour.border,
+        borderWidth: 1,
+        borderRadius: layout.radius.lg,
+        padding: layout.space[4],
+      }}
+    >
+      <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>{label}</Text>
+      <Text
+        style={{
+          marginTop: layout.space[1],
+          fontSize: layout.fontSize.xl,
+          fontWeight: '700',
+          color: tone === 'warning' ? colour.danger : colour.text,
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 /** A whole card that is pressable, for a list that leads somewhere. */
 export function CardLink({
   children,

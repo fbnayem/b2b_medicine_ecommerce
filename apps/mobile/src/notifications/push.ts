@@ -4,6 +4,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { PushPlatform } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
+import { colour } from '../theme';
 
 export type PushRegistrationOutcome =
   | { status: 'REGISTERED'; token: string }
@@ -20,7 +21,14 @@ export async function ensureAndroidChannel() {
     name: 'Operations',
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#16724A',
+    /*
+     * The same green as `app.json`'s channel colour, which is the token.
+     *
+     * This was `#16724A` — the *second* brand green, the one the token package
+     * was created to collapse — while `app.json` declared `#126b45` for the
+     * same Android channel. Two different greens for one notification.
+     */
+    lightColor: colour.brand,
   });
 }
 

@@ -1,12 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { FinanceState, StatusBadge } from '../../src/finance/components';
-import { apiErrorMessage, getOverdueShops } from '../../src/finance/api';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
+import { errorMessage } from '@medsupply/api-client';
+import { getOverdueShops } from '../../src/finance/api';
 import { formatFinanceDate } from '../../src/finance/date';
 import { formatMoneyMinor } from '../../src/finance/money';
 import type { OverdueShop } from '../../src/finance/types';
+import { useLanguage } from '../../src/i18n/useLanguage';
+import {
+  Badge,
+  Card,
+  EmptyState,
+  ErrorState,
+  ListRow,
+  LoadingState,
+  Screen,
+} from '../../src/components';
+import { colour, layout } from '../../src/theme';
 
 export default function OverdueShopsScreen() {
+  const { t, language } = useLanguage();
   const [items, setItems] = useState<OverdueShop[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -17,27 +29,40 @@ export default function OverdueShopsScreen() {
       setItems((await getOverdueShops()).items);
       setError('');
     } catch (caught) {
-      setError(apiErrorMessage(caught, 'Unable to load overdue shops.'));
+      setError(errorMessage(caught, language, t('finance.couldNotLoadReport')));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [language, t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (loading) return <FinanceState loading />;
-  if (!items.length && error) return <FinanceState error={error} onRetry={() => void load()} />;
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState label={t('finance.loadingReport')} />
+      </Screen>
+    );
+  }
+
+  if (!items.length && error) {
+    return (
+      <Screen>
+        <ErrorState message={error} onRetry={() => void load()} />
+      </Screen>
+    );
+  }
 
   return (
-    <View style={styles.screen}>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+    <Screen scroll={false}>
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
       <FlatList
         data={items}
         keyExtractor={(item) => item.shopId}
-        contentContainerStyle={items.length ? styles.list : styles.emptyList}
+        contentContainerStyle={{ gap: layout.space[3], paddingBottom: layout.space[6] }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -47,73 +72,52 @@ export default function OverdueShopsScreen() {
             }}
           />
         }
-        ListEmptyComponent={<FinanceState empty="No shops currently have an overdue balance." />}
+        ListEmptyComponent={
+          <EmptyState
+            title={t('finance.noOverdueShops')}
+            description={t('finance.noOverdueShopsBody')}
+          />
+        }
         renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.row}>
-              <View style={styles.nameBlock}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.reference}>{item.reference}</Text>
+          <Card>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                gap: layout.space[2],
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{ fontSize: layout.fontSize.lg, fontWeight: '600', color: colour.text }}
+                >
+                  {item.name}
+                </Text>
+                <Text style={{ color: colour.brand, fontSize: layout.fontSize.sm }}>
+                  {item.reference}
+                </Text>
               </View>
-              <StatusBadge value={`${item.daysOverdue} DAYS`} />
+              {/* Was `${days} DAYS` pushed through the status badge, so a made-up
+                  value rendered as though it were a status the server sent. */}
+              <Badge tone="danger">{t('finance.daysOverdue', { count: item.daysOverdue })}</Badge>
             </View>
-            <View style={styles.moneyRow}>
-              <Amount label="Outstanding" amount={item.outstandingBalanceMinor} />
-              <Amount label="Overdue" amount={item.overdueBalanceMinor} warning />
-            </View>
-            <Text style={styles.muted}>
-              Oldest due date {formatFinanceDate(item.oldestDueDate)}
-            </Text>
-          </View>
+            <ListRow
+              label={t('finance.outstanding')}
+              value={formatMoneyMinor(item.outstandingBalanceMinor)}
+              numeric
+            />
+            <ListRow
+              label={t('finance.overdue')}
+              value={formatMoneyMinor(item.overdueBalanceMinor)}
+              numeric
+            />
+            <ListRow
+              label={t('finance.oldestDueDate')}
+              value={formatFinanceDate(item.oldestDueDate)}
+            />
+          </Card>
         )}
       />
-    </View>
+    </Screen>
   );
 }
-
-function Amount({
-  label,
-  amount,
-  warning = false,
-}: {
-  label: string;
-  amount: number;
-  warning?: boolean;
-}) {
-  return (
-    <View>
-      <Text style={styles.amountLabel}>{label}</Text>
-      <Text style={[styles.amount, warning && styles.warning]}>{formatMoneyMinor(amount)}</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  list: { padding: 14, gap: 10 },
-  emptyList: { flexGrow: 1 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 15, gap: 10 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  nameBlock: { flex: 1 },
-  name: { fontWeight: '900', fontSize: 17 },
-  reference: { color: '#126b45', marginTop: 2 },
-  moneyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e7ede9',
-  },
-  amountLabel: { color: '#66756d', fontSize: 11 },
-  amount: { fontWeight: '900', marginTop: 3 },
-  warning: { color: '#9b2c2c' },
-  muted: { color: '#66756d' },
-  error: {
-    color: '#8b2525',
-    backgroundColor: '#fff0ee',
-    padding: 10,
-    margin: 14,
-    marginBottom: 0,
-    borderRadius: 8,
-  },
-});
