@@ -1,45 +1,58 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import type { AnalyticsOverview } from '@medsupply/shared-types';
-import { FinanceState } from '../../../src/finance/components';
-import { apiErrorMessage } from '../../../src/finance/api';
+import { errorMessage } from '@medsupply/api-client';
+import { toDateInputValue } from '@medsupply/utilities';
 import { formatMoneyMinor } from '../../../src/finance/money';
 import { getAnalyticsOverview } from '../../../src/returns/api';
+import { useLanguage } from '../../../src/i18n/useLanguage';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  FilterChips,
+  ListRow,
+  LoadingState,
+  Metric,
+  Screen,
+  SectionTitle,
+} from '../../../src/components';
+import { colour, layout } from '../../../src/theme';
 
-/** Asia/Dhaka, matching the server's report calendar. */
-function dhakaToday() {
-  return new Date(Date.now() + 6 * 3_600_000).toISOString().slice(0, 10);
+type Preset = 'MONTH' | 'WEEK' | 'QUARTER';
+
+/**
+ * Today, in the tenant's configured zone.
+ *
+ * This was `new Date(Date.now() + 6 * 3_600_000).toISOString().slice(0, 10)` —
+ * a hand-rolled Dhaka offset three lines from a helper that does it properly.
+ * It is wrong twice over: it hard-codes +06:00 for a deployment that can now be
+ * configured to any zone, and between midnight and 06:00 it reports tomorrow.
+ */
+function today() {
+  return toDateInputValue(new Date());
 }
 
-function rangeFor(preset: 'MONTH' | 'WEEK' | 'QUARTER') {
-  const to = dhakaToday();
+function rangeFor(preset: Preset) {
+  const to = today();
   if (preset === 'MONTH') return { from: `${to.slice(0, 8)}01`, to, granularity: 'DAY' as const };
   const days = preset === 'WEEK' ? 6 : 89;
-  const from = new Date(Date.parse(`${to}T00:00:00.000+06:00`) - days * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+  const from = toDateInputValue(new Date(Date.parse(`${to}T12:00:00.000Z`) - days * 86_400_000));
   return { from, to, granularity: preset === 'WEEK' ? ('DAY' as const) : ('WEEK' as const) };
 }
 
-const PRESETS = [
-  { value: 'WEEK', label: 'Last 7 days' },
-  { value: 'MONTH', label: 'This month' },
-  { value: 'QUARTER', label: 'Last 90 days' },
-] as const;
+const PRESETS: readonly Preset[] = ['WEEK', 'MONTH', 'QUARTER'];
+const PRESET_KEY: Record<Preset, string> = {
+  WEEK: 'analyticsMobile.last7',
+  MONTH: 'analyticsMobile.thisMonth',
+  QUARTER: 'analyticsMobile.last90',
+};
 
 const percent = (basisPoints: number) => `${(basisPoints / 100).toFixed(1)}%`;
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.metric}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
-    </View>
-  );
-}
-
 export default function AnalyticsScreen() {
-  const [preset, setPreset] = useState<'MONTH' | 'WEEK' | 'QUARTER'>('MONTH');
+  const { t, language } = useLanguage();
+  const [preset, setPreset] = useState<Preset>('MONTH');
   const [data, setData] = useState<AnalyticsOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,25 +63,44 @@ export default function AnalyticsScreen() {
       setData(await getAnalyticsOverview(rangeFor(preset)));
       setError('');
     } catch (caught) {
-      setError(apiErrorMessage(caught, 'Unable to load business analytics.'));
+      setError(errorMessage(caught, language, t('analyticsMobile.couldNotLoad')));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [preset]);
+  }, [preset, language, t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (loading) return <FinanceState loading />;
-  if (!data)
-    return <FinanceState error={error || 'No analytics available.'} onRetry={() => void load()} />;
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState label={t('analyticsMobile.loading')} />
+      </Screen>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Screen>
+        {error ? (
+          <ErrorState message={error} onRetry={() => void load()} />
+        ) : (
+          <EmptyState
+            title={t('analyticsMobile.none')}
+            description={t('analyticsMobile.noneBody')}
+          />
+        )}
+      </Screen>
+    );
+  }
 
   return (
     <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
+      style={{ flex: 1, backgroundColor: colour.canvas }}
+      contentContainerStyle={{ padding: layout.space[4], gap: layout.space[3] }}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -79,138 +111,123 @@ export default function AnalyticsScreen() {
         />
       }
     >
-      <View style={styles.filters}>
-        {PRESETS.map((entry) => (
-          <Pressable
-            accessibilityRole="button"
-            key={entry.value}
-            style={[styles.filter, preset === entry.value ? styles.filterActive : null]}
-            onPress={() => {
-              setLoading(true);
-              setPreset(entry.value);
-            }}
-          >
-            <Text style={preset === entry.value ? styles.filterTextActive : styles.filterText}>
-              {entry.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <FilterChips
+        label={t('analyticsMobile.rangeLabel')}
+        value={preset}
+        onChange={(next) => {
+          setLoading(true);
+          setPreset(next as Preset);
+        }}
+        options={PRESETS.map((value) => ({ value, label: t(PRESET_KEY[value]) }))}
+      />
 
-      {error ? (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {error}
-        </Text>
-      ) : null}
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
 
-      <View style={styles.card}>
-        <Text style={styles.heading}>Sales</Text>
-        <View style={styles.metricRow}>
-          <Metric label="Net sales" value={formatMoneyMinor(data.sales.netMinor)} />
-          <Metric label="After returns" value={formatMoneyMinor(data.sales.netAfterReturnsMinor)} />
-        </View>
-        <View style={styles.metricRow}>
-          <Metric label="Invoices" value={String(data.sales.invoiceCount)} />
+      <Card>
+        <SectionTitle>{t('analyticsMobile.sales')}</SectionTitle>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: layout.space[3] }}>
           <Metric
-            label="Average invoice"
+            label={t('analyticsMobile.netSales')}
+            value={formatMoneyMinor(data.sales.netMinor)}
+          />
+          <Metric
+            label={t('analyticsMobile.afterReturns')}
+            value={formatMoneyMinor(data.sales.netAfterReturnsMinor)}
+          />
+          <Metric label={t('analyticsMobile.invoices')} value={data.sales.invoiceCount} />
+          <Metric
+            label={t('analyticsMobile.averageInvoice')}
             value={formatMoneyMinor(data.sales.averageInvoiceMinor)}
           />
         </View>
-      </View>
+      </Card>
 
-      <View style={styles.card}>
-        <Text style={styles.heading}>Receivables</Text>
-        <View style={styles.metricRow}>
-          <Metric label="Outstanding" value={formatMoneyMinor(data.receivables.outstandingMinor)} />
-          <Metric label="Overdue" value={formatMoneyMinor(data.receivables.overdueMinor)} />
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.heading}>Orders</Text>
-        <View style={styles.metricRow}>
-          <Metric label="Submitted" value={String(data.orders.submitted)} />
-          <Metric label="Approved" value={String(data.orders.approved)} />
-        </View>
-        <View style={styles.metricRow}>
-          <Metric label="Delivered" value={String(data.orders.delivered)} />
-          <Metric label="Cancelled" value={String(data.orders.cancelled)} />
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.heading}>Delivery</Text>
-        <View style={styles.metricRow}>
-          <Metric label="Success rate" value={percent(data.delivery.successBasisPoints)} />
-          <Metric label="On time" value={percent(data.delivery.onTimeBasisPoints)} />
-        </View>
-        <View style={styles.metricRow}>
-          <Metric label="Failed" value={String(data.delivery.failed)} />
+      <Card>
+        <SectionTitle>{t('analyticsMobile.receivables')}</SectionTitle>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: layout.space[3] }}>
           <Metric
-            label="Average cycle"
+            label={t('analyticsMobile.outstanding')}
+            value={formatMoneyMinor(data.receivables.outstandingMinor)}
+          />
+          <Metric
+            label={t('analyticsMobile.overdue')}
+            value={formatMoneyMinor(data.receivables.overdueMinor)}
+            tone={data.receivables.overdueMinor > 0 ? 'warning' : 'normal'}
+          />
+        </View>
+      </Card>
+
+      <Card>
+        <SectionTitle>{t('analyticsMobile.orders')}</SectionTitle>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: layout.space[3] }}>
+          <Metric label={t('analyticsMobile.submitted')} value={data.orders.submitted} />
+          <Metric label={t('analyticsMobile.approved')} value={data.orders.approved} />
+          <Metric label={t('analyticsMobile.delivered')} value={data.orders.delivered} />
+          <Metric label={t('analyticsMobile.cancelled')} value={data.orders.cancelled} />
+        </View>
+      </Card>
+
+      <Card>
+        <SectionTitle>{t('analyticsMobile.delivery')}</SectionTitle>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: layout.space[3] }}>
+          <Metric
+            label={t('analyticsMobile.successRate')}
+            value={percent(data.delivery.successBasisPoints)}
+          />
+          <Metric
+            label={t('analyticsMobile.onTime')}
+            value={percent(data.delivery.onTimeBasisPoints)}
+          />
+          <Metric
+            label={t('analyticsMobile.failed')}
+            value={data.delivery.failed}
+            tone={data.delivery.failed > 0 ? 'warning' : 'normal'}
+          />
+          <Metric
+            label={t('analyticsMobile.averageCycle')}
             value={
               data.delivery.averageCycleHours === null
                 ? '—'
-                : `${data.delivery.averageCycleHours} h`
+                : t('analyticsMobile.hours', { count: data.delivery.averageCycleHours })
             }
           />
         </View>
-      </View>
+      </Card>
 
-      <View style={styles.card}>
-        <Text style={styles.heading}>Returns</Text>
-        <View style={styles.metricRow}>
-          <Metric label="Credited" value={formatMoneyMinor(data.returns.creditedMinor)} />
+      <Card>
+        <SectionTitle>{t('analyticsMobile.returns')}</SectionTitle>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: layout.space[3] }}>
           <Metric
-            label="Awaiting credit"
+            label={t('analyticsMobile.credited')}
+            value={formatMoneyMinor(data.returns.creditedMinor)}
+          />
+          <Metric
+            label={t('analyticsMobile.awaitingCredit')}
             value={formatMoneyMinor(data.returns.pendingCreditMinor)}
           />
+          <Metric
+            label={t('analyticsMobile.returnRate')}
+            value={percent(data.returns.returnRateBasisPoints)}
+          />
+          <Metric label={t('analyticsMobile.openRequests')} value={data.returns.pendingCount} />
         </View>
-        <View style={styles.metricRow}>
-          <Metric label="Return rate" value={percent(data.returns.returnRateBasisPoints)} />
-          <Metric label="Open requests" value={String(data.returns.pendingCount)} />
-        </View>
-      </View>
+      </Card>
 
-      <View style={styles.card}>
-        <Text style={styles.heading}>Top medicines</Text>
+      <Card>
+        <SectionTitle>{t('analyticsMobile.topMedicines')}</SectionTitle>
         {data.topMedicines.length === 0 ? (
-          <Text style={styles.muted}>Nothing was sold in this period.</Text>
+          <Text style={{ color: colour.textMuted }}>{t('analyticsMobile.nothingSold')}</Text>
         ) : (
           data.topMedicines.map((row) => (
-            <View key={row.key} style={styles.listRow}>
-              <Text style={styles.listLabel}>{row.label}</Text>
-              <Text style={styles.listValue}>{formatMoneyMinor(row.netMinor)}</Text>
-            </View>
+            <ListRow
+              key={row.key}
+              label={row.label}
+              value={formatMoneyMinor(row.netMinor)}
+              numeric
+            />
           ))
         )}
-      </View>
-
-      <Text style={styles.footnote}>
-        Periods use the Asia/Dhaka business calendar, the same boundary the ledger uses.
-      </Text>
+      </Card>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  content: { padding: 14, gap: 12, paddingBottom: 34 },
-  filters: { flexDirection: 'row', gap: 7 },
-  filter: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 999, backgroundColor: '#fff' },
-  filterActive: { backgroundColor: '#126b45' },
-  filterText: { color: '#274b3b', fontSize: 12, fontWeight: '600' },
-  filterTextActive: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 15, gap: 9 },
-  heading: { color: '#173f2e', fontWeight: '900', fontSize: 15 },
-  metricRow: { flexDirection: 'row', gap: 10 },
-  metric: { flex: 1, backgroundColor: '#f4f7f5', borderRadius: 9, padding: 11 },
-  metricLabel: { color: '#66756d', fontSize: 11 },
-  metricValue: { color: '#173f2e', fontWeight: '900', fontSize: 17, marginTop: 3 },
-  listRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  listLabel: { flex: 1, color: '#274b3b' },
-  listValue: { fontWeight: '700', color: '#173f2e' },
-  muted: { color: '#66756d' },
-  footnote: { color: '#66756d', fontSize: 12, textAlign: 'center' },
-  error: { color: '#8b2525', backgroundColor: '#fff0ee', padding: 10, borderRadius: 8 },
-});
