@@ -60,6 +60,8 @@ export const en = {
     notSet: 'Not set',
     on: 'On',
     off: 'Off',
+    active: 'Active',
+    inactive: 'Not in use',
     nothing: 'None',
     between: '{{from}} to {{to}}',
   },
@@ -641,6 +643,9 @@ export const en = {
   },
 
   shops: {
+    priceList: 'Price list',
+    priceListHint: 'Which list this customer is charged from.',
+    priceListDefault: 'The default list',
     title: 'Shops',
     subtitle: 'Every pharmacy we supply, and how much credit each one has.',
     add: 'Add a shop',
@@ -1579,6 +1584,7 @@ export const en = {
     category: 'Category',
     costPrice: 'What we pay',
     sellingPrice: 'What the shop pays',
+    mrp: 'MRP (printed on the pack)',
     minimumOrderQuantity: 'Smallest order',
     maximumOrderQuantity: 'Largest order',
     classification: 'Classification',
@@ -1900,6 +1906,86 @@ export const en = {
     saveFailed: 'That warehouse could not be added.',
   },
 
+  /**
+   * Price lists and free-goods offers.
+   *
+   * The commercial vocabulary of this trade: what a group of customers pays,
+   * and what they get free for buying in quantity. Both existed as models and a
+   * resolver with no way in.
+   */
+  priceLists: {
+    title: 'Price lists',
+    subtitle:
+      'What each group of customers pays. A customer with no list assigned is charged from the default one, and then from the medicine\u2019s own price.',
+    loading: 'Loading price lists',
+    couldNotLoad: 'The price lists could not be loaded.',
+    none: 'No price lists yet',
+    noneBody:
+      'Add one and assign customers to it. Until then everybody pays the medicine\u2019s own price.',
+    add: 'Add a price list',
+    addTitle: 'Add a price list',
+    editTitle: 'Edit this price list',
+    formSubtitle:
+      'The whole sheet is saved at once. If somebody else has changed it since you opened it, you will be told rather than overwriting their prices.',
+    name: 'Name',
+    default: 'Default',
+    isDefault: 'Make this the default',
+    isDefaultHint: 'Customers with no list of their own are charged from this one.',
+    pricedItems: 'Priced items',
+    customers: 'Customers',
+    inForce: 'In force',
+    openEnded: 'No end date',
+    openEndedHint: 'Leave both blank to run until somebody ends it.',
+    validFrom: 'From',
+    validTo: 'Until',
+    lines: 'Prices',
+    medicine: 'Medicine',
+    chooseMedicine: 'Choose a medicine',
+    unitPrice: 'Unit price',
+    discountPercent: 'Discount %',
+    addLine: 'Add a price',
+    removeLine: 'Remove',
+    pricedCount: '{{count}} priced, from {{cheapest}}.',
+    save: 'Save this price list',
+    saved: '{{name}} saved.',
+    saveFailed: 'That price list could not be saved.',
+  },
+
+  schemes: {
+    title: 'Free-goods offers',
+    subtitle:
+      'Buy ten, get one. The customer is charged for what they ordered and the free units go out alongside \u2014 the warehouse picks eleven and the invoice prices ten.',
+    loading: 'Loading offers',
+    couldNotLoad: 'The offers could not be loaded.',
+    none: 'No offers yet',
+    noneBody: 'Add one and it applies to every order placed after it.',
+    add: 'Add an offer',
+    addTitle: 'Add a free-goods offer',
+    editTitle: 'Edit this offer',
+    formSubtitle:
+      'Changing an offer never restates an order already placed \u2014 each order records the terms it was given.',
+    name: 'Name',
+    medicine: 'Medicine',
+    chooseMedicine: 'Choose a medicine',
+    terms: 'Offer',
+    buyGet: 'Buy {{buy}}, get {{free}} free',
+    buyQuantity: 'Buy',
+    buyQuantityHint: 'Whole multiples only. Nine units under a 10+1 earns nothing.',
+    freeQuantity: 'Free',
+    audience: 'Who gets it',
+    audienceHint: 'Name nobody and it runs for every customer, which is the usual case.',
+    everyCustomer: 'Every customer',
+    namedCustomers: '{{count}} named customers',
+    inForce: 'In force',
+    openEnded: 'No end date',
+    openEndedHint: 'Leave both blank to run until somebody ends it.',
+    validFrom: 'From',
+    validTo: 'Until',
+    save: 'Save this offer',
+    saved: '{{name}} saved.',
+    saveFailed: 'That offer could not be saved.',
+  },
+
   movementType: {
     [StockMovementType.RECEIPT]: 'Booked in',
     [StockMovementType.ADDITION]: 'Added',
@@ -2212,6 +2298,12 @@ export const en = {
   } as Record<string, string>,
 
   navItem: {
+    'price-lists': 'Price lists',
+    'price-list-new': 'Add a price list',
+    'price-list-detail': 'Price list',
+    schemes: 'Free-goods offers',
+    'scheme-new': 'Add an offer',
+    'scheme-detail': 'Offer',
     dashboard: 'Home',
     orders: 'Orders',
     'order-detail': 'Order',

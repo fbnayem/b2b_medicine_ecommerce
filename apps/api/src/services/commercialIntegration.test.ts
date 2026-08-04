@@ -329,7 +329,13 @@ test('a 10+1 line: eleven leave stock, ten are charged, six back credits six ele
    * dispatched count does.
    */
   await Scheme.create({
-    reference: 'SCH-2026-000001',
+    /*
+     * Deliberately outside the counter's series. A fixture that hand-writes
+     * `SCH-2026-000001` claims the first reference `nextReference` will issue,
+     * so the first scheme created through the API collides on the unique index
+     * — which is how this fixture and the API test met.
+     */
+    reference: 'SCH-2026-009001',
     name: 'Napa 10+1',
     medicineId,
     buyQuantity: 10,
@@ -345,7 +351,7 @@ test('a 10+1 line: eleven leave stock, ten are charged, six back credits six ele
   const line = order?.items[0];
   assert.equal(line?.requestedQuantity, 10, 'ten is what the customer asked for and pays for');
   assert.equal(line?.freeQuantity, 1, 'one rides alongside it');
-  assert.equal(line?.schemeReference, 'SCH-2026-000001');
+  assert.equal(line?.schemeReference, 'SCH-2026-009001');
 
   assert.equal(
     order?.estimatedTotalMinor,
@@ -377,4 +383,297 @@ test('a short line earns nothing, because that is what the offer says', async ()
     'nine under a 10+1 earns nothing — rounding up would be a discount nobody ' +
       'agreed to, applied silently, on every line that fell short',
   );
+});
+
+/*
+ * ── Setting the terms ───────────────────────────────────────────────────────
+ *
+ * The models above were written in the same phase as the resolver, and nothing
+ * could create either of them: every fixture in this file reaches past the API
+ * and writes the document directly, which is exactly how the gap survived. A
+ * price list nobody can edit prices nothing.
+ */
+
+async function api(
+  method: string,
+  path: string,
+  as: Types.ObjectId,
+  body?: Record<string, unknown>,
+) {
+  const response = await fetch(`${base}${path}`, {
+    method,
+    headers: authorization(as),
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return { status: response.status, body: (await response.json()) as Record<string, never> };
+}
+
+function payload<T>(result: { body: Record<string, never> }): T {
+  return result.body.data as unknown as T;
+}
+
+test('a manager creates a price list and reads it back with its lines named', async () => {
+  const created = await api('POST', '/api/v1/pricing/price-lists', manager._id, {
+    name: 'Chain retail',
+    description: 'Negotiated with the pharmacy chain',
+    lines: [
+      { medicineId: String(listedMedicineId), unitPriceMinor: 990, discountPercent: 2 },
+      { medicineId: String(medicineId), unitPriceMinor: 1040 },
+    ],
+  });
+  assert.equal(created.status, 201);
+
+  const id = String(payload<{ _id: string }>(created)._id);
+  assert.match(
+    payload<{ reference: string }>(created).reference,
+    /^PRC-\d{4}-\d{6}$/,
+    'a reference a human can quote, from the same counter as every other one',
+  );
+
+  const detail = await api('GET', `/api/v1/pricing/price-lists/${id}`, manager._id);
+  assert.equal(detail.status, 200);
+  const list = payload<{ lines: Array<{ medicineBrandName?: string; medicineSku?: string }> }>(
+    detail,
+  );
+  assert.equal(list.lines.length, 2);
+  assert.equal(
+    list.lines[0]?.medicineBrandName,
+    'Ace 500 mg',
+    'the sheet names the medicine — AGENTS.md forbids showing the id, and one ' +
+      'request per row is what a forty-line list would otherwise cost',
+  );
+  assert.equal(list.lines[0]?.medicineSku, 'ACE-500');
+});
+
+test('the list refuses two prices for one medicine', async () => {
+  /*
+   * `resolvePriceFrom` takes the first matching line, so a duplicate is not an
+   * error anybody would see — it is a second price that silently never applies,
+   * and which of the two wins depends on the order they were typed.
+   */
+  const refused = await api('POST', '/api/v1/pricing/price-lists', manager._id, {
+    name: 'Contradictory',
+    lines: [
+      { medicineId: String(medicineId), unitPriceMinor: 1000 },
+      { medicineId: String(medicineId), unitPriceMinor: 900 },
+    ],
+  });
+  assert.equal(refused.status, 400);
+});
+
+test('a list cannot price a medicine that does not exist', async () => {
+  // A line against a mistyped id prices nothing, and the resolver falls through
+  // to the medicine's own price — so the customer is quietly charged the wrong
+  // amount rather than seeing an error.
+  const refused = await api('POST', '/api/v1/pricing/price-lists', manager._id, {
+    name: 'Ghost',
+    lines: [{ medicineId: String(new Types.ObjectId()), unitPriceMinor: 1000 }],
+  });
+  assert.equal(refused.status, 404);
+  assert.equal((refused.body.error as unknown as { code: string }).code, 'MEDICINE_NOT_FOUND');
+});
+
+test('making a list the default moves the flag rather than adding a second one', async () => {
+  const listing = await api('GET', '/api/v1/pricing/price-lists', manager._id);
+  assert.equal(listing.status, 200);
+  const before = payload<{ items: Array<{ _id: string; name: string; version: number }> }>(listing);
+  const chain = before.items.find((row) => row.name === 'Chain retail');
+  assert.ok(chain);
+
+  const updated = await api('PATCH', `/api/v1/pricing/price-lists/${chain._id}`, manager._id, {
+    version: chain.version,
+    isDefault: true,
+  });
+  assert.equal(updated.status, 200);
+
+  assert.equal(
+    await PriceList.countDocuments({ isDefault: true }),
+    1,
+    'two defaults would make "which list prices this shop" ambiguous for every ' +
+      'shop assigned none',
+  );
+  assert.equal(String((await PriceList.findOne({ isDefault: true }))?._id), String(chain._id));
+});
+
+test('a stale editor is refused rather than silently overwriting the sheet', async () => {
+  const listing = await api('GET', '/api/v1/pricing/price-lists', manager._id);
+  const chain = payload<{ items: Array<{ _id: string; name: string; version: number }> }>(
+    listing,
+  ).items.find((row) => row.name === 'Chain retail');
+  assert.ok(chain);
+
+  const stale = await api('PATCH', `/api/v1/pricing/price-lists/${chain._id}`, manager._id, {
+    version: chain.version - 1,
+    name: 'Overwritten',
+  });
+  assert.equal(stale.status, 409);
+  assert.equal((stale.body.error as unknown as { code: string }).code, 'VERSION_CONFLICT');
+});
+
+test('a rep reads the terms and cannot set them', async () => {
+  // Quoting a customer means knowing what they pay; a rep who has to ask
+  // somebody else quotes from memory. Writing stays with management, because a
+  // price list is the revenue of every order placed after it.
+  assert.equal((await api('GET', '/api/v1/pricing/price-lists', rep._id)).status, 200);
+  assert.equal((await api('GET', '/api/v1/pricing/schemes', rep._id)).status, 200);
+
+  const refused = await api('POST', '/api/v1/pricing/price-lists', rep._id, {
+    name: 'Rep list',
+    lines: [],
+  });
+  assert.equal(refused.status, 403);
+});
+
+test('a scheme created through the API prices the next order and not the last one', async () => {
+  const created = await api('POST', '/api/v1/pricing/schemes', manager._id, {
+    name: 'Ace 20+3',
+    medicineId: String(listedMedicineId),
+    buyQuantity: 20,
+    freeQuantity: 3,
+  });
+  assert.equal(created.status, 201);
+  const scheme = payload<{ _id: string; reference: string; version: number }>(created);
+
+  const detail = await api('GET', `/api/v1/pricing/schemes/${scheme._id}`, manager._id);
+  assert.equal(detail.status, 200);
+  assert.equal(
+    payload<{ medicineBrandName?: string }>(detail).medicineBrandName,
+    'Ace 500 mg',
+    'the offer names the medicine it runs on',
+  );
+
+  const placed = await submitQuantity(listedMedicineId, 20, 'commercial-api-scheme-1');
+  assert.equal(placed.status, 201, JSON.stringify(placed.body));
+  const withScheme = await Order.findOne({ submissionIdempotencyKey: 'commercial-api-scheme-1' });
+  assert.equal(withScheme?.items[0]?.freeQuantity, 3);
+  assert.equal(withScheme?.items[0]?.schemeReference, scheme.reference);
+
+  // Ending the offer stops the next order rather than restating that one.
+  const ended = await api('PATCH', `/api/v1/pricing/schemes/${scheme._id}`, manager._id, {
+    version: scheme.version,
+    isActive: false,
+  });
+  assert.equal(ended.status, 200);
+
+  const after = await submitQuantity(listedMedicineId, 20, 'commercial-api-scheme-2');
+  assert.equal(after.status, 201);
+  const later = await Order.findOne({ submissionIdempotencyKey: 'commercial-api-scheme-2' });
+  assert.equal(later?.items[0]?.freeQuantity, 0);
+
+  const unchanged = await Order.findOne({ submissionIdempotencyKey: 'commercial-api-scheme-1' });
+  assert.equal(
+    unchanged?.items[0]?.freeQuantity,
+    3,
+    'the order already placed keeps the terms it was given',
+  );
+});
+
+async function submitQuantity(medicine: Types.ObjectId, quantity: number, key: string) {
+  const response = await fetch(`${base}/api/v1/orders/submit`, {
+    method: 'POST',
+    headers: authorization(rep._id),
+    body: JSON.stringify({
+      shopId: String(inTerritory._id),
+      deliveryAddressId: String(inTerritory.addressId),
+      requestedPaymentMethod: PaymentMethod.CREDIT,
+      idempotencyKey: key,
+      items: [{ medicineId: String(medicine), requestedQuantity: quantity }],
+    }),
+  });
+  return { status: response.status, body: (await response.json()) as Record<string, unknown> };
+}
+
+test('a shop can be assigned a price list, and not an inactive one', async () => {
+  const created = await api('POST', '/api/v1/pricing/price-lists', manager._id, {
+    name: 'Retired list',
+    isActive: false,
+    lines: [{ medicineId: String(medicineId), unitPriceMinor: 700 }],
+  });
+  const retired = payload<{ _id: string }>(created);
+
+  // Editing a customer record is administration, not management — the same
+  // roles that could always edit a shop.
+  const admin = await User.create({
+    email: 'commercial-admin@test.local',
+    passwordHash: 'x',
+    firstName: 'Commercial',
+    lastName: 'Admin',
+    role: UserRole.ADMIN,
+    status: UserStatus.ACTIVE,
+  });
+
+  const refused = await fetch(`${base}/api/v1/shops/${inTerritory._id}`, {
+    method: 'PATCH',
+    headers: authorization(admin._id),
+    body: JSON.stringify({ priceListId: retired._id }),
+  });
+  assert.equal(
+    refused.status,
+    409,
+    'an inactive list assigned to a customer is a price that silently does not ' +
+      'apply — the resolver skips it and charges them from the default instead',
+  );
+
+  const live = await PriceList.findOne({ name: 'Chain retail' });
+  const assigned = await fetch(`${base}/api/v1/shops/${inTerritory._id}`, {
+    method: 'PATCH',
+    headers: authorization(admin._id),
+    body: JSON.stringify({ priceListId: String(live!._id) }),
+  });
+  assert.equal(assigned.status, 200);
+  assert.equal(String((await Shop.findById(inTerritory._id))?.priceListId), String(live!._id));
+
+  // And an empty string clears it rather than reaching Mongoose as a cast error.
+  const cleared = await fetch(`${base}/api/v1/shops/${inTerritory._id}`, {
+    method: 'PATCH',
+    headers: authorization(admin._id),
+    body: JSON.stringify({ priceListId: '' }),
+  });
+  assert.equal(cleared.status, 200);
+  assert.equal((await Shop.findById(inTerritory._id))?.priceListId, null);
+});
+
+test('an MRP can be set, and a trade price above it is refused', async () => {
+  /*
+   * `mrpMinor` was on the model, in the shared types and read by
+   * `marginBasisPoints` — and absent from the validation schema, so zod stripped
+   * it from every request and no medicine could ever carry one.
+   */
+  const created = await fetch(`${base}/api/v1/inventory/medicines`, {
+    method: 'POST',
+    headers: authorization(manager._id),
+    body: JSON.stringify({
+      sku: 'SETMRP-1',
+      brandName: 'Seclo',
+      genericName: 'Omeprazole',
+      manufacturer: 'Square',
+      strength: '20 mg',
+      dosageForm: 'CAPSULE',
+      packSize: '30s',
+      unit: 'box',
+      category: 'Gastro',
+      classification: MedicineClassification.OTC,
+      costPriceMinor: 500,
+      defaultSellingPriceMinor: 700,
+      mrpMinor: 900,
+    }),
+  });
+  assert.equal(created.status, 201);
+  const medicine = ((await created.json()) as { data: { _id: string } }).data;
+  assert.equal((await Medicine.findById(medicine._id))?.mrpMinor, 900);
+
+  // A pharmacy may not legally sell above the price printed on the pack, so
+  // charging them more than it means they lose money on every unit.
+  const refused = await fetch(`${base}/api/v1/inventory/medicines/${medicine._id}`, {
+    method: 'PATCH',
+    headers: authorization(manager._id),
+    body: JSON.stringify({ defaultSellingPriceMinor: 1000 }),
+  });
+  assert.equal(
+    refused.status,
+    400,
+    'the patch alone never sees the stored MRP, so this has to be checked ' +
+      'against the merged document rather than against the request',
+  );
+  assert.equal((await Medicine.findById(medicine._id))?.defaultSellingPriceMinor, 700);
 });

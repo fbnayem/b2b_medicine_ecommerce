@@ -4,7 +4,24 @@ import { Shop } from '../models/Shop';
 import { CreateShopSchema, UpdateShopSchema } from '@medsupply/validation';
 import { ShopStatus, UserRole } from '@medsupply/shared-types';
 import { User } from '../models/User';
+import { assertPriceListAssignable } from '../services/priceListService';
 import { containsFilter } from '../services/requestSanitiser';
+
+/**
+ * Turns the form's price-list field into what the document stores.
+ *
+ * An empty string is how a form says "no list", and it has to become `null`
+ * rather than reaching Mongoose as `''` — which casts to an error the customer
+ * would see as a failed save with no field to blame. A named list is checked
+ * for being assignable here, because assigning an inactive one is a price that
+ * silently does not apply.
+ */
+async function resolvePriceList<T extends { priceListId?: string }>(data: T) {
+  if (data.priceListId === undefined) return data;
+  if (data.priceListId === '') return { ...data, priceListId: null };
+  await assertPriceListAssignable(data.priceListId);
+  return data;
+}
 
 // ─── Create shop (Admin / Super Admin only) ─────────────────────────────────
 export const createShop = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -28,7 +45,10 @@ export const createShop = async (req: AuthRequest, res: Response, next: NextFunc
       });
     }
 
-    const shop = await Shop.create({ ...data, createdBy: req.user!._id });
+    const shop = await Shop.create({
+      ...(await resolvePriceList(data)),
+      createdBy: req.user!._id,
+    });
     res.status(201).json({ data: shop });
   } catch (error) {
     next(error);
@@ -110,7 +130,7 @@ export const listShops = async (req: AuthRequest, res: Response, next: NextFunct
 // ─── Update shop ─────────────────────────────────────────────────────────────
 export const updateShop = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const data = UpdateShopSchema.parse(req.body);
+    const data = await resolvePriceList(UpdateShopSchema.parse(req.body));
     const shop = await Shop.findByIdAndUpdate(req.params.id, data, {
       new: true,
       runValidators: true,

@@ -50,6 +50,15 @@ export const CreateShopSchema = z.object({
   creditLimit: z.number().int().min(0).default(0),
   paymentTermsDays: z.number().int().min(0).default(30),
   defaultDiscount: z.number().min(0).max(100).default(0),
+  /**
+   * Which price list this customer is charged from.
+   *
+   * `priceListForShop` has read this since Phase 8 and nothing could write it,
+   * so the middle tier of the precedence — shop override → **price list** →
+   * medicine default — was reachable only by marking a list the default. An
+   * empty string clears the assignment, which is how the form sends "none".
+   */
+  priceListId: z.string().min(1).or(z.literal('')).optional(),
   billingAddress: AddressSchema.optional(),
   deliveryAddresses: z.array(AddressSchema).default([]),
   notes: z.string().optional(),
@@ -107,6 +116,15 @@ export const MedicineFieldsSchema = z.object({
   productImageUrl: z.string().url().optional(),
   costPriceMinor: moneyMinor,
   defaultSellingPriceMinor: moneyMinor,
+  /**
+   * Maximum retail price — the figure printed on the pack.
+   *
+   * Optional because the catalogue predates it and a half-filled MRP is more
+   * useful than none: `marginBasisPoints` returns `undefined` where it is
+   * absent, so an un-backfilled product reports *no answer* rather than a
+   * margin of zero.
+   */
+  mrpMinor: moneyMinor.optional(),
   minimumOrderQuantity: positiveQuantity.default(1),
   maximumOrderQuantity: positiveQuantity.optional(),
   classification: z.nativeEnum(MedicineClassification),
@@ -131,9 +149,58 @@ const validateMedicineLimits = (
   }
 };
 
-export const CreateMedicineSchema = MedicineFieldsSchema.superRefine(validateMedicineLimits);
-export const UpdateMedicineSchema =
-  MedicineFieldsSchema.partial().superRefine(validateMedicineLimits);
+/**
+ * A trade price above the MRP, described once.
+ *
+ * A pharmacy may not legally sell above the price printed on the pack, so
+ * charging them more than it leaves them losing money on every unit — a
+ * data-entry slip that only shows up as a complaint weeks later.
+ *
+ * Exported as a plain function rather than living only inside the refine
+ * because **a partial update sees only the patch**: raising the trade price
+ * alone would pass a check that never saw the stored MRP. The controller runs
+ * this against the merged document, and both callers therefore say the same
+ * thing.
+ */
+export function tradePriceExceedsMrp(
+  mrpMinor: number | undefined | null,
+  tradeMinor: number | undefined | null,
+): boolean {
+  if (!mrpMinor || mrpMinor <= 0) return false;
+  if (tradeMinor === undefined || tradeMinor === null) return false;
+  return tradeMinor > mrpMinor;
+}
+
+export const TRADE_ABOVE_MRP_MESSAGE = 'Trade price cannot be above the MRP printed on the pack';
+
+const validateMedicinePrices = (
+  value: { mrpMinor?: number; defaultSellingPriceMinor?: number },
+  context: z.RefinementCtx,
+) => {
+  if (tradePriceExceedsMrp(value.mrpMinor, value.defaultSellingPriceMinor)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['defaultSellingPriceMinor'],
+      message: TRADE_ABOVE_MRP_MESSAGE,
+    });
+  }
+};
+
+const validateMedicine = (
+  value: {
+    minimumOrderQuantity?: number;
+    maximumOrderQuantity?: number;
+    mrpMinor?: number;
+    defaultSellingPriceMinor?: number;
+  },
+  context: z.RefinementCtx,
+) => {
+  validateMedicineLimits(value, context);
+  validateMedicinePrices(value, context);
+};
+
+export const CreateMedicineSchema = MedicineFieldsSchema.superRefine(validateMedicine);
+export const UpdateMedicineSchema = MedicineFieldsSchema.partial().superRefine(validateMedicine);
 
 export const ReceiveStockSchema = z
   .object({
@@ -1084,3 +1151,82 @@ export const CreateWarehouseSchema = z.object({
   notes: z.string().trim().max(1000).optional(),
   makeDefault: z.boolean().optional(),
 });
+
+/*
+ * ── Price lists and schemes ─────────────────────────────────────────────────
+ *
+ * The commercial model from Phase 8, which existed as models and a resolver
+ * and had no way in. A price list nobody can edit prices nothing.
+ */
+
+const validityWindow = (value: { validFrom?: Date; validTo?: Date }, context: z.RefinementCtx) => {
+  if (value.validFrom && value.validTo && value.validTo < value.validFrom) {
+    context.addIssue({
+      code: 'custom',
+      path: ['validTo'],
+      message: 'The end of the window cannot be before its start',
+    });
+  }
+};
+
+export const PriceListLineSchema = z.object({
+  medicineId: z.string().min(1),
+  unitPriceMinor: moneyMinor,
+  discountPercent: z.number().min(0).max(100).default(0),
+});
+
+const priceListFields = z.object({
+  name: z.string().trim().min(2).max(120),
+  description: z.string().trim().max(1000).optional(),
+  isDefault: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+  validFrom: z.coerce.date().optional(),
+  validTo: z.coerce.date().optional(),
+  lines: z.array(PriceListLineSchema).default([]),
+});
+
+const validatePriceList = (
+  value: { validFrom?: Date; validTo?: Date; lines?: Array<{ medicineId: string }> },
+  context: z.RefinementCtx,
+) => {
+  validityWindow(value, context);
+
+  /*
+   * One medicine, one price.
+   *
+   * `resolvePriceFrom` takes the first matching line, so a duplicate is not an
+   * error anybody would see — it is a second price that silently never
+   * applies, and which of the two wins depends on the order they were typed.
+   */
+  const seen = new Set<string>();
+  value.lines?.forEach((line, index) => {
+    if (seen.has(line.medicineId)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['lines', index, 'medicineId'],
+        message: 'This medicine is already priced on this list',
+      });
+    }
+    seen.add(line.medicineId);
+  });
+};
+
+export const CreatePriceListSchema = priceListFields.superRefine(validatePriceList);
+export const UpdatePriceListSchema = priceListFields.partial().superRefine(validatePriceList);
+
+const schemeFields = z.object({
+  name: z.string().trim().min(2).max(120),
+  medicineId: z.string().min(1),
+  /** Chargeable units that earn the free ones. */
+  buyQuantity: positiveQuantity,
+  freeQuantity: positiveQuantity,
+  validFrom: z.coerce.date().optional(),
+  validTo: z.coerce.date().optional(),
+  /** Empty means every customer, which is the ordinary case. */
+  shopIds: z.array(z.string().min(1)).default([]),
+  isActive: z.boolean().default(true),
+  notes: z.string().trim().max(1000).optional(),
+});
+
+export const CreateSchemeSchema = schemeFields.superRefine(validityWindow);
+export const UpdateSchemeSchema = schemeFields.partial().superRefine(validityWindow);

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { parseMoney } from '@medsupply/utilities';
+import type { PriceListRecord } from '@medsupply/shared-types';
 import { apiClient, errorMessage, failureReference } from '../api/client';
 import {
   Button,
@@ -10,8 +11,10 @@ import {
   Input,
   LinkButton,
   PageHeader,
+  Select,
   Textarea,
 } from '../components/ui';
+import { useApiCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 
 const EMPTY = {
@@ -45,8 +48,19 @@ export function ShopForm() {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const [form, setForm] = useState(EMPTY);
+  const [priceListId, setPriceListId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [failure, setFailure] = useState<{ message: string; reference?: string }>();
+
+  /*
+   * Only lists that are in force. Assigning an inactive one is a price that
+   * silently does not apply — the resolver skips it and charges this customer
+   * from the default instead, which is a decision nobody made.
+   */
+  const priceLists = useApiCollection<PriceListRecord>(
+    ['price-lists', 'active'],
+    '/pricing/price-lists?activeOnly=true',
+  );
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -68,6 +82,7 @@ export function ShopForm() {
       const response = await apiClient.post('/shops', {
         ...form,
         creditLimit: credit.minor,
+        priceListId,
         paymentTermsDays: Number(form.paymentTermsDays),
         drugLicenceExpiryDate: form.drugLicenceExpiryDate || undefined,
       });
@@ -121,6 +136,17 @@ export function ShopForm() {
               </Field>
             ))}
           </div>
+
+          <Field label={t('shops.priceList')} hint={t('shops.priceListHint')}>
+            <Select value={priceListId} onChange={(event) => setPriceListId(event.target.value)}>
+              <option value="">{t('shops.priceListDefault')}</option>
+              {(priceLists.data?.items ?? []).map((list) => (
+                <option key={list._id} value={list._id}>
+                  {list.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
 
           <Field label={t('shops.internalNotes')}>
             <Textarea

@@ -39,6 +39,8 @@ export interface Shop {
   reservedCreditMinor?: number;
   paymentTermsDays: number;
   defaultDiscount: number;
+  /** The price list this customer is charged from; absent means the default. */
+  priceListId?: string | null;
   status: ShopStatus;
   orderBlockingReason?: string;
   notes?: string;
@@ -1659,6 +1661,67 @@ export interface Warehouse {
   notes?: string;
   /** What it is holding. Unassigned batches count against the default. */
   stock: { batches: number; onHand: number; available: number };
+}
+
+/**
+ * What a group of customers pays.
+ *
+ * Deliberately not versioned: `validFrom`/`validTo` say what changed and when,
+ * and an order line snapshots the price it was given — so "what did this
+ * customer pay in March" is answered by the order rather than by replaying a
+ * list's history.
+ */
+export interface PriceListLine {
+  medicineId: string;
+  /** Denormalised for display, so a list of forty lines is one request. */
+  medicineBrandName?: string;
+  medicineSku?: string;
+  unitPriceMinor: number;
+  discountPercent: number;
+}
+
+export interface PriceListRecord {
+  _id: string;
+  reference: string;
+  name: string;
+  description?: string;
+  /** The list a shop falls back to when it is assigned none. At most one. */
+  isDefault: boolean;
+  isActive: boolean;
+  validFrom?: string;
+  validTo?: string;
+  lines: PriceListLine[];
+  /** How many shops are priced from this list. */
+  shopCount?: number;
+  version: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Free goods: "buy 10, get 1".
+ *
+ * `quantity` stays the chargeable quantity and `freeQuantity` rides alongside
+ * it, which is what keeps this away from the invoice arithmetic entirely.
+ */
+export interface SchemeRecord {
+  _id: string;
+  reference: string;
+  name: string;
+  medicineId: string;
+  medicineBrandName?: string;
+  medicineSku?: string;
+  buyQuantity: number;
+  freeQuantity: number;
+  validFrom?: string;
+  validTo?: string;
+  /** Empty means every customer, which is the ordinary case. */
+  shopIds: string[];
+  isActive: boolean;
+  notes?: string;
+  version: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /**

@@ -36,6 +36,13 @@ const shopSchema = new mongoose.Schema(
     reservedCreditMinor: { type: Number, default: 0, min: 0, validate: Number.isSafeInteger },
     paymentTermsDays: { type: Number, default: 30 },
     defaultDiscount: { type: Number, default: 0 }, // percent
+    /**
+     * The list this customer is priced from.
+     *
+     * Null falls through to whichever list is marked the default, and then to
+     * the medicine's own price — the precedence `pricingService` documents.
+     */
+    priceListId: { type: mongoose.Schema.Types.ObjectId, ref: 'PriceList', default: null },
     status: {
       type: String,
       enum: Object.values(ShopStatus),

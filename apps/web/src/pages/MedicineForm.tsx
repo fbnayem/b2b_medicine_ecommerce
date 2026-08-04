@@ -37,15 +37,40 @@ const money = z.string().refine((value) => parseMoney(value).ok, {
   message: 'Enter an amount like 12.50.',
 });
 
+/** Blank is a real answer here: most of the catalogue has no MRP recorded yet. */
+const optionalMoney = z.string().refine((value) => value === '' || parseMoney(value).ok, {
+  message: 'Enter an amount like 12.50, or leave it blank.',
+});
+
 const MedicineFormSchema = MedicineFieldsSchema.omit({
   costPriceMinor: true,
   defaultSellingPriceMinor: true,
+  mrpMinor: true,
   isActive: true,
   productImageUrl: true,
-}).extend({
-  costPrice: money,
-  sellingPrice: money,
-});
+})
+  .extend({
+    costPrice: money,
+    sellingPrice: money,
+    mrp: optionalMoney,
+  })
+  .superRefine((value, context) => {
+    /*
+     * A pharmacy may not legally sell above the price printed on the pack, so a
+     * trade price above the MRP means they lose money on every unit. The server
+     * refuses it too — this is here so the person typing finds out while their
+     * hands are still on the field.
+     */
+    const mrp = parseMoney(value.mrp);
+    const trade = parseMoney(value.sellingPrice);
+    if (mrp.ok && trade.ok && trade.minor > mrp.minor) {
+      context.addIssue({
+        code: 'custom',
+        path: ['sellingPrice'],
+        message: 'The trade price cannot be above the MRP.',
+      });
+    }
+  });
 
 type MedicineValues = z.input<typeof MedicineFormSchema>;
 type MedicineOutput = z.output<typeof MedicineFormSchema>;
@@ -64,11 +89,12 @@ const TEXT_FIELDS: Array<[keyof MedicineOutput & string, string, string]> = [
   ['category', 'category', 'text'],
   ['costPrice', 'costPrice', 'text'],
   ['sellingPrice', 'sellingPrice', 'text'],
+  ['mrp', 'mrp', 'text'],
   ['minimumOrderQuantity', 'minimumOrderQuantity', 'number'],
   ['maximumOrderQuantity', 'maximumOrderQuantity', 'number'],
 ];
 
-const OPTIONAL = new Set(['barcode', 'maximumOrderQuantity']);
+const OPTIONAL = new Set(['barcode', 'maximumOrderQuantity', 'mrp']);
 
 export function MedicineForm() {
   const { t, language } = useLanguage();
@@ -89,6 +115,7 @@ export function MedicineForm() {
       description: '',
       costPrice: '',
       sellingPrice: '',
+      mrp: '',
       minimumOrderQuantity: 1,
       classification: MedicineClassification.PRESCRIPTION,
       coldChain: false,
@@ -96,9 +123,12 @@ export function MedicineForm() {
   });
 
   const submit = form.handleSubmit(async (values) => {
-    const { costPrice, sellingPrice, ...rest } = values;
+    const { costPrice, sellingPrice, mrp, ...rest } = values;
     const cost = parseMoney(costPrice);
     const selling = parseMoney(sellingPrice);
+    // Blank stays absent rather than becoming zero — `marginBasisPoints`
+    // returns no answer without an MRP, which is different from a margin of nil.
+    const printed = parseMoney(mrp);
     if (!cost.ok || !selling.ok) return;
     try {
       const response = await apiClient.post('/inventory/medicines', {
@@ -106,6 +136,7 @@ export function MedicineForm() {
         barcode: rest.barcode || undefined,
         costPriceMinor: cost.minor,
         defaultSellingPriceMinor: selling.minor,
+        mrpMinor: printed.ok ? printed.minor : undefined,
       });
       navigate(`/medicines/${response.data.data._id}`);
     } catch (caught) {
@@ -141,7 +172,9 @@ export function MedicineForm() {
                   type={type}
                   min={type === 'number' ? 0 : undefined}
                   inputMode={
-                    name === 'costPrice' || name === 'sellingPrice' ? 'decimal' : undefined
+                    name === 'costPrice' || name === 'sellingPrice' || name === 'mrp'
+                      ? 'decimal'
+                      : undefined
                   }
                   {...form.register(
                     name as never,

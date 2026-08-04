@@ -148,3 +148,32 @@ Self-service session management is deliberately available to every role: until t
 Ending another user's sessions remains an administrative action, unchanged from Phase 10, and still happens automatically on a role change, a status change away from active and an administrative password reset.
 
 Revocation is now enforced on every authenticated request and on the realtime handshake, not only at refresh time. A revoked session's access token stops working immediately instead of remaining valid for the rest of its lifetime.
+
+## Commercial terms: price lists and free-goods offers
+
+| Action                              | Super Admin | Admin | Manager | Sales | Storekeeper | Delivery | Shop Owner |
+| ----------------------------------- | ----------- | ----- | ------- | ----- | ----------- | -------- | ---------- |
+| Read price lists and offers         | Yes         | Yes   | Yes     | Yes   | No          | No       | No         |
+| Create or change a price list       | Yes         | Yes   | Yes     | No    | No          | No       | No         |
+| Create or change a free-goods offer | Yes         | Yes   | Yes     | No    | No          | No       | No         |
+| Assign a price list to a customer   | Yes         | Yes   | No      | No    | No          | No       | No         |
+| Set the MRP printed on a pack       | Yes         | Yes   | Yes     | No    | No          | No       | No         |
+
+A rep reads the terms and cannot set them. Quoting a customer means knowing what
+they pay and what offer is running, so `SALES` reads both lists; writing stays
+with management because a price list is the revenue of every order placed after
+it. Assigning a list to a customer follows the existing shop-edit rule and is
+therefore administration rather than management.
+
+Two guard rails sit on top of the role check:
+
+- **At most one default price list**, moved rather than added. Two would make
+  "which list prices this shop" ambiguous for every customer assigned none.
+- **A customer cannot be assigned an inactive list.** The resolver skips a list
+  that is not in force and falls through to the default, so the assignment would
+  be a price that silently does not apply.
+
+Both writes are optimistic: a save carrying a stale version is refused with
+`VERSION_CONFLICT` rather than overwriting, because two people editing one price
+sheet would otherwise discard each other's prices and charge a customer an
+amount nobody chose.

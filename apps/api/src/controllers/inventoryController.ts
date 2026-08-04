@@ -7,6 +7,8 @@ import {
   CreateMedicineSchema,
   ReceiveStockSchema,
   StockOperationSchema,
+  TRADE_ABOVE_MRP_MESSAGE,
+  tradePriceExceedsMrp,
   UpdateMedicineSchema,
 } from '@medsupply/validation';
 import { AuthRequest } from '../middlewares/auth';
@@ -93,6 +95,28 @@ export async function updateMedicine(req: AuthRequest, res: Response, next: Next
   try {
     const data = UpdateMedicineSchema.parse(req.body);
     const before = await Medicine.findById(req.params.id).lean();
+
+    /*
+     * The schema sees only the patch, so raising the trade price on its own
+     * passes a check that never saw the stored MRP — and a price above the
+     * figure printed on the pack means the pharmacy loses money on every unit
+     * it sells. Merged, the same rule applies to a partial edit.
+     */
+    if (
+      before &&
+      tradePriceExceedsMrp(
+        data.mrpMinor ?? before.mrpMinor,
+        data.defaultSellingPriceMinor ?? before.defaultSellingPriceMinor,
+      )
+    ) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: TRADE_ABOVE_MRP_MESSAGE,
+          details: [{ path: 'defaultSellingPriceMinor', message: TRADE_ABOVE_MRP_MESSAGE }],
+        },
+      });
+    }
     const medicine = await Medicine.findByIdAndUpdate(req.params.id, data, {
       new: true,
       runValidators: true,

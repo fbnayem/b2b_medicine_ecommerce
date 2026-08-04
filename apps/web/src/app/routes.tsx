@@ -90,6 +90,22 @@ export const ROUTES: readonly RouteNode[] = [
     element: page(() => import('../pages/MedicineDetail'), 'MedicineDetail'),
   },
   { id: 'medicine-new', element: page(() => import('../pages/MedicineForm'), 'MedicineForm') },
+  { id: 'price-lists', element: page(() => import('../pages/PriceListList'), 'PriceListList') },
+  { id: 'price-list-new', element: page(() => import('../pages/PriceListForm'), 'PriceListForm') },
+  {
+    id: 'price-list-detail',
+    element: page(() => import('../pages/PriceListForm'), 'PriceListForm'),
+    // The same form, editing rather than creating. Two ids because the label,
+    // the breadcrumb and the roles differ, which is what the manifest is for.
+    props: { mode: 'edit' },
+  },
+  { id: 'schemes', element: page(() => import('../pages/SchemeList'), 'SchemeList') },
+  { id: 'scheme-new', element: page(() => import('../pages/SchemeForm'), 'SchemeForm') },
+  {
+    id: 'scheme-detail',
+    element: page(() => import('../pages/SchemeForm'), 'SchemeForm'),
+    props: { mode: 'edit' },
+  },
   {
     id: 'inventory',
     element: page(() => import('../pages/InventoryDashboard'), 'InventoryDashboard'),

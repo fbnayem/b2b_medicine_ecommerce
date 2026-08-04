@@ -11,6 +11,7 @@ import inventoryRoutes from './inventoryRoutes';
 import notificationRoutes from './notificationRoutes';
 import orderRoutes from './orderRoutes';
 import paymentRoutes from './paymentRoutes';
+import pricingRoutes from './pricingRoutes';
 import purchasingRoutes from './purchasingRoutes';
 import reportRoutes from './reportRoutes';
 import returnRoutes from './returnRoutes';
@@ -63,6 +64,7 @@ export const API_MOUNTS: readonly ApiMount[] = [
   { prefix: '/api/v1/admin', router: adminRoutes, tier: 'write' },
   { prefix: '/api/v1/returns', router: returnRoutes, tier: 'write' },
   { prefix: '/api/v1/purchasing', router: purchasingRoutes, tier: 'write' },
+  { prefix: '/api/v1/pricing', router: pricingRoutes, tier: 'write' },
   { prefix: '/api/v1/stocktakes', router: stocktakeRoutes, tier: 'write' },
   { prefix: '/api/v1/trips', router: tripRoutes, tier: 'write' },
   // Every report recomputes from source records, so these are the most

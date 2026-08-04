@@ -255,6 +255,69 @@ export const NAV_ITEMS: readonly NavItem[] = [
     hidden: true,
     parent: 'medicines',
   },
+  /*
+   * A rep reads the terms; a manager sets them.
+   *
+   * Quoting a customer means knowing what they pay and what offer is running,
+   * so `SALES` reads both lists. The forms stay with management, because a
+   * price list is the revenue of every order placed after it.
+   */
+  {
+    id: 'price-lists',
+    label: 'Price lists',
+    path: '/pricing/price-lists',
+    roles: [...MANAGEMENT, UserRole.SALES],
+    group: 'catalogue',
+    icon: 'money',
+  },
+  {
+    id: 'price-list-new',
+    label: 'Add a price list',
+    path: '/pricing/price-lists/new',
+    roles: MANAGEMENT,
+    group: 'catalogue',
+    icon: 'money',
+    hidden: true,
+    parent: 'price-lists',
+  },
+  {
+    id: 'price-list-detail',
+    label: 'Price list',
+    path: '/pricing/price-lists/:id',
+    roles: [...MANAGEMENT, UserRole.SALES],
+    group: 'catalogue',
+    icon: 'money',
+    hidden: true,
+    parent: 'price-lists',
+  },
+  {
+    id: 'schemes',
+    label: 'Free-goods offers',
+    path: '/pricing/schemes',
+    roles: [...MANAGEMENT, UserRole.SALES],
+    group: 'catalogue',
+    icon: 'money',
+  },
+  {
+    id: 'scheme-new',
+    label: 'Add an offer',
+    path: '/pricing/schemes/new',
+    roles: MANAGEMENT,
+    group: 'catalogue',
+    icon: 'money',
+    hidden: true,
+    parent: 'schemes',
+  },
+  {
+    id: 'scheme-detail',
+    label: 'Offer',
+    path: '/pricing/schemes/:id',
+    roles: [...MANAGEMENT, UserRole.SALES],
+    group: 'catalogue',
+    icon: 'money',
+    hidden: true,
+    parent: 'schemes',
+  },
   {
     id: 'inventory',
     label: 'Stock',
