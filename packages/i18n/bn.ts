@@ -12,6 +12,7 @@ import {
   ShopStatus,
   StockMovementType,
   UserRole,
+  UserStatus,
 } from '@medsupply/shared-types';
 import type { Catalogue } from './en';
 
@@ -151,6 +152,8 @@ export const bn: Catalogue = {
     clear: 'মুছুন',
     filter: 'ফিল্টার',
     reason: 'কারণ',
+    reasonTooShort:
+      'অন্তত {{minimum}} অক্ষরে কারণ লিখুন, যাতে পরে রেকর্ড দেখে বোঝা যায় কেন এটি করা হয়েছিল।',
     delete: 'মুছে ফেলুন',
   },
 
@@ -1593,6 +1596,25 @@ export const bn: Catalogue = {
     skipToContent: 'মূল অংশে যান',
   },
 
+  screens: {
+    medicineDetails: 'ওষুধের বিবরণ',
+    checkout: 'চেকআউট',
+    orderDetails: 'অর্ডারের বিবরণ',
+    reviewOrder: 'অর্ডার পর্যালোচনা',
+    pickingAndPacking: 'পিকিং ও প্যাকিং',
+    deliveryDetails: 'ডেলিভারির বিবরণ',
+    proofOfDelivery: 'ডেলিভারির প্রমাণ',
+    returnDetails: 'ফেরতের বিবরণ',
+    notificationPreferences: 'বিজ্ঞপ্তির পছন্দ',
+    invoices: 'চালান',
+    paymentHistory: 'পেমেন্টের ইতিহাস',
+    accountStatement: 'হিসাবের বিবরণী',
+    overdueShops: 'বকেয়া দোকান',
+    collectionReview: 'কালেকশন পর্যালোচনা',
+    myCollections: 'আমার কালেকশন',
+    paymentDetails: 'পেমেন্টের বিবরণ',
+  },
+
   roles: {
     [UserRole.SUPER_ADMIN]: 'প্রধান প্রশাসক',
     [UserRole.ADMIN]: 'প্রশাসক',
@@ -1668,6 +1690,12 @@ export const bn: Catalogue = {
     [ShopStatus.SUSPENDED]: 'স্থগিত',
     [ShopStatus.CREDIT_BLOCKED]: 'বাকি বন্ধ',
     [ShopStatus.LICENCE_EXPIRED]: 'লাইসেন্সের মেয়াদ শেষ',
+  },
+
+  userStatus: {
+    [UserStatus.ACTIVE]: 'সক্রিয়',
+    [UserStatus.INACTIVE]: 'নিষ্ক্রিয়',
+    [UserStatus.SUSPENDED]: 'স্থগিত',
   },
 
   errors: {

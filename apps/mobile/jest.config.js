@@ -50,6 +50,7 @@ const workspacePackages = [
 module.exports = {
   preset: 'jest-expo',
   testMatch: ['<rootDir>/src/**/*.render.test.tsx', '<rootDir>/app/**/*.render.test.tsx'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   moduleNameMapper: Object.fromEntries(
     workspacePackages.map((name) => [
       `^@medsupply/${name}$`,

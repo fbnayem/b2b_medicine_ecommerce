@@ -717,7 +717,7 @@ export function ReturnDetail() {
                             multiline: true,
                             confirmLabel: t('returnDetail.cancelConfirm'),
                             danger: true,
-                            validate: requireReason(),
+                            validate: requireReason(t),
                           });
                           if (reason && reason.trim().length >= 5) {
                             await act(

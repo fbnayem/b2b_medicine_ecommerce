@@ -103,7 +103,7 @@ export function UserAdministration() {
       multiline: true,
       confirmLabel: t('users.resetPassword'),
       danger: true,
-      validate: requireReason(),
+      validate: requireReason(t),
     });
     if (!reason) return;
 
@@ -130,7 +130,7 @@ export function UserAdministration() {
       multiline: true,
       confirmLabel: t('users.signOutConfirm'),
       danger: true,
-      validate: requireReason(),
+      validate: requireReason(t),
     });
     if (!reason) return;
 

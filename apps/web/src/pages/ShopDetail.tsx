@@ -73,7 +73,7 @@ export function ShopDetail() {
         multiline: true,
         confirmLabel: t(`shops.${key}`),
         danger: true,
-        validate: requireReason(),
+        validate: requireReason(t),
       });
       if (!answer) return;
       reason = answer;

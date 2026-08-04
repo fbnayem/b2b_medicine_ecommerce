@@ -60,7 +60,7 @@ export function OrderDetail() {
       label: t('orders.cancelLabel'),
       multiline: true,
       confirmLabel: t('orders.cancelConfirm'),
-      validate: requireReason(),
+      validate: requireReason(t),
     });
     if (!reason) return;
     await apiClient.post(`/orders/${id}/cancellation-request`, { reason });

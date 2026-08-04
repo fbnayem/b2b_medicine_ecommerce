@@ -190,7 +190,7 @@ export function FulfilmentWork() {
       label: t('picking.resolveLabel'),
       multiline: true,
       confirmLabel: t('picking.resolveConfirm'),
-      validate: requireReason(),
+      validate: requireReason(t),
     });
     if (!resolutionNotes) return;
     await post(

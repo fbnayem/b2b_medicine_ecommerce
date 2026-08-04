@@ -102,7 +102,7 @@ export function SystemSettings() {
       multiline: true,
       confirmLabel: t('settings.resetConfirm'),
       danger: true,
-      validate: requireReason(),
+      validate: requireReason(t),
     });
     if (!reason) return;
 

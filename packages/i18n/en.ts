@@ -12,6 +12,7 @@ import {
   ShopStatus,
   StockMovementType,
   UserRole,
+  UserStatus,
 } from '@medsupply/shared-types';
 
 /**
@@ -169,6 +170,8 @@ export const en = {
     clear: 'Clear',
     filter: 'Filter',
     reason: 'Reason',
+    reasonTooShort:
+      'Please give a reason of at least {{minimum}} characters, so the record explains itself later.',
     // A destructive action names what it destroys at the call site; this is
     // only the verb.
     delete: 'Delete',
@@ -1650,6 +1653,34 @@ export const en = {
     skipToContent: 'Skip to the main content',
   },
 
+  /**
+   * The titles in the mobile stack's own header bar.
+   *
+   * Separate from `nav`, which names the sections of the web shell, and
+   * separate again from `@medsupply/navigation`, whose tab labels are shared
+   * between the two clients and are still English in both languages. These are
+   * the seventeen headers a rider or a storekeeper reads at the top of a pushed
+   * screen, and they were the last hard-coded English on that client's chrome.
+   */
+  screens: {
+    medicineDetails: 'Medicine details',
+    checkout: 'Checkout',
+    orderDetails: 'Order details',
+    reviewOrder: 'Review order',
+    pickingAndPacking: 'Picking and packing',
+    deliveryDetails: 'Delivery details',
+    proofOfDelivery: 'Proof of delivery',
+    returnDetails: 'Return details',
+    notificationPreferences: 'Notification preferences',
+    invoices: 'Invoices',
+    paymentHistory: 'Payment history',
+    accountStatement: 'Account statement',
+    overdueShops: 'Overdue shops',
+    collectionReview: 'Collection review',
+    myCollections: 'My collections',
+    paymentDetails: 'Payment details',
+  },
+
   roles: {
     [UserRole.SUPER_ADMIN]: 'Super administrator',
     [UserRole.ADMIN]: 'Administrator',
@@ -1726,6 +1757,12 @@ export const en = {
     [ShopStatus.CREDIT_BLOCKED]: 'Credit blocked',
     [ShopStatus.LICENCE_EXPIRED]: 'Licence expired',
   } as Record<ShopStatus, string>,
+
+  userStatus: {
+    [UserStatus.ACTIVE]: 'Active',
+    [UserStatus.INACTIVE]: 'Inactive',
+    [UserStatus.SUSPENDED]: 'Suspended',
+  } as Record<UserStatus, string>,
 
   /**
    * Server error codes, in words the person reading them can act on.

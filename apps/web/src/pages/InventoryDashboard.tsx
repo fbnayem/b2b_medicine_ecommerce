@@ -123,7 +123,7 @@ export function InventoryDashboard() {
       multiline: true,
       confirmLabel: t('inventory.recordIt'),
       danger: true,
-      validate: requireReason(),
+      validate: requireReason(t),
     });
     if (!reason) return;
 

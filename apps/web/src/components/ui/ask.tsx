@@ -183,10 +183,17 @@ export function AskProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** A reason of at least `minimum` characters, which most of these ask for. */
-export function requireReason(minimum = 5) {
+/**
+ * A reason of at least `minimum` characters, which most of these ask for.
+ *
+ * Takes the translator rather than closing over English. This message is read
+ * inside a dialog, by the same people the rest of the product was translated
+ * for — it was the last hard-coded sentence on the confirmation path.
+ */
+export function requireReason(
+  t: (path: string, values?: Record<string, string | number>) => string,
+  minimum = 5,
+) {
   return (value: string) =>
-    value.length < minimum
-      ? `Please give a reason of at least ${minimum} characters, so the record explains itself later.`
-      : null;
+    value.trim().length < minimum ? t('actions.reasonTooShort', { minimum }) : null;
 }

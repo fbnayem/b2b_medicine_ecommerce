@@ -224,7 +224,7 @@ export function PaymentDetail({ ownerMode = false }: PaymentDetailProps) {
                                 multiline: true,
                                 confirmLabel: t('finance.markFailedConfirm'),
                                 danger: true,
-                                validate: requireReason(),
+                                validate: requireReason(t),
                               });
                               if (reason) await run('fail', t('finance.markedFailed'), reason);
                             })();
@@ -254,7 +254,7 @@ export function PaymentDetail({ ownerMode = false }: PaymentDetailProps) {
                               multiline: true,
                               confirmLabel: t('finance.reverseConfirm'),
                               danger: true,
-                              validate: requireReason(),
+                              validate: requireReason(t),
                             });
                             if (reason) await run('reverse', t('finance.reversed'), reason);
                           })();

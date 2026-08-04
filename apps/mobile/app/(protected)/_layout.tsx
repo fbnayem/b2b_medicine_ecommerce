@@ -11,6 +11,8 @@ import {
 } from '../../src/notifications/push';
 import { connectRealtime, disconnectRealtime } from '../../src/notifications/realtime';
 import { colour } from '../../src/theme';
+import { useLanguage } from '../../src/i18n/useLanguage';
+import { AskProvider, Toaster } from '../../src/components';
 
 configureForegroundPresentation();
 
@@ -30,6 +32,7 @@ configureForegroundPresentation();
  * tab to omit.
  */
 export default function ProtectedLayout() {
+  const { t } = useLanguage();
   const role = useAuthStore((state) => state.user?.role);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isOwner = role === UserRole.SHOP_OWNER;
@@ -56,42 +59,54 @@ export default function ProtectedLayout() {
   }, [isAuthenticated]);
 
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: colour.surface },
-        headerTintColor: colour.text,
-      }}
-    >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    /*
+     * Both providers sit here rather than in the root layout, because both
+     * belong to a signed-in session: there is nothing to confirm and nothing to
+     * announce on the sign-in screen. `Toaster` renders after the stack so it
+     * draws above it.
+     */
+    <AskProvider>
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: colour.surface },
+          headerTintColor: colour.text,
+        }}
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
-      <Stack.Screen name="medicine-detail" options={{ title: 'Medicine details' }} />
-      <Stack.Screen name="checkout" options={{ title: 'Checkout' }} />
-      <Stack.Screen name="order-detail" options={{ title: 'Order details' }} />
-      <Stack.Screen name="approval-review" options={{ title: 'Review order' }} />
-      <Stack.Screen name="picking" options={{ title: 'Picking and packing' }} />
-      <Stack.Screen name="delivery-detail" options={{ title: 'Delivery details' }} />
-      <Stack.Screen name="delivery-proof" options={{ title: 'Proof of delivery' }} />
-      <Stack.Screen name="return-detail" options={{ title: 'Return details' }} />
-      <Stack.Screen
-        name="notification-preferences"
-        options={{ title: 'Notification preferences' }}
-      />
+        <Stack.Screen name="medicine-detail" options={{ title: t('screens.medicineDetails') }} />
+        <Stack.Screen name="checkout" options={{ title: t('screens.checkout') }} />
+        <Stack.Screen name="order-detail" options={{ title: t('screens.orderDetails') }} />
+        <Stack.Screen name="approval-review" options={{ title: t('screens.reviewOrder') }} />
+        <Stack.Screen name="picking" options={{ title: t('screens.pickingAndPacking') }} />
+        <Stack.Screen name="delivery-detail" options={{ title: t('screens.deliveryDetails') }} />
+        <Stack.Screen name="delivery-proof" options={{ title: t('screens.proofOfDelivery') }} />
+        <Stack.Screen name="return-detail" options={{ title: t('screens.returnDetails') }} />
+        <Stack.Screen
+          name="notification-preferences"
+          options={{ title: t('screens.notificationPreferences') }}
+        />
 
-      <Stack.Protected guard={isOwner}>
-        <Stack.Screen name="invoices" options={{ title: 'Invoices' }} />
-        <Stack.Screen name="payments" options={{ title: 'Payment history' }} />
-        <Stack.Screen name="statement" options={{ title: 'Account statement' }} />
-      </Stack.Protected>
-      <Stack.Protected guard={isManager}>
-        <Stack.Screen name="overdue-shops" options={{ title: 'Overdue shops' }} />
-        <Stack.Screen name="collection-review" options={{ title: 'Collection review' }} />
-      </Stack.Protected>
-      <Stack.Protected guard={isDeliveryPerson}>
-        <Stack.Screen name="collections" options={{ title: 'My collections' }} />
-      </Stack.Protected>
-      <Stack.Protected guard={isOwner || isManager || isDeliveryPerson}>
-        <Stack.Screen name="payment-detail" options={{ title: 'Payment details' }} />
-      </Stack.Protected>
-    </Stack>
+        <Stack.Protected guard={isOwner}>
+          <Stack.Screen name="invoices" options={{ title: t('screens.invoices') }} />
+          <Stack.Screen name="payments" options={{ title: t('screens.paymentHistory') }} />
+          <Stack.Screen name="statement" options={{ title: t('screens.accountStatement') }} />
+        </Stack.Protected>
+        <Stack.Protected guard={isManager}>
+          <Stack.Screen name="overdue-shops" options={{ title: t('screens.overdueShops') }} />
+          <Stack.Screen
+            name="collection-review"
+            options={{ title: t('screens.collectionReview') }}
+          />
+        </Stack.Protected>
+        <Stack.Protected guard={isDeliveryPerson}>
+          <Stack.Screen name="collections" options={{ title: t('screens.myCollections') }} />
+        </Stack.Protected>
+        <Stack.Protected guard={isOwner || isManager || isDeliveryPerson}>
+          <Stack.Screen name="payment-detail" options={{ title: t('screens.paymentDetails') }} />
+        </Stack.Protected>
+      </Stack>
+      <Toaster />
+    </AskProvider>
   );
 }

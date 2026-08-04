@@ -177,7 +177,7 @@ export function CollectionReview() {
                     multiline: true,
                     confirmLabel: t('finance.rejectConfirm'),
                     danger: true,
-                    validate: requireReason(),
+                    validate: requireReason(t),
                   });
                   if (reason?.trim()) await act(payment, 'fail', reason.trim());
                 })();

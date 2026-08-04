@@ -19,6 +19,17 @@ import { colour, layout } from '../theme';
 export function LoadingState({ label = 'Loading' }: { label?: string }) {
   return (
     <View
+      /*
+       * `accessible` is not decoration here.
+       *
+       * React Native exposes `Text` to a screen reader by default and a `View`
+       * not at all, so `accessibilityRole` on a plain `View` is inert — the
+       * role is declared and never reaches TalkBack or VoiceOver. This
+       * component and `ErrorState` below both shipped that way, which meant the
+       * two states a rider most needs announced were the two that said nothing.
+       * Caught by the first render test written against them.
+       */
+      accessible
       accessibilityRole="progressbar"
       accessibilityLabel={label}
       style={{
@@ -102,6 +113,9 @@ export function ErrorState({
 }: ErrorStateProps) {
   return (
     <View
+      // See `LoadingState` above: without `accessible`, the alert role on a
+      // `View` never reaches a screen reader.
+      accessible
       accessibilityRole="alert"
       style={[
         {

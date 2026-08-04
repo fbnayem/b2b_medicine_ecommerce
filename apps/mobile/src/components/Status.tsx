@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+import { Text, View, type ViewStyle } from 'react-native';
 import {
   DeliveryStatus,
   OrderStatus,
@@ -6,33 +8,72 @@ import {
   ShopStatus,
   UserStatus,
 } from '@medsupply/shared-types';
-import { Badge, type BadgeTone } from './Data';
-import { useLanguage } from '../../lib/useLanguage';
+import { amber, blue, green, neutral, red } from '@medsupply/design-tokens';
+import { layout } from '../theme';
+import { useLanguage } from '../i18n/useLanguage';
 
 /**
- * One status, one colour, one wording, everywhere.
+ * One status, one colour, one wording — and the same ones the web client uses.
  *
- * Statuses were rendered by roughly forty ad-hoc `replaceAll('_', ' ')` calls,
- * which produced SHOUTING text — `READY FOR DELIVERY` — with the casing
- * differing between pages, and each page picked its own colour. The same order
- * could therefore be amber on one screen and grey on the next.
+ * Mobile rendered statuses with its own `replaceAll('_', ' ')` calls, so the
+ * order a manager saw as "Ready for delivery" on a desktop read
+ * `READY FOR DELIVERY` on the phone in the warehouse. This is the same split
+ * the web `StatusPill` makes: **the colour lives here, the words live in the
+ * catalogue**, because a colour is not translatable and a word is.
  *
- * **The words come from the catalogue; only the colour lives here.** They used
- * to live here too, in a second hard-coded English copy, while
- * `packages/i18n` already carried translated `orderStatus`, `deliveryStatus`,
- * `paymentStatus`, `returnStatus` and `shopStatus` namespaces that the filter
- * dropdowns read. So in Bangla the filter said one word and the pill beside the
- * row said another — two sources of truth for one string, agreeing only in
- * English. A colour is not translatable and a word is, which is the line the
- * split follows.
- *
- * The maps below are still `Record<Status, BadgeTone>`, so **adding a member to
- * any status enum in `@medsupply/shared-types` is a compile error here** until
- * it has been given a tone — and a compile error in the catalogue until it has
- * been given words in both languages. That turns "the new status renders as raw
- * `PARTIALLY_DELIVERED`" from something a user reports into something the build
- * refuses.
+ * The tone maps are `Record<Status, BadgeTone>`, so adding a member to any
+ * status enum in `@medsupply/shared-types` is a compile error here until it has
+ * a colour, and a compile error in `packages/i18n` until it has words in both
+ * languages.
  */
+
+export type BadgeTone = 'neutral' | 'brand' | 'success' | 'warning' | 'danger' | 'info';
+
+/**
+ * A tint and a darker ink from the same ramp.
+ *
+ * Both are taken from the token package rather than typed in: the two brand
+ * greens this application shipped side by side came from exactly this kind of
+ * small local colour decision.
+ */
+const TONE_COLOURS: Record<BadgeTone, { background: string; text: string }> = {
+  neutral: { background: neutral[100], text: neutral[700] },
+  brand: { background: green[100], text: green[700] },
+  success: { background: green[100], text: green[700] },
+  warning: { background: amber[100], text: amber[700] },
+  danger: { background: red[100], text: red[700] },
+  info: { background: blue[100], text: blue[700] },
+};
+
+export function Badge({
+  children,
+  tone = 'neutral',
+  style,
+}: {
+  children: ReactNode;
+  tone?: BadgeTone;
+  style?: ViewStyle;
+}) {
+  const { background, text } = TONE_COLOURS[tone];
+  return (
+    <View
+      style={[
+        {
+          alignSelf: 'flex-start',
+          backgroundColor: background,
+          borderRadius: layout.radius.full,
+          paddingHorizontal: layout.space[2],
+          paddingVertical: layout.space[1],
+        },
+        style,
+      ]}
+    >
+      <Text style={{ color: text, fontSize: layout.fontSize.sm, fontWeight: '600' }}>
+        {children}
+      </Text>
+    </View>
+  );
+}
 
 const ORDER: Record<OrderStatus, BadgeTone> = {
   [OrderStatus.DRAFT]: 'neutral',
@@ -129,36 +170,31 @@ const NAMESPACE = {
 
 export type StatusKind = keyof typeof TONES;
 
-export type Translate = (path: string, values?: Record<string, string | number>) => string;
+type Translate = (path: string, values?: Record<string, string | number>) => string;
 
-/**
- * The label alone, for places where a pill would be too heavy — a page title,
- * a CSV export, a sentence.
- *
- * Takes `t` rather than calling the hook, so it stays usable from a column
- * definition or a callback where a hook cannot go.
- */
+/** The label alone, for a sentence or a heading where a pill is too heavy. */
 export function statusLabel(t: Translate, kind: StatusKind, status: string): string {
   const key = `${NAMESPACE[kind]}.${status}`;
   const label = t(key);
-  // `t` hands back the key itself when it is missing, which can only happen for
-  // a status from a server newer than this bundle. Show the raw value rather
-  // than a dotted key path, but leave it visibly unpolished so it reads as
-  // "unexpected" and not as a considered wording.
+  // `t` hands back the key when it is missing, which can only happen for a
+  // status from a server newer than this build. Show the raw value rather than
+  // a dotted path, left visibly unpolished so it reads as unexpected.
   return label === key ? status.replaceAll('_', ' ').toLowerCase() : label;
 }
 
-export interface StatusPillProps {
+export function StatusPill({
+  kind,
+  status,
+  style,
+}: {
   kind: StatusKind;
   status: string;
-  className?: string;
-}
-
-export function StatusPill({ kind, status, className }: StatusPillProps) {
+  style?: ViewStyle;
+}) {
   const { t } = useLanguage();
   const tone = (TONES[kind] as Record<string, BadgeTone>)[status];
   return (
-    <Badge tone={tone ?? 'neutral'} className={className}>
+    <Badge tone={tone ?? 'neutral'} style={style}>
       {statusLabel(t, kind, status)}
     </Badge>
   );

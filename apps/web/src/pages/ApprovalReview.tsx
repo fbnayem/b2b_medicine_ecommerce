@@ -140,7 +140,7 @@ export function ApprovalReview() {
       multiline: true,
       confirmLabel: approve ? t('approvals.cancelTheOrder') : t('approvals.refuseConfirm'),
       danger: approve,
-      validate: requireReason(),
+      validate: requireReason(t),
     });
     if (!reason) return;
 
@@ -209,7 +209,7 @@ export function ApprovalReview() {
           multiline: true,
           confirmLabel: name === 'hold' ? t('approvals.holdConfirm') : t('approvals.rejectConfirm'),
           danger: name !== 'hold',
-          validate: requireReason(),
+          validate: requireReason(t),
         });
         if (!reason) return;
         body = {
