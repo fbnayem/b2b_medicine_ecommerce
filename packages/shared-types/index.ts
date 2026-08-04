@@ -1623,3 +1623,26 @@ export interface PlannableDelivery {
   addressSnapshot?: { line1: string; city: string; district?: string };
   expectedDeliveryDate?: string;
 }
+
+/*
+ * ── Warehouses ──────────────────────────────────────────────────────────────
+ *
+ * The entity, ahead of the second depot. A batch that names no warehouse
+ * belongs to the default, which is what let this be added without backfilling
+ * anything.
+ */
+
+export interface Warehouse {
+  _id: string;
+  reference: string;
+  /** Short code staff say out loud: `DHK`, `CTG`. */
+  code: string;
+  name: string;
+  address?: { line1?: string; city?: string; district?: string };
+  contactPhone?: string;
+  isDefault: boolean;
+  isActive: boolean;
+  notes?: string;
+  /** What it is holding. Unassigned batches count against the default. */
+  stock: { batches: number; onHand: number; available: number };
+}

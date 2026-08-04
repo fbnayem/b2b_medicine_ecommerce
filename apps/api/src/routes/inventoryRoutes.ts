@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { UserRole } from '@medsupply/shared-types';
+import { create as createWarehouse, listWarehouses } from '../controllers/warehouseController';
 import { requireAuth } from '../middlewares/auth';
 import { requireRole } from '../middlewares/role';
 import {
@@ -42,6 +43,15 @@ router.get('/medicines/:id', requireRole(catalogueReaders), getMedicine);
 router.patch('/medicines/:id', requireRole(catalogueManagers), updateMedicine);
 router.get('/batches', requireRole(stockReaders), listBatches);
 router.post('/batches/receive', requireRole(stockOperators), receive);
+/*
+ * Warehouses.
+ *
+ * Under inventory rather than on their own mount: a warehouse is where stock
+ * is, and every caller that cares is already talking to this router.
+ */
+router.get('/warehouses', requireRole(stockReaders), listWarehouses);
+router.post('/warehouses', requireRole(catalogueManagers), createWarehouse);
+
 router.get('/batches/:id', requireRole(stockReaders), getBatch);
 router.post('/batches/:id/operations', requireRole(stockOperators), operate);
 router.post('/batches/:id/adjust', requireRole(catalogueManagers), adjust);

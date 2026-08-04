@@ -263,6 +263,24 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: 'warehouse',
   },
   {
+    id: 'warehouses',
+    label: 'Warehouses',
+    path: '/inventory/warehouses',
+    roles: WAREHOUSE,
+    group: 'catalogue',
+    icon: 'warehouse',
+  },
+  {
+    id: 'warehouse-new',
+    label: 'Add a warehouse',
+    path: '/inventory/warehouses/new',
+    roles: MANAGEMENT,
+    group: 'catalogue',
+    icon: 'warehouse',
+    hidden: true,
+    parent: 'warehouses',
+  },
+  {
     /*
      * Counting is warehouse work; approving is not. The route is open to both,
      * and the server refuses a storekeeper who tries to post their own sheet —

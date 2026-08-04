@@ -16,6 +16,7 @@ import { Medicine } from '../models/Medicine';
 import { MedicineBatch } from '../models/MedicineBatch';
 import { StockMovement } from '../models/StockMovement';
 import { Stocktake } from '../models/Stocktake';
+import { Warehouse } from '../models/Warehouse';
 import { User } from '../models/User';
 
 /**
@@ -83,6 +84,7 @@ before(async () => {
     MedicineBatch.init(),
     StockMovement.init(),
     Stocktake.init(),
+    Warehouse.init(),
     User.init(),
   ]);
 
@@ -430,4 +432,56 @@ test('an abandoned count posts nothing and says why', async () => {
 
   const audit = await AuditLog.findOne({ action: 'STOCKTAKE_ABANDONED' });
   assert.ok(audit, 'abandoning a count is recorded, so a missing sheet has an explanation');
+});
+
+test('warehouses: the first one becomes the default, and holds everything already on hand', async () => {
+  /*
+   * The property the whole design rests on: a batch that names no warehouse
+   * belongs to the default. Every batch in this database predates the entity,
+   * so this is what lets a one-godown operation see its whole stock without
+   * anything having been backfilled.
+   */
+  const created = await call('POST', '/api/v1/inventory/warehouses', {
+    code: 'DHK',
+    name: 'Dhaka godown',
+  });
+  assert.equal(created.status, 201);
+  assert.equal((created.body.data as unknown as { isDefault: boolean }).isDefault, true);
+
+  const listed = await call('GET', '/api/v1/inventory/warehouses', undefined, storekeeper._id);
+  const items = (
+    listed.body.data as unknown as {
+      items: Array<{
+        code: string;
+        isDefault: boolean;
+        stock: { batches: number; onHand: number };
+      }>;
+    }
+  ).items;
+  const main = items.find((row) => row.code === 'DHK');
+  assert.ok(main);
+  assert.equal(main.stock.batches, 3, 'the three unassigned batches count against the default');
+  assert.ok(main.stock.onHand > 0);
+
+  const second = await call('POST', '/api/v1/inventory/warehouses', {
+    code: 'CTG',
+    name: 'Chattogram depot',
+    makeDefault: true,
+  });
+  assert.equal(second.status, 201);
+
+  const afterMove = (await call('GET', '/api/v1/inventory/warehouses')).body.data as unknown as {
+    items: Array<{ code: string; isDefault: boolean }>;
+  };
+  assert.deepEqual(
+    afterMove.items.filter((row) => row.isDefault).map((row) => row.code),
+    ['CTG'],
+    'one default, moved rather than added — two would make every unassigned batch ambiguous',
+  );
+
+  const duplicate = await call('POST', '/api/v1/inventory/warehouses', {
+    code: 'ctg',
+    name: 'Another Chattogram',
+  });
+  assert.equal(duplicate.status, 409, 'the code is what staff say out loud, so it is unique');
 });

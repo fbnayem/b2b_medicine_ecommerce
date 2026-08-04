@@ -31,7 +31,17 @@ const medicineBatchSchema = new mongoose.Schema(
     sellingPriceOverrideMinor: { type: Number, min: 0 },
     receivedQuantity: { type: Number, required: true, min: 1 },
     quantities: { type: quantitiesSchema, required: true },
+    /** Whereabouts *inside* a warehouse: an aisle, a rack, a cold room. */
     warehouseLocation: { type: String, required: true, trim: true },
+    /**
+     * Which warehouse, once there is more than one.
+     *
+     * Absent means the default, which is every batch that predates the
+     * warehouse entity. Reading it as "belongs to the default" rather than
+     * backfilling means a one-godown operation needed no migration at all, and
+     * the second depot is a data change rather than a rewrite of every batch.
+     */
+    warehouseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', index: true },
 
     /**
      * Where this stock came from.

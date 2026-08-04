@@ -94,6 +94,11 @@ export const ROUTES: readonly RouteNode[] = [
     id: 'inventory',
     element: page(() => import('../pages/InventoryDashboard'), 'InventoryDashboard'),
   },
+  { id: 'warehouses', element: page(() => import('../pages/WarehouseList'), 'WarehouseList') },
+  {
+    id: 'warehouse-new',
+    element: page(() => import('../pages/WarehouseForm'), 'WarehouseForm'),
+  },
   { id: 'stocktakes', element: page(() => import('../pages/StocktakeList'), 'StocktakeList') },
   {
     id: 'stocktake-new',

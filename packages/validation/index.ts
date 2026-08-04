@@ -1046,3 +1046,32 @@ export const CancelTripSchema = z.object({
   version: z.number().int().min(0),
   reason: z.string().trim().min(5).max(500),
 });
+
+/*
+ * ── Warehouses ──────────────────────────────────────────────────────────────
+ *
+ * The entity, ahead of the second depot. Everything that names no warehouse
+ * belongs to the default, which is why a one-godown operation needed no
+ * migration.
+ */
+
+export const CreateWarehouseSchema = z.object({
+  /** Short code staff say out loud: `DHK`, `CTG`. */
+  code: z
+    .string()
+    .trim()
+    .min(2)
+    .max(12)
+    .regex(/^[A-Za-z0-9-]+$/, 'Use letters, digits and hyphens only'),
+  name: z.string().trim().min(2).max(120),
+  address: z
+    .object({
+      line1: z.string().trim().max(200).optional(),
+      city: z.string().trim().max(100).optional(),
+      district: z.string().trim().max(100).optional(),
+    })
+    .optional(),
+  contactPhone: z.string().trim().max(30).optional(),
+  notes: z.string().trim().max(1000).optional(),
+  makeDefault: z.boolean().optional(),
+});
