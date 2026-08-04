@@ -1,12 +1,17 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../api/client';
+import { renderWithUi } from '../testing/render';
 import { PaymentList } from './PaymentList';
 
-vi.mock('../api/client', () => ({ apiClient: { get: vi.fn() } }));
+vi.mock('../api/client', async () => {
+  const actual = await vi.importActual<typeof import('../api/client')>('../api/client');
+  return { ...actual, apiClient: { get: vi.fn() } };
+});
 const get = vi.mocked(apiClient.get);
+const requested = () => get.mock.calls.map(([url]) => url as string);
 
 const payment = {
   _id: 'payment-1',
@@ -27,33 +32,31 @@ describe('PaymentList', () => {
 
   it('shows payments and requests the selected status queue', async () => {
     get.mockResolvedValue({ data: { data: [payment], meta: { page: 1, pages: 1, total: 1 } } });
-    render(
+    renderWithUi(
       <MemoryRouter>
         <PaymentList />
       </MemoryRouter>,
     );
-    expect(screen.getByText('Loading payments...')).toBeTruthy();
     expect(await screen.findByText('PAY-2026-000001')).toBeTruthy();
     expect(screen.getByText('৳1,250.50')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'POSTED' }));
+    // The filter reads "Posted" rather than the raw enum, and the status
+    // travels in the URL because it is also the query's cache key.
+    fireEvent.click(screen.getByRole('button', { name: 'Posted' }));
     await waitFor(() =>
-      expect(get).toHaveBeenLastCalledWith('/payments', {
-        params: { status: 'POSTED', page: 1, limit: 30 },
-      }),
+      expect(requested().some((url) => url.includes('status=POSTED'))).toBe(true),
     );
   });
 
   it('offers a working retry after a loading failure', async () => {
     get
       .mockRejectedValueOnce(new Error('offline'))
-      .mockResolvedValueOnce({ data: { data: [], meta: { page: 1, pages: 1 } } });
-    render(
+      .mockResolvedValue({ data: { data: [], meta: { page: 1, pages: 1, total: 0 } } });
+    renderWithUi(
       <MemoryRouter>
         <PaymentList />
       </MemoryRouter>,
     );
-    expect(await screen.findByText('Unable to load payments.')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(await screen.findByText('No payments match these filters.')).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('No payments yet')).toBeTruthy();
   });
 });

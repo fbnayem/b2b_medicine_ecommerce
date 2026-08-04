@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../api/client';
 import { CollectionReview } from './CollectionReview';
 
-vi.mock('../api/client', () => ({ apiClient: { get: vi.fn(), post: vi.fn() } }));
+vi.mock('../api/client', async () => {
+  const actual = await vi.importActual<typeof import('../api/client')>('../api/client');
+  return { ...actual, apiClient: { get: vi.fn(), post: vi.fn() } };
+});
 const get = vi.mocked(apiClient.get);
 const post = vi.mocked(apiClient.post);
 
@@ -48,10 +51,9 @@ describe('CollectionReview', () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText('PAY-2026-000001')).toBeTruthy();
-    expect(get).toHaveBeenCalledWith('/payments', {
-      params: { status: 'PENDING', source: 'DELIVERY_COLLECTION', limit: 100 },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
+    // The filter travels in the URL because it is also the query's cache key.
+    expect(get.mock.calls[0]?.[0]).toContain('status=PENDING&source=DELIVERY_COLLECTION');
+    fireEvent.click(screen.getByRole('button', { name: 'Post it' }));
     // The confirmation is now a real dialog rather than `window.confirm`.
     // Playwright and jsdom both dismiss the native one silently, so a test
     // written against it would have passed while cancelling the very action it

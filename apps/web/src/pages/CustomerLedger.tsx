@@ -1,132 +1,145 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { apiClient } from '../api/client';
+import { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { FinanceSummaryCards } from '../components/FinanceSummaryCards';
+import {
+  Button,
+  DataTable,
+  EmptyState,
+  Field,
+  Input,
+  LinkButton,
+  PageHeader,
+  Resource,
+  type Column,
+} from '../components/ui';
+import { useApiCollection, useApiResource } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime, formatMinor } from '../lib/finance';
 import type { AccountSummary, LedgerEntry } from './financeTypes';
-import './inventory.css';
 
 export function CustomerLedger() {
   const { shopId } = useParams();
-  const [summary, setSummary] = useState<AccountSummary>();
-  const [entries, setEntries] = useState<LedgerEntry[]>([]);
+  const { t } = useLanguage();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [applied, setApplied] = useState({ from: '', to: '' });
 
-  const load = useCallback(async () => {
-    if (!shopId) return;
-    setLoading(true);
-    try {
-      const [summaryResponse, ledgerResponse] = await Promise.all([
-        apiClient.get(`/finance/shops/${shopId}/summary`),
-        apiClient.get(`/finance/shops/${shopId}/ledger`, {
-          params: { ...(from ? { from } : {}), ...(to ? { to } : {}) },
-        }),
-      ]);
-      setSummary(summaryResponse.data.data as AccountSummary);
-      setEntries(ledgerResponse.data.data as LedgerEntry[]);
-      setError('');
-    } catch {
-      setError('Unable to load this customer ledger.');
-    } finally {
-      setLoading(false);
-    }
-  }, [from, shopId, to]);
+  const summary = useApiResource<AccountSummary>(
+    ['shop-finance-summary', shopId],
+    `/finance/shops/${shopId}/summary`,
+  );
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const params = new URLSearchParams();
+  if (applied.from) params.set('from', applied.from);
+  if (applied.to) params.set('to', applied.to);
+  const ledger = useApiCollection<LedgerEntry>(
+    ['shop-ledger', shopId, applied.from, applied.to],
+    `/finance/shops/${shopId}/ledger${params.size ? `?${params.toString()}` : ''}`,
+  );
+
+  const columns: ReadonlyArray<Column<LedgerEntry>> = [
+    {
+      key: 'posted',
+      header: t('finance.posted'),
+      cell: (entry) =>
+        formatFinanceDateTime(entry.postingTime ?? entry.postedAt ?? entry.createdAt),
+    },
+    {
+      key: 'reference',
+      header: t('fields.reference'),
+      cell: (entry) => entry.reference ?? entry.sourceReference ?? '—',
+    },
+    {
+      key: 'type',
+      header: t('finance.type'),
+      cell: (entry) => entry.type.replaceAll('_', ' ').toLowerCase(),
+    },
+    {
+      key: 'description',
+      header: t('finance.description'),
+      cell: (entry) => entry.description ?? '—',
+    },
+    {
+      key: 'debit',
+      header: t('finance.debit'),
+      numeric: true,
+      cell: (entry) => (entry.debitMinor ? formatMinor(entry.debitMinor) : '—'),
+    },
+    {
+      key: 'credit',
+      header: t('finance.credit'),
+      numeric: true,
+      cell: (entry) => (entry.creditMinor ? formatMinor(entry.creditMinor) : '—'),
+    },
+    {
+      key: 'balance',
+      header: t('finance.balance'),
+      numeric: true,
+      cell: (entry) => <strong>{formatMinor(entry.balanceAfterMinor)}</strong>,
+    },
+  ];
 
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Customer finance</p>
-          <h1>Customer ledger</h1>
-          <p>Append-only charges, payments, credits, debits and reversals.</p>
-        </div>
-        <div className="actions">
-          <Link className="secondary-button" to={`/shops/${shopId}`}>
-            Shop
-          </Link>
-          <Link className="secondary-button" to={`/shops/${shopId}/statement`}>
-            Statement
-          </Link>
-          <Link className="primary-button" to={`/payments/new?shopId=${shopId}`}>
-            Record payment
-          </Link>
-        </div>
-      </header>
+    <main>
+      <PageHeader
+        routeId="shop-ledger"
+        title={t('finance.ledgerTitle')}
+        description={t('finance.ledgerSubtitle')}
+        actions={
+          <>
+            <LinkButton to={`/shops/${shopId}`}>{t('finance.shop')}</LinkButton>
+            <LinkButton to={`/shops/${shopId}/statement`}>{t('finance.statement')}</LinkButton>
+            <LinkButton variant="primary" to={`/payments/new?shopId=${shopId}`}>
+              {t('finance.recordPayment')}
+            </LinkButton>
+          </>
+        }
+      />
+
       <form
-        className="panel data-form finance-filters"
+        className="mb-4 flex flex-wrap items-end gap-3"
         onSubmit={(event) => {
           event.preventDefault();
-          void load();
+          setApplied({ from, to });
         }}
       >
-        <div className="form-grid">
-          <label>
-            From
-            <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
-          </label>
-          <label>
-            To
-            <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
-          </label>
-        </div>
-        <button className="secondary-button">Apply dates</button>
+        <Field label={t('finance.from')} className="min-w-44">
+          <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+        </Field>
+        <Field label={t('finance.to')} className="min-w-44">
+          <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+        </Field>
+        <Button type="submit">{t('finance.applyDates')}</Button>
       </form>
-      {error ? (
-        <section className="state error" role="alert">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
-      {summary ? <FinanceSummaryCards summary={summary} /> : null}
-      {loading ? (
-        <section className="state">Loading ledger...</section>
-      ) : entries.length === 0 ? (
-        <section className="state">No ledger entries match this period.</section>
-      ) : (
-        <section className="panel">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Posted</th>
-                  <th>Reference</th>
-                  <th>Type</th>
-                  <th>Description</th>
-                  <th>Debit</th>
-                  <th>Credit</th>
-                  <th>Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((entry) => (
-                  <tr key={entry._id}>
-                    <td>
-                      {formatFinanceDateTime(
-                        entry.postingTime ?? entry.postedAt ?? entry.createdAt,
-                      )}
-                    </td>
-                    <td>{entry.reference ?? entry.sourceReference ?? '—'}</td>
-                    <td>{entry.type.replaceAll('_', ' ')}</td>
-                    <td>{entry.description ?? '—'}</td>
-                    <td>{entry.debitMinor ? formatMinor(entry.debitMinor) : '—'}</td>
-                    <td>{entry.creditMinor ? formatMinor(entry.creditMinor) : '—'}</td>
-                    <td>
-                      <strong>{formatMinor(entry.balanceAfterMinor)}</strong>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+
+      <Resource
+        query={summary}
+        loadingLabel={t('finance.loadingLedger')}
+        errorMessageFallback={t('finance.couldNotLoadLedger')}
+      >
+        {(data) => <FinanceSummaryCards summary={data} />}
+      </Resource>
+
+      <div className="mt-4">
+        <Resource
+          query={ledger}
+          loadingLabel={t('finance.loadingLedger')}
+          errorMessageFallback={t('finance.couldNotLoadLedger')}
+          empty={
+            <EmptyState title={t('finance.noEntries')} description={t('finance.noEntriesBody')} />
+          }
+        >
+          {(page) => (
+            <DataTable
+              caption={t('finance.ledgerTitle')}
+              columns={columns}
+              rows={page.items}
+              rowKey={(entry) => entry._id}
+              rowTest={(entry) => entry.reference ?? entry.sourceReference ?? entry._id}
+            />
+          )}
+        </Resource>
+      </div>
     </main>
   );
 }

@@ -1,269 +1,223 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiClient } from '../api/client';
-import { formatFinanceDateTime, formatMinor } from '../lib/finance';
+import { PaymentMethod, PaymentStatus } from '@medsupply/shared-types';
 import {
-  financePaymentMethods,
-  financePaymentStatuses,
-  type FinancePayment,
-  type PageMeta,
-} from './financeTypes';
-import './inventory.css';
+  Button,
+  DataTable,
+  EmptyState,
+  Field,
+  FilterTabs,
+  Input,
+  LinkButton,
+  PageHeader,
+  Pagination,
+  Resource,
+  Select,
+  StatusPill,
+  type Column,
+} from '../components/ui';
+import { useApiCollection } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
+import { formatFinanceDateTime, formatMinor } from '../lib/finance';
+import type { FinancePayment } from './financeTypes';
 
 interface PaymentListProps {
   ownerMode?: boolean;
 }
 
 export function PaymentList({ ownerMode = false }: PaymentListProps) {
-  const [payments, setPayments] = useState<FinancePayment[]>([]);
-  const [meta, setMeta] = useState<PageMeta>({ page: 1, pages: 1 });
+  const { t } = useLanguage();
   const [status, setStatus] = useState('');
   const [method, setMethod] = useState('');
-  const [queryInput, setQueryInput] = useState('');
-  const [query, setQuery] = useState('');
+  const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [applied, setApplied] = useState({ q: '', method: '', from: '', to: '' });
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.get('/payments', {
-        params: {
-          ...(status ? { status } : {}),
-          ...(method ? { method } : {}),
-          ...(query ? { q: query } : {}),
-          ...(from ? { from } : {}),
-          ...(to ? { to } : {}),
-          page,
-          limit: 30,
-        },
-      });
-      setPayments(response.data.data as FinancePayment[]);
-      setMeta((response.data.meta ?? { page, pages: 1 }) as PageMeta);
-      setError('');
-    } catch {
-      setError('Unable to load payments.');
-    } finally {
-      setLoading(false);
-    }
-  }, [from, method, page, query, status, to]);
+  const params = new URLSearchParams({ page: String(page), limit: '30' });
+  if (status) params.set('status', status);
+  if (applied.method) params.set('method', applied.method);
+  if (applied.q) params.set('q', applied.q);
+  if (applied.from) params.set('from', applied.from);
+  if (applied.to) params.set('to', applied.to);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const payments = useApiCollection<FinancePayment>(
+    ['payments', status, applied.method, applied.q, applied.from, applied.to, page],
+    `/payments?${params.toString()}`,
+  );
 
-  function applySearch() {
-    setPage(1);
-    setQuery(queryInput.trim());
-  }
+  const columns: ReadonlyArray<Column<FinancePayment>> = [
+    {
+      key: 'reference',
+      header: t('finance.paymentReference'),
+      cell: (payment) => (
+        <Link
+          className="font-medium text-brand underline"
+          to={ownerMode ? `/account/payments/${payment._id}` : `/payments/${payment._id}`}
+        >
+          {payment.reference}
+        </Link>
+      ),
+    },
+    ...(ownerMode
+      ? []
+      : [
+          {
+            key: 'shop',
+            header: t('fields.shop'),
+            cell: (payment: FinancePayment) => {
+              const shop = typeof payment.shopId === 'string' ? undefined : payment.shopId;
+              return (
+                <div>
+                  <p className="text-text">{shop?.name ?? '—'}</p>
+                  <p className="text-sm text-text-muted">{shop?.reference}</p>
+                </div>
+              );
+            },
+          },
+        ]),
+    {
+      key: 'against',
+      header: t('finance.invoice'),
+      cell: (payment) => {
+        const invoice = typeof payment.invoiceId === 'string' ? undefined : payment.invoiceId;
+        const delivery = typeof payment.deliveryId === 'string' ? undefined : payment.deliveryId;
+        return (
+          <div>
+            <p className="text-text">{invoice?.reference ?? t('finance.noInvoice')}</p>
+            {delivery?.reference && <p className="text-sm text-text-muted">{delivery.reference}</p>}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'method',
+      header: t('finance.method'),
+      cell: (payment) => t(`paymentMethod.${payment.method}`),
+    },
+    {
+      key: 'amount',
+      header: t('fields.amount'),
+      numeric: true,
+      cell: (payment) => <strong>{formatMinor(payment.amountMinor)}</strong>,
+    },
+    {
+      key: 'status',
+      header: t('fields.status'),
+      cell: (payment) => <StatusPill kind="payment" status={payment.status} />,
+    },
+    {
+      key: 'collected',
+      header: t('finance.collectedAt'),
+      cell: (payment) =>
+        formatFinanceDateTime(payment.collectionTime ?? payment.collectedAt ?? payment.createdAt),
+    },
+  ];
+
+  const filtered = Boolean(status || applied.method || applied.q || applied.from || applied.to);
 
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">{ownerMode ? 'Your account' : 'Finance'}</p>
-          <h1>{ownerMode ? 'Payment history' : 'Payments'}</h1>
-          <p>Posted receipts, pending collections, failures and reversals.</p>
-        </div>
-        <div className="actions">
-          {ownerMode ? (
-            <Link className="secondary-button" to="/account">
-              Account summary
-            </Link>
+    <main>
+      <PageHeader
+        routeId={ownerMode ? 'my-payments' : 'payments'}
+        title={ownerMode ? t('finance.ownPaymentsTitle') : t('finance.paymentsTitle')}
+        description={ownerMode ? t('finance.ownPaymentsSubtitle') : t('finance.paymentsSubtitle')}
+        actions={
+          ownerMode ? (
+            <LinkButton to="/account">{t('account.title')}</LinkButton>
           ) : (
             <>
-              <Link className="secondary-button" to="/payments/collections">
-                Review collections
-              </Link>
-              <Link className="primary-button" to="/payments/new">
-                Record payment
-              </Link>
+              <LinkButton to="/payments/collections">{t('finance.collectionsTitle')}</LinkButton>
+              <LinkButton variant="primary" to="/payments/new">
+                {t('finance.recordPayment')}
+              </LinkButton>
             </>
-          )}
-        </div>
-      </header>
+          )
+        }
+      />
 
       <form
-        className="panel data-form finance-filters"
+        className="mb-4 flex flex-wrap items-end gap-3"
         onSubmit={(event) => {
           event.preventDefault();
-          applySearch();
+          setPage(1);
+          setApplied({ q: search.trim(), method, from, to });
         }}
       >
-        <div className="form-grid finance-filter-grid">
-          <label>
-            Reference or transaction
-            <input
-              value={queryInput}
-              onChange={(event) => setQueryInput(event.target.value)}
-              placeholder="PAY-2026-000001"
-            />
-          </label>
-          <label>
-            Method
-            <select
-              value={method}
-              onChange={(event) => {
-                setMethod(event.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">All methods</option>
-              {financePaymentMethods.map((value) => (
-                <option key={value} value={value}>
-                  {value.replaceAll('_', ' ')}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            From
-            <input
-              type="date"
-              value={from}
-              onChange={(event) => {
-                setFrom(event.target.value);
-                setPage(1);
-              }}
-            />
-          </label>
-          <label>
-            To
-            <input
-              type="date"
-              value={to}
-              onChange={(event) => {
-                setTo(event.target.value);
-                setPage(1);
-              }}
-            />
-          </label>
-        </div>
-        <button className="secondary-button" type="submit">
-          Apply filters
-        </button>
+        <Field label={t('fields.reference')} className="min-w-56">
+          <Input
+            value={search}
+            placeholder="PAY-2026-000001"
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </Field>
+        <Field label={t('finance.method')} className="min-w-48">
+          <Select value={method} onChange={(event) => setMethod(event.target.value)}>
+            <option value="">{t('finance.anyMethod')}</option>
+            {Object.values(PaymentMethod).map((value) => (
+              <option key={value} value={value}>
+                {t(`paymentMethod.${value}`)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={t('finance.from')} className="min-w-40">
+          <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+        </Field>
+        <Field label={t('finance.to')} className="min-w-40">
+          <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+        </Field>
+        <Button type="submit">{t('actions.apply')}</Button>
       </form>
 
-      <nav className="filter-tabs" aria-label="Payment status">
-        <button
-          className={!status ? 'selected' : ''}
-          onClick={() => {
-            setStatus('');
+      <div className="mb-4">
+        <FilterTabs
+          label={t('fields.status')}
+          options={[
+            { value: '', label: t('finance.anyStatus') },
+            ...Object.values(PaymentStatus).map((value) => ({
+              value,
+              label: t(`paymentStatus.${value}`),
+            })),
+          ]}
+          value={status}
+          onChange={(value) => {
+            setStatus(value);
             setPage(1);
           }}
-        >
-          All
-        </button>
-        {financePaymentStatuses.map((value) => (
-          <button
-            key={value}
-            className={status === value ? 'selected' : ''}
-            onClick={() => {
-              setStatus(value);
-              setPage(1);
-            }}
-          >
-            {value}
-          </button>
-        ))}
-      </nav>
+        />
+      </div>
 
-      {error ? (
-        <section className="state error" role="alert">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
-      {loading ? (
-        <section className="state">Loading payments...</section>
-      ) : payments.length === 0 ? (
-        <section className="state">No payments match these filters.</section>
-      ) : (
-        <section className="panel">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Payment</th>
-                  {!ownerMode ? <th>Shop</th> : null}
-                  <th>Invoice / delivery</th>
-                  <th>Method</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Collected</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map((payment) => {
-                  const shop = typeof payment.shopId === 'string' ? undefined : payment.shopId;
-                  const invoice =
-                    typeof payment.invoiceId === 'string' ? undefined : payment.invoiceId;
-                  const delivery =
-                    typeof payment.deliveryId === 'string' ? undefined : payment.deliveryId;
-                  const detailPath = ownerMode
-                    ? `/account/payments/${payment._id}`
-                    : `/payments/${payment._id}`;
-                  return (
-                    <tr key={payment._id}>
-                      <td>
-                        <Link to={detailPath}>{payment.reference}</Link>
-                      </td>
-                      {!ownerMode ? (
-                        <td>
-                          {shop?.name ?? '—'}
-                          <small>{shop?.reference}</small>
-                        </td>
-                      ) : null}
-                      <td>
-                        {invoice?.reference ?? 'Unallocated'}
-                        <small>{delivery?.reference}</small>
-                      </td>
-                      <td>{payment.method.replaceAll('_', ' ')}</td>
-                      <td>
-                        <strong>{formatMinor(payment.amountMinor)}</strong>
-                      </td>
-                      <td>
-                        <span className={`status finance-status ${payment.status.toLowerCase()}`}>
-                          {payment.status}
-                        </span>
-                      </td>
-                      <td>
-                        {formatFinanceDateTime(
-                          payment.collectionTime ?? payment.collectedAt ?? payment.createdAt,
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {(meta.pages ?? 1) > 1 ? (
-            <div className="pagination actions">
-              <button
-                className="secondary-button"
-                disabled={page <= 1}
-                onClick={() => setPage((value) => value - 1)}
-              >
-                Previous
-              </button>
-              <span>
-                Page {meta.page ?? page} of {meta.pages}
-              </span>
-              <button
-                className="secondary-button"
-                disabled={page >= (meta.pages ?? 1)}
-                onClick={() => setPage((value) => value + 1)}
-              >
-                Next
-              </button>
-            </div>
-          ) : null}
-        </section>
-      )}
+      <Resource
+        query={payments}
+        loadingLabel={t('finance.loadingPayments')}
+        errorMessageFallback={t('finance.couldNotLoadPayments')}
+        empty={
+          <EmptyState
+            title={filtered ? t('finance.noPaymentsFiltered') : t('finance.noPayments')}
+            description={filtered ? t('lists.noResultsBody') : t('finance.noPaymentsBody')}
+          />
+        }
+      >
+        {(result) => (
+          <>
+            <DataTable
+              caption={t('finance.paymentsTitle')}
+              columns={columns}
+              rows={result.items}
+              rowKey={(payment) => payment._id}
+              rowTest={(payment) => payment.reference}
+            />
+            <Pagination
+              page={result.page}
+              limit={result.limit}
+              total={result.total}
+              onPage={setPage}
+            />
+          </>
+        )}
+      </Resource>
     </main>
   );
 }

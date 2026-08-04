@@ -1,10 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiClient } from '../api/client';
 import { toDateInputValue } from '@medsupply/utilities';
+import {
+  Button,
+  Card,
+  DataTable,
+  EmptyState,
+  Field,
+  Input,
+  LinkButton,
+  PageHeader,
+  Resource,
+  type Column,
+} from '../components/ui';
+import { useApiResource } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatFinanceDateTime, formatMinor } from '../lib/finance';
 import type { FinanceReportData, FinanceReportRow } from './financeTypes';
-import './inventory.css';
 
 type ReportKind = 'outstanding' | 'overdue' | 'collections';
 
@@ -16,19 +28,16 @@ interface ReportSummary {
   shopCount?: number;
 }
 
-const reportCopy: Record<ReportKind, { title: string; description: string }> = {
-  outstanding: {
-    title: 'Outstanding report',
-    description: 'Customer balances and open invoice exposure.',
-  },
-  overdue: {
-    title: 'Overdue report',
-    description: 'Balances past invoice due dates, ordered by risk.',
-  },
-  collections: {
-    title: 'Collection report',
-    description: 'Collected, pending, failed and reversed payments.',
-  },
+const ROUTE_IDS: Record<ReportKind, string> = {
+  outstanding: 'report-outstanding',
+  overdue: 'report-overdue',
+  collections: 'report-collections',
+};
+
+const TITLE_KEYS: Record<ReportKind, string> = {
+  outstanding: 'finance.reportsOutstanding',
+  overdue: 'finance.reportsOverdue',
+  collections: 'finance.reportsCollections',
 };
 
 function reportAmount(kind: ReportKind, row: FinanceReportRow) {
@@ -38,218 +47,247 @@ function reportAmount(kind: ReportKind, row: FinanceReportRow) {
 }
 
 function FinancialReportPage({ kind }: { kind: ReportKind }) {
+  const { t } = useLanguage();
   // Dhaka's today, not UTC's: before 6 am the two differ, and a clerk opening
   // the collections report at the start of a shift got yesterday's figures.
   const today = toDateInputValue(new Date());
   const monthStart = `${today.slice(0, 8)}01`;
-  const [rows, setRows] = useState<FinanceReportRow[]>([]);
-  const [summary, setSummary] = useState<ReportSummary>({});
-  const [totalMinor, setTotalMinor] = useState(0);
+
   const [asOf, setAsOf] = useState(today);
   const [from, setFrom] = useState(monthStart);
   const [to, setTo] = useState(today);
   const [applied, setApplied] = useState({ asOf: today, from: monthStart, to: today });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params =
-        kind === 'collections' ? { from: applied.from, to: applied.to } : { asOf: applied.asOf };
-      const [reportResponse, summaryResponse] = await Promise.all([
-        apiClient.get(`/finance/reports/${kind}`, { params }),
-        apiClient.get('/finance/reports/summary', { params }),
-      ]);
-      const raw = reportResponse.data.data as FinanceReportData | FinanceReportRow[];
-      const data = Array.isArray(raw) ? { rows: raw } : raw;
-      setRows(data.rows);
-      setTotalMinor(
-        data.totalMinor ??
-          data.outstandingTotalMinor ??
-          data.overdueTotalMinor ??
-          data.collectedTotalMinor ??
-          data.rows.reduce((sum, row) => sum + reportAmount(kind, row), 0),
-      );
-      setSummary(summaryResponse.data.data as ReportSummary);
-      setError('');
-    } catch {
-      setError(`Unable to load the ${kind} report.`);
-    } finally {
-      setLoading(false);
-    }
-  }, [applied, kind]);
+  const search =
+    kind === 'collections' ? `from=${applied.from}&to=${applied.to}` : `asOf=${applied.asOf}`;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const report = useApiResource<FinanceReportData | FinanceReportRow[]>(
+    ['finance-report', kind, search],
+    `/finance/reports/${kind}?${search}`,
+  );
+  const summary = useApiResource<ReportSummary>(
+    ['finance-report-summary', search],
+    `/finance/reports/summary?${search}`,
+  );
 
-  const copy = reportCopy[kind];
-  return (
-    <main className="inventory-page">
-      <header className="page-heading">
+  const normalise = (raw: FinanceReportData | FinanceReportRow[]) =>
+    Array.isArray(raw) ? { rows: raw } : raw;
+
+  const collectionColumns: ReadonlyArray<Column<FinanceReportRow>> = [
+    {
+      key: 'payment',
+      header: t('finance.paymentReference'),
+      cell: (row) => row.paymentReference ?? '—',
+    },
+    {
+      key: 'shop',
+      header: t('fields.shop'),
+      cell: (row) => (
         <div>
-          <p className="eyebrow">Finance reports</p>
-          <h1>{copy.title}</h1>
-          <p>{copy.description}</p>
+          <p className="text-text">{row.shopName ?? '—'}</p>
+          <p className="text-sm text-text-muted">{row.shopReference}</p>
         </div>
-        <Link className="secondary-button" to="/payments">
-          Payments
-        </Link>
-      </header>
-      <nav className="filter-tabs" aria-label="Financial report">
-        <Link className={kind === 'outstanding' ? 'selected' : ''} to="/reports/outstanding">
-          Outstanding
-        </Link>
-        <Link className={kind === 'overdue' ? 'selected' : ''} to="/reports/overdue">
-          Overdue
-        </Link>
-        <Link className={kind === 'collections' ? 'selected' : ''} to="/reports/collections">
-          Collections
-        </Link>
+      ),
+    },
+    {
+      key: 'collector',
+      header: t('finance.collectedBy'),
+      cell: (row) => row.collectorName ?? '—',
+    },
+    {
+      key: 'method',
+      header: t('finance.method'),
+      cell: (row) => (row.method ? t(`paymentMethod.${row.method}`) : '—'),
+    },
+    {
+      key: 'status',
+      header: t('fields.status'),
+      cell: (row) => (row.status ? t(`paymentStatus.${row.status}`) : '—'),
+    },
+    {
+      key: 'collected',
+      header: t('finance.collectedAt'),
+      cell: (row) => formatFinanceDateTime(row.collectionTime),
+    },
+    {
+      key: 'amount',
+      header: t('fields.amount'),
+      numeric: true,
+      cell: (row) => <strong>{formatMinor(reportAmount(kind, row))}</strong>,
+    },
+  ];
+
+  const balanceColumns: ReadonlyArray<Column<FinanceReportRow>> = [
+    {
+      key: 'shop',
+      header: t('fields.shop'),
+      cell: (row) => (
+        <div>
+          <p className="text-text">{row.shopName ?? '—'}</p>
+          <p className="text-sm text-text-muted">{row.shopReference}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'invoices',
+      header: t('finance.invoiceCount'),
+      numeric: true,
+      cell: (row) => row.invoiceCount ?? '—',
+    },
+    {
+      key: 'due',
+      header: kind === 'overdue' ? t('finance.oldestDue') : t('fields.dueDate'),
+      cell: (row) => formatFinanceDate(row.oldestDueDate ?? row.dueDate),
+    },
+    ...(kind === 'overdue'
+      ? [
+          {
+            key: 'days',
+            header: t('finance.overdueDays'),
+            numeric: true,
+            cell: (row: FinanceReportRow) => row.overdueDays ?? '—',
+          },
+        ]
+      : []),
+    {
+      key: 'amount',
+      header: t('fields.amount'),
+      numeric: true,
+      cell: (row) => <strong>{formatMinor(reportAmount(kind, row))}</strong>,
+    },
+    {
+      key: 'ledger',
+      header: '',
+      label: '',
+      cell: (row) =>
+        row.shopId ? (
+          <Link className="text-brand underline" to={`/shops/${row.shopId}/ledger`}>
+            {t('finance.viewLedger')}
+          </Link>
+        ) : (
+          '—'
+        ),
+    },
+  ];
+
+  return (
+    <main>
+      <PageHeader
+        routeId={ROUTE_IDS[kind]}
+        title={t(TITLE_KEYS[kind])}
+        description={t('finance.reportsSubtitle')}
+        actions={<LinkButton to="/payments">{t('finance.allPayments')}</LinkButton>}
+      />
+
+      {/*
+        Links rather than buttons: each report is its own route, and a report a
+        clerk wants to send to the accountant has to be addressable.
+      */}
+      <nav aria-label={t('nav.sections')} className="mb-4 flex flex-wrap gap-2">
+        {(
+          [
+            ['outstanding', '/reports/outstanding'],
+            ['overdue', '/reports/overdue'],
+            ['collections', '/reports/collections'],
+          ] as const
+        ).map(([value, path]) => (
+          <Link
+            key={value}
+            to={path}
+            aria-current={kind === value ? 'page' : undefined}
+            className={
+              kind === value
+                ? 'min-h-11 rounded-full border border-brand bg-brand-subtle px-4 py-2 text-sm font-medium text-brand'
+                : 'min-h-11 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-muted hover:bg-surface-hover'
+            }
+          >
+            {t(TITLE_KEYS[value])}
+          </Link>
+        ))}
       </nav>
+
       <form
-        className="panel data-form finance-filters"
+        className="mb-4 flex flex-wrap items-end gap-3"
         onSubmit={(event) => {
           event.preventDefault();
           setApplied({ asOf, from, to });
         }}
       >
         {kind === 'collections' ? (
-          <div className="form-grid">
-            <label>
-              From
-              <input
+          <>
+            <Field label={t('finance.from')} className="min-w-44">
+              <Input
                 required
                 type="date"
                 value={from}
                 onChange={(event) => setFrom(event.target.value)}
               />
-            </label>
-            <label>
-              To
-              <input
+            </Field>
+            <Field label={t('finance.to')} className="min-w-44">
+              <Input
                 required
-                min={from}
                 type="date"
+                min={from}
                 value={to}
                 onChange={(event) => setTo(event.target.value)}
               />
-            </label>
-          </div>
+            </Field>
+          </>
         ) : (
-          <label>
-            As of
-            <input
+          <Field label={t('finance.asOf')} className="min-w-44">
+            <Input
               required
               type="date"
               value={asOf}
               onChange={(event) => setAsOf(event.target.value)}
             />
-          </label>
+          </Field>
         )}
-        <button className="secondary-button">Run report</button>
+        <Button type="submit">{t('actions.apply')}</Button>
       </form>
-      <section className="metric-grid finance-metrics">
-        <article>
-          <span>Report total</span>
-          <strong>{formatMinor(totalMinor)}</strong>
-        </article>
-        <article>
-          <span>All outstanding</span>
-          <strong>{formatMinor(summary.outstandingBalanceMinor ?? 0)}</strong>
-        </article>
-        <article>
-          <span>All overdue</span>
-          <strong>{formatMinor(summary.overdueBalanceMinor ?? 0)}</strong>
-        </article>
-        <article>
-          <span>Period collected</span>
-          <strong>{formatMinor(summary.collectedAmountMinor ?? 0)}</strong>
-        </article>
-      </section>
-      {error ? (
-        <section className="state error" role="alert">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
-      {loading ? (
-        <section className="state">Loading report...</section>
-      ) : rows.length === 0 ? (
-        <section className="state">No records match this report period.</section>
-      ) : (
-        <section className="panel">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  {kind === 'collections' ? (
-                    <>
-                      <th>Payment</th>
-                      <th>Shop</th>
-                      <th>Collector</th>
-                      <th>Method</th>
-                      <th>Status</th>
-                      <th>Collected</th>
-                      <th>Amount</th>
-                    </>
-                  ) : (
-                    <>
-                      <th>Shop</th>
-                      <th>Invoices</th>
-                      <th>{kind === 'overdue' ? 'Oldest due' : 'Due date'}</th>
-                      {kind === 'overdue' ? <th>Days overdue</th> : null}
-                      <th>Amount</th>
-                      <th>Account</th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, index) =>
-                  kind === 'collections' ? (
-                    <tr key={row.paymentReference ?? `${index}`}>
-                      <td>{row.paymentReference ?? '—'}</td>
-                      <td>
-                        {row.shopName ?? '—'}
-                        <small>{row.shopReference}</small>
-                      </td>
-                      <td>{row.collectorName ?? '—'}</td>
-                      <td>{row.method?.replaceAll('_', ' ') ?? '—'}</td>
-                      <td>{row.status ?? '—'}</td>
-                      <td>{formatFinanceDateTime(row.collectionTime)}</td>
-                      <td>
-                        <strong>{formatMinor(reportAmount(kind, row))}</strong>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr key={row.shopId ?? row.shopReference ?? `${index}`}>
-                      <td>
-                        {row.shopName ?? '—'}
-                        <small>{row.shopReference}</small>
-                      </td>
-                      <td>{row.invoiceCount ?? '—'}</td>
-                      <td>{formatFinanceDate(row.oldestDueDate ?? row.dueDate)}</td>
-                      {kind === 'overdue' ? <td>{row.overdueDays ?? '—'}</td> : null}
-                      <td>
-                        <strong>{formatMinor(reportAmount(kind, row))}</strong>
-                      </td>
-                      <td>
-                        {row.shopId ? (
-                          <Link to={`/shops/${row.shopId}/ledger`}>View ledger</Link>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                    </tr>
-                  ),
-                )}
-              </tbody>
-            </table>
+
+      <Resource
+        query={summary}
+        loadingLabel={t('finance.loadingReport')}
+        errorMessageFallback={t('finance.couldNotLoadReport')}
+      >
+        {(data) => (
+          <div className="mb-4 grid gap-3 sm:grid-cols-3">
+            {(
+              [
+                [t('finance.outstandingTotal'), data.outstandingBalanceMinor ?? 0],
+                [t('finance.overdueTotal'), data.overdueBalanceMinor ?? 0],
+                [t('finance.collectedTotal'), data.collectedAmountMinor ?? 0],
+              ] as const
+            ).map(([label, value]) => (
+              <Card key={label}>
+                <p className="text-sm text-text-muted">{label}</p>
+                <p className="text-xl font-semibold tabular-nums text-text">{formatMinor(value)}</p>
+              </Card>
+            ))}
           </div>
-        </section>
-      )}
+        )}
+      </Resource>
+
+      <Resource
+        query={report}
+        loadingLabel={t('finance.loadingReport')}
+        errorMessageFallback={t('finance.couldNotLoadReport')}
+        isEmpty={(raw) => normalise(raw).rows.length === 0}
+        empty={<EmptyState title={t('finance.noRows')} description={t('finance.noRowsBody')} />}
+      >
+        {(raw) => (
+          <DataTable
+            caption={t(TITLE_KEYS[kind])}
+            columns={kind === 'collections' ? collectionColumns : balanceColumns}
+            rows={normalise(raw).rows}
+            rowKey={(row) =>
+              row.paymentReference ?? row.shopId ?? row.shopReference ?? JSON.stringify(row)
+            }
+            rowTest={(row) => row.paymentReference ?? row.shopReference ?? ''}
+          />
+        )}
+      </Resource>
     </main>
   );
 }

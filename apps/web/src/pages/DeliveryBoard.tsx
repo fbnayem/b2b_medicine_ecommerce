@@ -1,122 +1,137 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { DeliveryStatus, RealtimeEvent } from '@medsupply/shared-types';
 import type { Delivery } from '@medsupply/shared-types';
-import { apiClient } from '../api/client';
 import { useLiveRefresh } from '../realtime/useRealtime';
-import './inventory.css';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  FilterTabs,
+  Input,
+  PageHeader,
+  Resource,
+  StatusPill,
+} from '../components/ui';
+import { useApiCollection } from '../lib/query';
+import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate } from '../lib/finance';
 
-const statuses = ['', ...Object.values(DeliveryStatus)] as const;
-
 export function DeliveryBoard() {
-  const [data, setData] = useState<Delivery[]>([]);
+  const { t } = useLanguage();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState('');
+  const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const load = useCallback(
-    async (silent = false) => {
-      if (!silent) setLoading(true);
-      try {
-        const response = await apiClient.get('/deliveries', {
-          params: { ...(status ? { status } : {}), ...(query.trim() ? { q: query.trim() } : {}) },
-        });
-        setData(response.data.data);
-        setError('');
-      } catch {
-        setError('Unable to load the delivery board.');
-      } finally {
-        if (!silent) setLoading(false);
-      }
-    },
-    [query, status],
+
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (query) params.set('q', query);
+  const deliveries = useApiCollection<Delivery>(
+    ['deliveries', status, query],
+    `/deliveries${params.size ? `?${params.toString()}` : ''}`,
   );
-  useEffect(() => {
-    void load();
-  }, [load]);
+
   // Realtime is the primary signal; polling stays as the fallback for blocked sockets.
-  useLiveRefresh(RealtimeEvent.DELIVERY_UPDATED, () => void load(true), 30_000);
+  useLiveRefresh(
+    RealtimeEvent.DELIVERY_UPDATED,
+    () => void queryClient.invalidateQueries({ queryKey: ['deliveries'] }),
+    30_000,
+  );
+
   return (
-    <main className="inventory-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Dispatch control</p>
-          <h1>Delivery board</h1>
-          <p>Assignment, handover, delivery progress, failed attempts, and proof of delivery.</p>
-        </div>
-        <button className="secondary-button" onClick={() => void load()}>
-          Refresh now
-        </button>
-      </header>
+    <main>
+      <PageHeader
+        routeId="deliveries"
+        title={t('delivery.title')}
+        description={t('delivery.subtitle')}
+        actions={<Button onClick={() => void deliveries.refetch()}>{t('delivery.refresh')}</Button>}
+      />
+
       <form
-        className="search-bar"
+        className="mb-4 flex flex-wrap items-end gap-2"
+        role="search"
         onSubmit={(event) => {
           event.preventDefault();
-          void load();
+          setQuery(search.trim());
         }}
       >
-        <label htmlFor="delivery-search">Delivery reference</label>
-        <div>
-          <input
-            id="delivery-search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="DEL-2026-000001"
+        <Field label={t('delivery.searchLabel')} className="min-w-64 flex-1">
+          <Input
+            value={search}
+            placeholder={t('delivery.searchHint')}
+            onChange={(event) => setSearch(event.target.value)}
           />
-          <button type="submit">Search</button>
-        </div>
+        </Field>
+        <Button type="submit">{t('common.search')}</Button>
       </form>
-      <nav className="filter-tabs" aria-label="Delivery status">
-        {statuses.map((value) => (
-          <button
-            key={value}
-            className={status === value ? 'selected' : ''}
-            onClick={() => setStatus(value)}
-          >
-            {value ? value.replaceAll('_', ' ') : 'All'}
-          </button>
-        ))}
-      </nav>
-      {error ? (
-        <section className="state error">
-          {error}
-          <button onClick={() => void load()}>Retry</button>
-        </section>
-      ) : null}
-      {loading ? (
-        <section className="state">Loading deliveries...</section>
-      ) : data.length === 0 ? (
-        <section className="state">No deliveries match this queue.</section>
-      ) : (
-        <section className="catalogue-grid">
-          {data.map((delivery) => {
-            const shop = typeof delivery.shopId === 'string' ? undefined : delivery.shopId;
-            const order = typeof delivery.orderId === 'string' ? undefined : delivery.orderId;
-            const person =
-              typeof delivery.assignedTo === 'string' ? undefined : delivery.assignedTo;
-            return (
-              <Link className="medicine-card" to={`/deliveries/${delivery._id}`} key={delivery._id}>
-                <div className="card-top">
-                  <span className="reference">{delivery.reference}</span>
-                  <span className="status">{delivery.priority}</span>
-                </div>
-                <h2>{shop?.name ?? 'Delivery'}</h2>
-                <p>{order?.reference ?? ''}</p>
-                <p>{person ? `${person.firstName} ${person.lastName}` : 'Unassigned'}</p>
-                <div className="card-bottom">
-                  <strong>{delivery.status.replaceAll('_', ' ')}</strong>
-                  <span>
-                    {delivery.expectedDeliveryDate
-                      ? formatFinanceDate(delivery.expectedDeliveryDate)
-                      : 'Date pending'}
-                  </span>
-                </div>
-              </Link>
-            );
-          })}
-        </section>
-      )}
+
+      <div className="mb-4">
+        <FilterTabs
+          label={t('delivery.filterLabel')}
+          options={[
+            { value: '', label: t('delivery.allStatuses') },
+            ...Object.values(DeliveryStatus).map((value) => ({
+              value,
+              label: t(`deliveryStatus.${value}`),
+            })),
+          ]}
+          value={status}
+          onChange={setStatus}
+        />
+      </div>
+
+      <Resource
+        query={deliveries}
+        loadingLabel={t('delivery.loading')}
+        errorMessageFallback={t('delivery.couldNotLoad')}
+        empty={<EmptyState title={t('delivery.none')} description={t('delivery.noneBody')} />}
+      >
+        {(page) => (
+          <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">
+            {page.items.map((delivery) => {
+              const shop = typeof delivery.shopId === 'string' ? undefined : delivery.shopId;
+              const order = typeof delivery.orderId === 'string' ? undefined : delivery.orderId;
+              const rider =
+                typeof delivery.assignedTo === 'string' ? undefined : delivery.assignedTo;
+              return (
+                <li key={delivery._id}>
+                  <Card className="h-full p-0">
+                    <Link
+                      data-test={`row-${delivery.reference}`}
+                      to={`/deliveries/${delivery._id}`}
+                      className="flex h-full flex-col gap-1 rounded-lg p-4 hover:bg-surface-hover"
+                    >
+                      <span className="flex items-start justify-between gap-2">
+                        <span className="text-sm text-text-muted">{delivery.reference}</span>
+                        <Badge>{delivery.priority}</Badge>
+                      </span>
+                      <span className="text-lg font-semibold text-text">
+                        {shop?.name ?? t('delivery.title')}
+                      </span>
+                      <span className="text-text-muted">{order?.reference ?? ''}</span>
+                      <span className="text-text-muted">
+                        {rider ? `${rider.firstName} ${rider.lastName}` : t('delivery.unassigned')}
+                      </span>
+                      <span className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                        <StatusPill kind="delivery" status={delivery.status} />
+                        <span className="text-sm text-text-muted">
+                          {delivery.expectedDeliveryDate
+                            ? formatFinanceDate(delivery.expectedDeliveryDate)
+                            : t('delivery.datePending')}
+                        </span>
+                      </span>
+                    </Link>
+                  </Card>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Resource>
     </main>
   );
 }

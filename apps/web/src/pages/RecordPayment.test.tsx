@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../api/client';
+import { renderWithUi } from '../testing/render';
 import { RecordPayment } from './RecordPayment';
 
-vi.mock('../api/client', () => ({ apiClient: { get: vi.fn(), post: vi.fn() } }));
+vi.mock('../api/client', async () => {
+  const actual = await vi.importActual<typeof import('../api/client')>('../api/client');
+  return { ...actual, apiClient: { get: vi.fn(), post: vi.fn() } };
+});
 const get = vi.mocked(apiClient.get);
 const post = vi.mocked(apiClient.post);
 
@@ -15,7 +19,7 @@ describe('RecordPayment', () => {
     post.mockReset();
     get.mockImplementation((url) =>
       Promise.resolve(
-        url === '/shops'
+        url.startsWith('/shops')
           ? {
               data: {
                 data: [{ _id: 'shop-1', reference: 'SHP-2026-000001', name: 'Dhaka Pharmacy' }],
@@ -42,20 +46,20 @@ describe('RecordPayment', () => {
     post.mockResolvedValue({
       data: { data: { _id: 'payment-1', reference: 'PAY-2026-000001', status: 'POSTED' } },
     });
-    render(
+    renderWithUi(
       <MemoryRouter initialEntries={['/payments/new']}>
         <RecordPayment />
       </MemoryRouter>,
     );
-    const shopSelect = await screen.findByLabelText('Shop');
+    const shopSelect = await screen.findByLabelText(/Which shop/);
     fireEvent.change(shopSelect, { target: { value: 'shop-1' } });
-    const invoiceSelect = await screen.findByLabelText('Invoice allocation (optional for advance)');
+    const invoiceSelect = await screen.findByLabelText(/Against which invoice/);
     await waitFor(() =>
       expect(screen.getByRole('option', { name: /INV-2026-000001/ })).toBeTruthy(),
     );
     fireEvent.change(invoiceSelect, { target: { value: 'invoice-1' } });
-    fireEvent.change(screen.getByLabelText('Amount (৳)'), { target: { value: '1,234.56' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+    fireEvent.change(screen.getByLabelText(/How much/), { target: { value: '1,234.56' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record it' }));
     await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
     const body = post.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(body.amountMinor).toBe(123456);
@@ -65,15 +69,15 @@ describe('RecordPayment', () => {
   });
 
   it('blocks values with more than two decimal places before calling the API', async () => {
-    render(
+    renderWithUi(
       <MemoryRouter initialEntries={['/payments/new']}>
         <RecordPayment />
       </MemoryRouter>,
     );
-    const shopSelect = await screen.findByLabelText('Shop');
+    const shopSelect = await screen.findByLabelText(/Which shop/);
     fireEvent.change(shopSelect, { target: { value: 'shop-1' } });
-    fireEvent.change(screen.getByLabelText('Amount (৳)'), { target: { value: '10.001' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+    fireEvent.change(screen.getByLabelText(/How much/), { target: { value: '10.001' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record it' }));
     expect(
       await screen.findByText('Enter a positive amount with no more than two decimal places.'),
     ).toBeTruthy();

@@ -7,7 +7,12 @@ import { renderWithUi } from '../testing/render';
 import { CustomerStatement } from './CustomerStatement';
 import { OutstandingReport } from './FinancialReports';
 
-vi.mock('../api/client', () => ({ apiClient: { get: vi.fn() } }));
+// Only the transport is replaced: `errorMessage` and `failureReference` are
+// pure helpers, and stubbing them would hide the sentence a user reads.
+vi.mock('../api/client', async () => {
+  const actual = await vi.importActual<typeof import('../api/client')>('../api/client');
+  return { ...actual, apiClient: { get: vi.fn() } };
+});
 const get = vi.mocked(apiClient.get);
 
 describe('Phase 8 finance views', () => {
@@ -53,33 +58,32 @@ describe('Phase 8 finance views', () => {
   });
 
   it('renders server-aggregated outstanding balances with a ledger link', async () => {
-    get.mockImplementation((url) =>
+    get.mockImplementation((url: string) =>
       Promise.resolve({
         data: {
-          data:
-            url === '/finance/reports/summary'
-              ? {
-                  outstandingBalanceMinor: 75000,
-                  overdueBalanceMinor: 20000,
-                  collectedAmountMinor: 10000,
-                }
-              : {
-                  rows: [
-                    {
-                      shopId: 'shop-1',
-                      shopReference: 'SHP-2026-000001',
-                      shopName: 'Dhaka Pharmacy',
-                      invoiceCount: 2,
-                      outstandingBalanceMinor: 75000,
-                      oldestDueDate: '2026-07-01',
-                    },
-                  ],
-                  outstandingTotalMinor: 75000,
-                },
+          data: String(url).startsWith('/finance/reports/summary')
+            ? {
+                outstandingBalanceMinor: 75000,
+                overdueBalanceMinor: 20000,
+                collectedAmountMinor: 10000,
+              }
+            : {
+                rows: [
+                  {
+                    shopId: 'shop-1',
+                    shopReference: 'SHP-2026-000001',
+                    shopName: 'Dhaka Pharmacy',
+                    invoiceCount: 2,
+                    outstandingBalanceMinor: 75000,
+                    oldestDueDate: '2026-07-01',
+                  },
+                ],
+                outstandingTotalMinor: 75000,
+              },
         },
       }),
     );
-    render(
+    renderWithUi(
       <MemoryRouter>
         <OutstandingReport />
       </MemoryRouter>,
@@ -89,10 +93,13 @@ describe('Phase 8 finance views', () => {
     expect(screen.getByRole('link', { name: 'View ledger' }).getAttribute('href')).toBe(
       '/shops/shop-1/ledger',
     );
+    // The as-at date is part of the URL because it is also the query's key.
     await waitFor(() =>
-      expect(get).toHaveBeenCalledWith('/finance/reports/outstanding', {
-        params: expect.objectContaining({ asOf: expect.any(String) }),
-      }),
+      expect(
+        get.mock.calls.some(([url]) =>
+          /^\/finance\/reports\/outstanding\?asOf=\d{4}-\d{2}-\d{2}$/.test(url as string),
+        ),
+      ).toBe(true),
     );
   });
 });
