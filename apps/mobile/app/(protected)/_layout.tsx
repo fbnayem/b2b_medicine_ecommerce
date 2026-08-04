@@ -101,6 +101,7 @@ export default function ProtectedLayout() {
         </Stack.Protected>
         <Stack.Protected guard={isDeliveryPerson}>
           <Stack.Screen name="collections" options={{ title: t('screens.myCollections') }} />
+          <Stack.Screen name="trip" options={{ title: t('trips.myTitle') }} />
         </Stack.Protected>
         <Stack.Protected guard={isOwner || isManager || isDeliveryPerson}>
           <Stack.Screen name="payment-detail" options={{ title: t('screens.paymentDetails') }} />

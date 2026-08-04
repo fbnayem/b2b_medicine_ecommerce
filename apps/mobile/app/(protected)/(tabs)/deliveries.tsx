@@ -85,6 +85,17 @@ export default function DeliveriesScreen() {
         />
       ) : null}
 
+      {/*
+       * The round, which is the view a rider actually plans their day from.
+       * It sits above the list rather than replacing it: the list is what
+       * works offline, and a round needs the server.
+       */}
+      <Button
+        variant="secondary"
+        label={t('trips.myTitle')}
+        onPress={() => router.push('/(protected)/trip')}
+      />
+
       <FlatList
         data={data}
         keyExtractor={(item) => item._id}

@@ -1,5 +1,12 @@
-import type { ReactNode } from 'react';
-import { Pressable, ScrollView, Text, View, type ViewStyle } from 'react-native';
+import type { ReactElement, ReactNode } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  type RefreshControlProps,
+  type ViewStyle,
+} from 'react-native';
 import { colour, layout } from '../theme';
 
 /**
@@ -19,11 +26,18 @@ export function Screen({
   children,
   scroll = true,
   style,
+  refreshControl,
 }: {
   children: ReactNode;
   /** Off for a screen that owns a `FlatList`, which must scroll itself. */
   scroll?: boolean;
   style?: ViewStyle;
+  /**
+   * Pull to refresh. Here rather than on each screen because several were
+   * hand-rolling a `ScrollView` purely to get one, and then re-typing the
+   * padding and the canvas colour along with it.
+   */
+  refreshControl?: ReactElement<RefreshControlProps>;
 }) {
   const content = (
     <View style={[{ padding: layout.space[4], gap: layout.space[3] }, style]}>{children}</View>
@@ -37,6 +51,7 @@ export function Screen({
       contentContainerStyle={{ paddingBottom: layout.space[6] }}
       // A rider reading a delivery should not have the keyboard in the way.
       keyboardShouldPersistTaps="handled"
+      refreshControl={refreshControl}
     >
       {content}
     </ScrollView>
