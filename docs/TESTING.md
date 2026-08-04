@@ -116,9 +116,25 @@ rather than summarised as a percentage — the endpoint that mattered was
 and a percentage would have read "88%" and named nothing. A waiver that goes
 stale fails the build, so the lists can only shrink.
 
-**As of 05 August 2026: 165 routes, 90 undocumented, 75 untested.** No tranche
-of the burn-down has been done yet; what has changed is that the reconciliation
-now covers permissions, which is where the remaining risk actually sits.
+**As of 05 August 2026: 165 routes, 78 undocumented, 75 untested.**
+
+Tranches are ordered by what a real user's journey touches rather than by what
+is easy, so a shrinking number means the riskiest endpoints went first. Done so
+far, and what remains:
+
+| Tranche        | Documented                                         | Tested      |
+| -------------- | -------------------------------------------------- | ----------- |
+| Shop owner     | done — 12 endpoints                                | not started |
+| Warehouse      | not started                                        | not started |
+| Delivery       | not started                                        | not started |
+| Finance        | partial — the owner's four `/finance/my` endpoints | not started |
+| Management     | not started                                        | not started |
+| Administration | not started                                        | not started |
+
+Documentation goes first per tranche because it is the step that makes the next
+one honest: writing the summary, the tag and the roles forces somebody to state
+what an endpoint is for and who may call it, and the roles are then checked
+against the mounted router rather than taken on trust.
 
 #### The roles assertion
 

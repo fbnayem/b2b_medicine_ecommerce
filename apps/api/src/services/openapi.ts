@@ -865,6 +865,112 @@ export const OPERATIONS: Operation[] = [
     roles: MANAGEMENT,
     query: ['asOf', 'shopId', 'format'],
   },
+
+  /*
+   * ── The shop owner's own journey ────────────────────────────────────────
+   *
+   * First tranche of the documentation burn-down, ordered by what a real
+   * user's journey touches rather than by what is easy to write. A shop owner
+   * signs in, finds their shop, browses a medicine, tidies a draft, reads an
+   * order they placed, chases a return, and checks what they owe — and until
+   * now not one of those endpoints appeared in the specification, so the
+   * published API described a product a customer cannot actually use.
+   *
+   * The roles below are checked against the mounted router by
+   * `routeCoverage.test.ts`, so they are the server's answer rather than an
+   * intention. Two of them are worth reading twice: `/finance/my/collections`
+   * sits among the shop owner's endpoints and belongs to a **delivery rider**,
+   * and `/orders/drafts/{id}` admits `SALES` because a rep tidying a draft they
+   * built for a customer is the same action.
+   */
+  {
+    method: 'get',
+    path: '/api/v1/shops/my',
+    summary: 'The signed-in owner’s own shop',
+    tag: 'Shops',
+    roles: [UserRole.SHOP_OWNER],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/inventory/medicines/{id}',
+    summary: 'One medicine, with its current availability',
+    tag: 'Inventory',
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER, UserRole.SHOP_OWNER, UserRole.SALES],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/orders/{id}',
+    summary: 'One order, scoped to what the caller may see',
+    tag: 'Orders',
+    roles: [...MANAGEMENT, UserRole.SALES, UserRole.SHOP_OWNER],
+  },
+  {
+    method: 'delete',
+    path: '/api/v1/orders/drafts/{id}',
+    summary: 'Discard a draft order that was never submitted',
+    tag: 'Orders',
+    roles: [...MANAGEMENT, UserRole.SALES, UserRole.SHOP_OWNER],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/returns/{id}',
+    summary: 'One return, scoped to what the caller may see',
+    tag: 'Returns',
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER, UserRole.SHOP_OWNER, UserRole.DELIVERY_PERSON],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/finance/my/summary',
+    summary: 'What the signed-in owner’s shop owes, and by when',
+    tag: 'Finance',
+    roles: [UserRole.SHOP_OWNER],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/finance/my/invoices',
+    summary: 'The signed-in owner’s own invoices',
+    tag: 'Finance',
+    roles: [UserRole.SHOP_OWNER],
+    query: ['status', 'page', 'limit'],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/finance/my/statement',
+    summary: 'The signed-in owner’s account statement over a period',
+    tag: 'Finance',
+    roles: [UserRole.SHOP_OWNER],
+    query: ['from', 'to', 'format'],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/finance/my/collections',
+    summary: 'The cash a rider has collected and not yet handed over',
+    tag: 'Finance',
+    // Not the shop owner's, despite the path it shares with the three above.
+    roles: [UserRole.DELIVERY_PERSON],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/notifications/unread-count',
+    summary: 'How many notifications the signed-in user has not read',
+    tag: 'Notifications',
+    roles: ALL_ROLES,
+  },
+  {
+    method: 'get',
+    path: '/api/v1/notifications/preferences',
+    summary: 'The signed-in user’s own notification settings',
+    tag: 'Notifications',
+    roles: ALL_ROLES,
+  },
+  {
+    method: 'get',
+    path: '/api/v1/activity/timeline',
+    summary: 'The signed-in user’s recent activity',
+    tag: 'Activity',
+    roles: ALL_ROLES,
+    query: ['entityType', 'entityId', 'page', 'limit'],
+  },
 ];
 
 /** JSON Schema for a Zod schema, expressed for a request body. */
