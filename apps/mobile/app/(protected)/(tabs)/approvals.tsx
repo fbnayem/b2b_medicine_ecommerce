@@ -1,85 +1,105 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { Order, Shop } from '@medsupply/shared-types';
+import { errorMessage } from '@medsupply/api-client';
 import { apiClient } from '../../../src/api/client';
 import { formatMoneyMinor } from '../../../src/finance/money';
+import { useLanguage } from '../../../src/i18n/useLanguage';
+import {
+  CardLink,
+  EmptyState,
+  ErrorState,
+  ListRow,
+  LoadingState,
+  Screen,
+  StatusPill,
+} from '../../../src/components';
+import { colour, layout } from '../../../src/theme';
+
 export default function ApprovalsScreen() {
+  const { t, language } = useLanguage();
   const [data, setData] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const load = useCallback(async (refresh = false) => {
-    if (refresh) setRefreshing(true);
-    else setLoading(true);
-    try {
-      setData((await apiClient.get('/approvals/queue')).data.data);
-      setError('');
-    } catch {
-      setError('Unable to load approvals.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+
+  const load = useCallback(
+    async (refresh = false) => {
+      if (refresh) setRefreshing(true);
+      else setLoading(true);
+      try {
+        setData((await apiClient.get('/approvals/queue')).data.data);
+        setError('');
+      } catch (caught) {
+        setError(errorMessage(caught, language, t('approvals.couldNotLoad')));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [language, t],
+  );
+
   useEffect(() => {
     void load();
   }, [load]);
-  if (loading)
+
+  if (loading) {
     return (
-      <View style={s.center}>
-        <ActivityIndicator />
-      </View>
+      <Screen>
+        <LoadingState label={t('approvals.loading')} />
+      </Screen>
     );
+  }
+
   return (
-    <View style={s.screen}>
-      {error ? <Text style={s.error}>{error}</Text> : null}
+    <Screen scroll={false}>
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
       <FlatList
         data={data}
         keyExtractor={(item) => item._id}
+        contentContainerStyle={{ gap: layout.space[3], paddingBottom: layout.space[6] }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />
         }
         ListEmptyComponent={
-          <View style={s.center}>
-            <Text>No approvals waiting.</Text>
-          </View>
+          <EmptyState title={t('approvals.none')} description={t('approvals.noneBody')} />
         }
         renderItem={({ item }) => {
           const shop = item.shopId as Shop;
           return (
-            <Pressable
-              style={s.card}
+            <CardLink
+              accessibilityLabel={item.reference}
               onPress={() =>
                 router.push({ pathname: '/(protected)/approval-review', params: { id: item._id } })
               }
             >
-              <View style={s.row}>
-                <Text style={s.title}>{item.reference}</Text>
-                <Text>{item.status.replaceAll('_', ' ')}</Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: layout.space[2],
+                }}
+              >
+                <Text
+                  style={{ fontSize: layout.fontSize.lg, fontWeight: '600', color: colour.text }}
+                >
+                  {item.reference}
+                </Text>
+                <StatusPill kind="order" status={item.status} />
               </View>
-              <Text>{shop.name}</Text>
-              <Text>{formatMoneyMinor(item.estimatedTotalMinor)}</Text>
-            </Pressable>
+              <Text style={{ color: colour.text }}>{shop.name}</Text>
+              <ListRow
+                label={t('approvals.estimate')}
+                value={formatMoneyMinor(item.estimatedTotalMinor)}
+                numeric
+              />
+            </CardLink>
           );
         }}
       />
-    </View>
+    </Screen>
   );
 }
-const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5', padding: 14 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  card: { backgroundColor: '#fff', padding: 15, borderRadius: 12, marginBottom: 9 },
-  row: { flexDirection: 'row', justifyContent: 'space-between' },
-  title: { fontWeight: '700' },
-  error: { color: '#8b2525', padding: 12 },
-});

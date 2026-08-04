@@ -1,12 +1,27 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { FinanceCard, FinanceState, StatusBadge } from '../../../src/finance/components';
-import { apiErrorMessage, getMyFinanceSummary } from '../../../src/finance/api';
+import { errorMessage } from '@medsupply/api-client';
+import { getMyFinanceSummary } from '../../../src/finance/api';
 import { formatMoneyMinor, formatPercentFromBasisPoints } from '../../../src/finance/money';
 import type { ShopFinanceSummary } from '../../../src/finance/types';
+import { useLanguage } from '../../../src/i18n/useLanguage';
+import {
+  Button,
+  Card,
+  CardLink,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  Metric,
+  Screen,
+  SectionTitle,
+  StatusPill,
+} from '../../../src/components';
+import { colour, layout } from '../../../src/theme';
 
 export default function AccountScreen() {
+  const { t, language } = useLanguage();
   const [summary, setSummary] = useState<ShopFinanceSummary>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -17,26 +32,44 @@ export default function AccountScreen() {
       setSummary(await getMyFinanceSummary());
       setError('');
     } catch (caught) {
-      setError(apiErrorMessage(caught, 'Unable to load your account summary.'));
+      setError(errorMessage(caught, language, t('account.couldNotLoad')));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [language, t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (loading || (!summary && error)) {
-    return <FinanceState loading={loading} error={error} onRetry={() => void load()} />;
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState label={t('account.loading')} />
+      </Screen>
+    );
   }
-  if (!summary) return <FinanceState empty="No shop account is linked to this user." />;
+
+  if (!summary) {
+    return (
+      <Screen>
+        {error ? (
+          <ErrorState message={error} onRetry={() => void load()} />
+        ) : (
+          <EmptyState
+            title={t('account.noShopLinked')}
+            description={t('account.noShopLinkedBody')}
+          />
+        )}
+      </Screen>
+    );
+  }
 
   return (
     <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
+      style={{ flex: 1, backgroundColor: colour.canvas }}
+      contentContainerStyle={{ padding: layout.space[4], gap: layout.space[3] }}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -47,124 +80,99 @@ export default function AccountScreen() {
         />
       }
     >
-      {error ? <Text style={styles.warning}>{error}</Text> : null}
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+
       {summary.creditBlocked ? (
-        <View style={styles.blocked}>
-          <Text style={styles.blockedTitle}>Credit orders are blocked</Text>
-          <Text style={styles.blockedText}>
-            {summary.blockReason ?? 'Contact your account manager.'}
+        <Card style={{ borderColor: colour.danger }}>
+          <Text
+            accessibilityRole="header"
+            style={{ color: colour.danger, fontWeight: '700', fontSize: layout.fontSize.lg }}
+          >
+            {t('account.creditBlockedTitle')}
           </Text>
-        </View>
+          <Text style={{ color: colour.text }}>
+            {summary.blockReason ?? t('account.creditBlockedBody')}
+          </Text>
+          {/*
+           * The banner used to be a dead end — a red box telling a shop owner
+           * their account was blocked, with nothing to press. The statement is
+           * where they can see which invoices caused it.
+           */}
+          <Button
+            variant="secondary"
+            label={t('account.seeWhatIsOwed')}
+            onPress={() => router.push('/(protected)/statement')}
+          />
+        </Card>
       ) : null}
-      <FinanceCard>
-        <View style={styles.headingRow}>
-          <View>
-            <Text style={styles.shopName}>{summary.shop.name}</Text>
-            <Text style={styles.reference}>{summary.shop.reference}</Text>
+
+      <Card>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: layout.space[3],
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: layout.fontSize.xl, fontWeight: '700', color: colour.text }}>
+              {summary.shop.name}
+            </Text>
+            <Text style={{ color: colour.textMuted }}>{summary.shop.reference}</Text>
           </View>
-          <StatusBadge value={summary.shop.status} />
+          <StatusPill kind="shop" status={summary.shop.status} />
         </View>
-      </FinanceCard>
-      <View style={styles.grid}>
+      </Card>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: layout.space[3] }}>
         <Metric
-          label="Current due"
+          label={t('account.currentDue')}
           value={formatMoneyMinor(summary.outstandingBalanceMinor)}
-          warning={summary.outstandingBalanceMinor > 0}
+          tone={summary.outstandingBalanceMinor > 0 ? 'warning' : 'normal'}
         />
         <Metric
-          label="Overdue"
+          label={t('account.overdue')}
           value={formatMoneyMinor(summary.overdueBalanceMinor)}
-          warning={summary.overdueBalanceMinor > 0}
+          tone={summary.overdueBalanceMinor > 0 ? 'warning' : 'normal'}
         />
-        <Metric label="Available credit" value={formatMoneyMinor(summary.availableCreditMinor)} />
-        <Metric label="Credit limit" value={formatMoneyMinor(summary.creditLimitMinor)} />
         <Metric
-          label="Credit used"
+          label={t('account.availableCredit')}
+          value={formatMoneyMinor(summary.availableCreditMinor)}
+        />
+        <Metric
+          label={t('account.creditLimit')}
+          value={formatMoneyMinor(summary.creditLimitMinor)}
+        />
+        <Metric
+          label={t('account.creditUsed')}
           value={formatPercentFromBasisPoints(summary.creditUtilisationBps)}
         />
-        <Metric label="Payment terms" value={`${summary.paymentTermsDays} days`} />
+        <Metric
+          label={t('account.paymentTerms')}
+          value={t('account.days', { count: summary.paymentTermsDays })}
+        />
       </View>
-      <Text style={styles.section}>Account records</Text>
-      <AccountLink label="Invoices" onPress={() => router.push('/(protected)/invoices')} />
-      <AccountLink
-        label="Payment history and receipts"
+
+      <SectionTitle>{t('account.records')}</SectionTitle>
+      <CardLink
+        accessibilityLabel={t('account.invoices')}
+        onPress={() => router.push('/(protected)/invoices')}
+      >
+        <Text style={{ color: colour.text, fontWeight: '600' }}>{t('account.invoices')}</Text>
+      </CardLink>
+      <CardLink
+        accessibilityLabel={t('account.paymentHistory')}
         onPress={() => router.push('/(protected)/payments')}
-      />
-      <AccountLink
-        label="Account statement"
+      >
+        <Text style={{ color: colour.text, fontWeight: '600' }}>{t('account.paymentHistory')}</Text>
+      </CardLink>
+      <CardLink
+        accessibilityLabel={t('account.statement')}
         onPress={() => router.push('/(protected)/statement')}
-      />
+      >
+        <Text style={{ color: colour.text, fontWeight: '600' }}>{t('account.statement')}</Text>
+      </CardLink>
     </ScrollView>
   );
 }
-
-function Metric({
-  label,
-  value,
-  warning = false,
-}: {
-  label: string;
-  value: string;
-  warning?: boolean;
-}) {
-  return (
-    <View style={styles.metric}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={[styles.metricValue, warning && styles.warningValue]}>{value}</Text>
-    </View>
-  );
-}
-
-function AccountLink({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="button" style={styles.link} onPress={onPress}>
-      <Text style={styles.linkText}>{label}</Text>
-      <Text style={styles.chevron}>›</Text>
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  content: { padding: 14, gap: 12 },
-  warning: { color: '#7b5311', backgroundColor: '#fff4d6', padding: 10, borderRadius: 8 },
-  blocked: {
-    backgroundColor: '#fff0ee',
-    borderColor: '#e4aaa3',
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 13,
-  },
-  blockedTitle: { color: '#8b2525', fontWeight: '900' },
-  blockedText: { color: '#71332d', marginTop: 4 },
-  headingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  shopName: { fontSize: 21, fontWeight: '900', color: '#173f2e' },
-  reference: { color: '#66756d', marginTop: 3 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  metric: {
-    width: '48%',
-    minWidth: 145,
-    flexGrow: 1,
-    backgroundColor: '#fff',
-    borderRadius: 11,
-    padding: 13,
-  },
-  metricLabel: { color: '#66756d', fontSize: 12 },
-  metricValue: { color: '#173f2e', fontWeight: '900', fontSize: 18, marginTop: 5 },
-  warningValue: { color: '#9b2c2c' },
-  section: { fontSize: 17, fontWeight: '900', marginTop: 5 },
-  link: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  linkText: { color: '#173f2e', fontWeight: '800' },
-  chevron: { color: '#126b45', fontSize: 20, lineHeight: 18 },
-});

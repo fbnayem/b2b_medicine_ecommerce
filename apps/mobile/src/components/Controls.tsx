@@ -86,6 +86,72 @@ export function Button({
   );
 }
 
+export interface FilterOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * A row of queue filters, announced as the toggles they are.
+ *
+ * Every queue screen built its own row of `Pressable`s coloured by an `active`
+ * style, so which filter was applied was visible and silent — a screen reader
+ * read six identically-named buttons with no indication of which one was on.
+ * `aria-pressed`'s React Native equivalent is `accessibilityState.selected`,
+ * and it is the whole reason this is a component rather than a style.
+ */
+export function FilterChips({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: readonly FilterOption[];
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  return (
+    <View
+      accessibilityRole="tablist"
+      accessibilityLabel={label}
+      style={{ flexDirection: 'row', flexWrap: 'wrap', gap: layout.space[2] }}
+    >
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <Pressable
+            key={option.value || 'all'}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            accessibilityLabel={option.label}
+            onPress={() => onChange(option.value)}
+            style={{
+              minHeight: layout.minTapTarget,
+              justifyContent: 'center',
+              paddingHorizontal: layout.space[3],
+              borderRadius: layout.radius.full,
+              borderWidth: 1,
+              borderColor: selected ? colour.brand : colour.border,
+              backgroundColor: selected ? colour.brand : colour.surface,
+            }}
+          >
+            <Text
+              style={{
+                color: selected ? colour.onBrand : colour.text,
+                fontWeight: '600',
+                fontSize: layout.fontSize.sm,
+              }}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export interface FieldProps {
   label: string;
   hint?: string;

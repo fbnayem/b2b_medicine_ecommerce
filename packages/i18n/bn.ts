@@ -1165,6 +1165,14 @@ export const bn: Catalogue = {
     paymentMethod: 'কীভাবে দিয়েছেন',
     paymentTaken: 'টাকা নথিভুক্ত হয়েছে।',
     paymentFailed: 'টাকাটি নথিভুক্ত করা যায়নি।',
+    offlineNotice: 'অফলাইন — সর্বশেষ ডাউনলোড করা কাজ দেখানো হচ্ছে।',
+    unsynced: '{{count}}টি কাজ এখনও পাঠানো হয়নি · আবার চেষ্টা করতে চাপুন',
+    noCached: 'কোনও কাজ ডাউনলোড হয়নি',
+    noCachedBody: 'একবার সংযোগ পেলে আপনার রাউন্ড অফলাইনের জন্য সংরক্ষিত হবে।',
+    noneActive: 'কোনও ডেলিভারি দেওয়া হয়নি',
+    noneActiveBody: 'প্যাকেজ হাতে পেলে এখানে দেখা যাবে।',
+    packages: '{{count}}টি প্যাকেজ',
+    expected: 'প্রত্যাশিত',
   },
 
   deliveryDetail: {
@@ -1530,6 +1538,21 @@ export const bn: Catalogue = {
     recentPayments: 'সাম্প্রতিক জমা',
     viewAll: 'সব দেখুন',
     noPayments: 'এখনও কোনও জমা নথিভুক্ত হয়নি।',
+    creditBlockedTitle: 'নতুন বাকিতে অর্ডার বন্ধ আছে',
+    creditBlockedBody:
+      'আপনার অ্যাকাউন্ট ম্যানেজারের সঙ্গে কথা বলুন। মেয়াদোত্তীর্ণ টাকা পরিশোধ করলে বাধা উঠে যাবে।',
+    contactManager: 'আপনার অ্যাকাউন্ট ম্যানেজারের সঙ্গে যোগাযোগ করুন।',
+    seeWhatIsOwed: 'কী বাকি আছে দেখুন',
+    noShopLinked: 'এই সাইন-ইনের সঙ্গে কোনও দোকান যুক্ত নেই',
+    noShopLinkedBody: 'প্রশাসককে বলুন আপনার অ্যাকাউন্টটি একটি দোকানের সঙ্গে যুক্ত করতে।',
+    currentDue: 'এখন বাকি',
+    overdue: 'মেয়াদোত্তীর্ণ',
+    availableCredit: 'বাকি সীমার অবশিষ্ট',
+    creditLimit: 'বাকির সীমা',
+    creditUsed: 'ব্যবহৃত বাকি',
+    paymentTerms: 'পরিশোধের শর্ত',
+    days: '{{count}} দিন',
+    records: 'হিসাবের নথি',
   },
 
   statement: {

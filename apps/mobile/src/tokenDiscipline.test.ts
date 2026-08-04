@@ -56,13 +56,9 @@ const SOURCES: ReadonlyMap<string, string> = new Map(
  * answer, not a special case.
  */
 const RAW_HEX: readonly string[] = [
-  'app/(protected)/(tabs)/account.tsx',
   'app/(protected)/(tabs)/analytics.tsx',
-  'app/(protected)/(tabs)/approvals.tsx',
-  'app/(protected)/(tabs)/deliveries.tsx',
   'app/(protected)/(tabs)/inventory.tsx',
   'app/(protected)/(tabs)/notifications.tsx',
-  'app/(protected)/(tabs)/returns.tsx',
   'app/(protected)/(tabs)/security.tsx',
   'app/(protected)/(tabs)/system-settings.tsx',
   'app/(protected)/approval-review.tsx',

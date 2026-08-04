@@ -1,37 +1,50 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Text, RefreshControl, View } from 'react-native';
 import { router } from 'expo-router';
-import { UserRole } from '@medsupply/shared-types';
-import { FinanceState } from '../../../src/finance/components';
-import { apiErrorMessage } from '../../../src/finance/api';
+import { ReturnStatus, UserRole } from '@medsupply/shared-types';
+import { errorMessage } from '@medsupply/api-client';
 import { formatFinanceDate } from '../../../src/finance/date';
 import { formatMoneyMinor } from '../../../src/finance/money';
-import { getReturns, returnStatusLabel, type ReturnSummary } from '../../../src/returns/api';
+import { getReturns, type ReturnSummary } from '../../../src/returns/api';
 import { useAuthStore } from '../../../src/store/useAuth';
+import { useLanguage } from '../../../src/i18n/useLanguage';
+import {
+  CardLink,
+  EmptyState,
+  ErrorState,
+  FilterChips,
+  ListRow,
+  LoadingState,
+  Screen,
+  StatusPill,
+} from '../../../src/components';
+import { colour, layout } from '../../../src/theme';
 
 const named = (value: ReturnSummary['shopId']) =>
   typeof value === 'object' && value ? value : undefined;
 
 /** Each role opens on the queue it actually works, not the full list. */
 function defaultStatus(role?: UserRole) {
-  if (role === UserRole.STOREKEEPER) return 'COLLECTED';
-  if (role === UserRole.DELIVERY_PERSON) return 'APPROVED';
+  if (role === UserRole.STOREKEEPER) return ReturnStatus.COLLECTED;
+  if (role === UserRole.DELIVERY_PERSON) return ReturnStatus.APPROVED;
   return '';
 }
 
-const FILTERS = [
-  { value: '', label: 'All' },
-  { value: 'REQUESTED', label: 'Requested' },
-  { value: 'APPROVED', label: 'Approved' },
-  { value: 'COLLECTED', label: 'Collected' },
-  { value: 'RECEIVED', label: 'Awaiting credit' },
-  { value: 'COMPLETED', label: 'Completed' },
-];
+/** Order only. The words come from the catalogue, like every other status. */
+const FILTER_ORDER = [
+  '',
+  ReturnStatus.REQUESTED,
+  ReturnStatus.APPROVED,
+  ReturnStatus.COLLECTED,
+  ReturnStatus.RECEIVED,
+  ReturnStatus.COMPLETED,
+] as const;
 
 export default function ReturnsScreen() {
+  const { t, language } = useLanguage();
   const role = useAuthStore((state) => state.user?.role);
   const [items, setItems] = useState<ReturnSummary[]>([]);
-  const [status, setStatus] = useState(() => defaultStatus(role));
+  const [status, setStatus] = useState<string>(() => defaultStatus(role));
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -42,126 +55,113 @@ export default function ReturnsScreen() {
       setItems(result.items);
       setError('');
     } catch (caught) {
-      setError(apiErrorMessage(caught, 'Unable to load returns.'));
+      setError(errorMessage(caught, language, t('returns.couldNotLoad')));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [status]);
+  }, [status, language, t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (loading) return <FinanceState loading />;
-  if (!items.length && error) return <FinanceState error={error} onRetry={() => void load()} />;
-
   return (
-    <View style={styles.screen}>
-      <View style={styles.filters}>
-        {FILTERS.map((filter) => (
-          <Pressable
-            accessibilityRole="button"
-            key={filter.value || 'all'}
-            style={[styles.filter, status === filter.value ? styles.filterActive : null]}
-            onPress={() => {
-              setLoading(true);
-              setStatus(filter.value);
-            }}
-          >
-            <Text style={status === filter.value ? styles.filterTextActive : styles.filterText}>
-              {filter.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-      {error ? (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {error}
-        </Text>
-      ) : null}
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item._id}
-        contentContainerStyle={items.length ? styles.list : styles.emptyList}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              void load();
-            }}
-          />
-        }
-        ListEmptyComponent={
-          <FinanceState
-            empty={status ? 'No returns are in this state.' : 'No returns have been requested yet.'}
-          />
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            accessibilityRole="button"
-            style={styles.card}
-            onPress={() =>
-              router.push({ pathname: '/(protected)/return-detail', params: { id: item._id } })
-            }
-          >
-            <View style={styles.row}>
-              <Text style={styles.reference}>{item.reference}</Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{returnStatusLabel(item.status)}</Text>
-              </View>
-            </View>
-            <Text style={styles.amount}>
-              {formatMoneyMinor(
-                item.approvedTotalMinor > 0 ? item.approvedTotalMinor : item.requestedTotalMinor,
-              )}
-            </Text>
-            {role === UserRole.SHOP_OWNER ? null : (
-              <Text>{named(item.shopId)?.name ?? 'Unknown shop'}</Text>
-            )}
-            <Text>Invoice {named(item.invoiceId)?.reference ?? '—'}</Text>
-            <Text style={styles.muted}>
-              {item.primaryReason.replaceAll('_', ' ').toLowerCase()} ·{' '}
-              {formatFinanceDate(item.requestedAt)}
-            </Text>
-            {item.creditNoteReference ? (
-              <Text style={styles.credit}>Credit note {item.creditNoteReference}</Text>
-            ) : null}
-          </Pressable>
-        )}
+    <Screen scroll={false}>
+      <FilterChips
+        label={t('returns.allStatuses')}
+        value={status}
+        onChange={(next) => {
+          setLoading(true);
+          setStatus(next);
+        }}
+        options={FILTER_ORDER.map((value) => ({
+          value,
+          label: value ? t(`returnStatus.${value}`) : t('returns.allStatuses'),
+        }))}
       />
-    </View>
+
+      {loading ? (
+        <LoadingState label={t('returns.loading')} />
+      ) : (
+        <>
+          {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+          <FlatList
+            data={items}
+            keyExtractor={(item) => item._id}
+            contentContainerStyle={{ gap: layout.space[3], paddingBottom: layout.space[6] }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  setRefreshing(true);
+                  void load();
+                }}
+              />
+            }
+            ListEmptyComponent={
+              <EmptyState
+                title={status ? t('returns.noneFiltered') : t('returns.none')}
+                description={status ? undefined : t('returns.noneBody')}
+              />
+            }
+            renderItem={({ item }) => (
+              <CardLink
+                accessibilityLabel={item.reference}
+                onPress={() =>
+                  router.push({ pathname: '/(protected)/return-detail', params: { id: item._id } })
+                }
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: layout.space[2],
+                  }}
+                >
+                  <Text style={{ color: colour.brand, fontWeight: '600' }}>{item.reference}</Text>
+                  {/* Was `returnStatusLabel()` in src/returns/api.ts — a third
+                      set of status words, English in both languages. */}
+                  <StatusPill kind="return" status={item.status} />
+                </View>
+                <Text
+                  style={{
+                    fontSize: layout.fontSize.xl,
+                    fontWeight: '700',
+                    color: colour.text,
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {formatMoneyMinor(
+                    item.approvedTotalMinor > 0
+                      ? item.approvedTotalMinor
+                      : item.requestedTotalMinor,
+                  )}
+                </Text>
+                {role === UserRole.SHOP_OWNER ? null : (
+                  <ListRow label={t('finance.shop')} value={named(item.shopId)?.name ?? '—'} />
+                )}
+                <ListRow
+                  label={t('returns.invoice')}
+                  value={named(item.invoiceId)?.reference ?? '—'}
+                />
+                <ListRow
+                  label={t('returns.columnReason')}
+                  value={t(`returnReason.${item.primaryReason}`)}
+                />
+                <ListRow
+                  label={t('returns.columnRequested')}
+                  value={formatFinanceDate(item.requestedAt)}
+                />
+                {item.creditNoteReference ? (
+                  <ListRow label={t('returnDetail.creditNote')} value={item.creditNoteReference} />
+                ) : null}
+              </CardLink>
+            )}
+          />
+        </>
+      )}
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, padding: 12 },
-  filter: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, backgroundColor: '#fff' },
-  filterActive: { backgroundColor: '#126b45' },
-  filterText: { color: '#274b3b', fontSize: 12, fontWeight: '600' },
-  filterTextActive: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  list: { padding: 14, gap: 10 },
-  emptyList: { flexGrow: 1 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 15, gap: 4 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  reference: { color: '#126b45', fontWeight: '900', fontSize: 17 },
-  amount: { color: '#173f2e', fontWeight: '900', fontSize: 21, marginTop: 3 },
-  badge: {
-    backgroundColor: '#eef6f1',
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-  },
-  badgeText: { color: '#274b3b', fontSize: 11, fontWeight: '700' },
-  muted: { color: '#66756d', marginTop: 3 },
-  credit: { color: '#126b45', fontWeight: '700', marginTop: 4 },
-  error: {
-    color: '#8b2525',
-    backgroundColor: '#fff0ee',
-    padding: 10,
-    marginHorizontal: 14,
-    borderRadius: 8,
-  },
-});
