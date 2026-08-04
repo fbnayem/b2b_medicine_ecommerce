@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { navItemsFor, type NavGroup } from '@medsupply/navigation';
 import type { UserRole } from '@medsupply/shared-types';
+import { translatedOr } from '@medsupply/i18n';
 import { useAuthStore } from '../store/useAuth';
 import { useBranding } from '../lib/useBranding';
 import { Card, PageHeader } from '../components/ui';
@@ -68,7 +69,9 @@ export function Dashboard() {
                   to={item.path}
                   className="flex h-full flex-col gap-1 rounded-lg p-4 hover:bg-surface-hover"
                 >
-                  <span className="text-lg font-semibold text-text">{item.label}</span>
+                  <span className="text-lg font-semibold text-text">
+                    {translatedOr(t, `navItem.${item.id}`, item.label)}
+                  </span>
                   {/*
                     `t()` returns the key when it has no entry, which would put
                     "purpose.checkout" on a tile. Not every navigable screen

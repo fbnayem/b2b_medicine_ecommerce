@@ -9,6 +9,7 @@ import {
   NotificationChannel,
   PaymentMethod,
   PaymentStatus,
+  PurchaseOrderStatus,
   ReturnReason,
   ReturnStatus,
   ShopStatus,
@@ -104,6 +105,7 @@ export const en = {
     subtitle: 'Everything you can do in {{business}}, grouped by what it is for.',
     groupWork: 'Work',
     groupCatalogue: 'Catalogue',
+    groupPurchasing: 'Buying in',
     groupMoney: 'Money',
     groupInsight: 'Reports',
     groupAdministration: 'Administration',
@@ -1518,6 +1520,156 @@ export const en = {
     badAmount: 'Enter an amount like 12.50.',
   },
 
+  /**
+   * Buying in: suppliers, purchase orders, goods receipt, the batch trace and
+   * the prescription register.
+   *
+   * Every endpoint behind these has existed and been tested since phase 6 and
+   * appeared in none of the 51 navigation items, so for four phases the only
+   * way to reach any of it was curl.
+   */
+  purchasing: {
+    suppliersTitle: 'Suppliers',
+    allStatuses: 'All',
+    suppliersSubtitle: 'Who you buy from, and the licences that let them sell to you.',
+    suppliersLoading: 'Loading suppliers',
+    suppliersCouldNotLoad: 'The suppliers could not be loaded.',
+    suppliersNone: 'No suppliers yet',
+    suppliersNoneBody: 'Add the companies you buy from. A purchase order needs one.',
+    addSupplier: 'Add a supplier',
+    showInactive: 'Include ones you no longer buy from',
+    supplierName: 'Company name',
+    contactName: 'Who to ask for',
+    paymentTerms: 'Days to pay',
+    licence: 'Drug licence',
+    licenceExpiry: 'Licence expires',
+    licenceExpired: 'Expired',
+    licenceSoon: 'expires soon',
+    noLicenceRecorded: 'None recorded',
+    active: 'Buying from them',
+    inactive: 'Not buying from them',
+    supplierSaved: '{{name}} added.',
+    supplierFailed: 'That supplier could not be added.',
+    newSupplierTitle: 'Add a supplier',
+    newSupplierSubtitle:
+      'The licence number and its expiry are what an inspection asks for, so record them if you have them.',
+    saveSupplier: 'Add this supplier',
+
+    ordersTitle: 'Purchase orders',
+    ordersSubtitle: 'What you have ordered in, and how much of it has arrived.',
+    ordersLoading: 'Loading purchase orders',
+    ordersCouldNotLoad: 'The purchase orders could not be loaded.',
+    ordersNone: 'No purchase orders yet',
+    ordersNoneBody: 'Raise one to order stock from a supplier.',
+    raiseOrder: 'Raise a purchase order',
+    supplier: 'Supplier',
+    expectedDate: 'Expected',
+    supplierReference: 'Their reference',
+    supplierReferenceHint:
+      'The number on their paperwork, so a paper invoice can be matched to this.',
+    lines: '{{count}} lines',
+    ordered: 'Ordered',
+    received: 'Arrived',
+    outstanding: 'Still to come',
+    unitCost: 'Cost each',
+    lineTotal: 'Line total',
+    orderTotal: 'Order total',
+    orderLoading: 'Loading this purchase order',
+    orderCouldNotLoad: 'This purchase order could not be loaded.',
+    backToOrders: 'Back to purchase orders',
+    orderLines: 'What was ordered',
+    receipts: 'What has arrived',
+    noReceipts: 'Nothing has arrived against this order yet.',
+    receiptOn: 'Received {{when}}',
+    receiveTitle: 'Book in what arrived',
+    receiveBody:
+      'Count the cartons on the bay and enter what is actually there. What you enter becomes sellable stock, so it has to match the shelf.',
+    receiveLine: 'Booking in {{brand}}',
+    batchNumber: 'Batch number on the carton',
+    manufacturingDate: 'Made on',
+    expiryDate: 'Expires on',
+    receivedQuantity: 'How many arrived',
+    warehouseLocation: 'Where you are putting it',
+    supplierBatchReference: 'Their batch reference',
+    varianceReason: 'Why fewer than ordered',
+    varianceReasonHint:
+      'Required when less arrives than was ordered. It is what you take back to the supplier.',
+    supplierInvoiceReference: 'Their delivery note or invoice number',
+    confirmReceipt: 'Book this in',
+    receiptSaved: 'Booked in. The stock is now sellable.',
+    receiptFailed: 'That could not be booked in.',
+    nothingToReceive: 'Every line on this order has arrived in full.',
+    addLine: 'Add another medicine',
+    removeLine: 'Remove this line',
+    chooseMedicine: 'Which medicine',
+    quantity: 'How many',
+    needSupplierAndLine: 'Choose a supplier and at least one medicine with a quantity.',
+    orderRaised: 'Purchase order {{reference}} raised.',
+    orderFailed: 'That purchase order could not be raised.',
+    newOrderTitle: 'Raise a purchase order',
+    newOrderSubtitle: 'What you are ordering, from whom, and what you expect to pay for it.',
+    saveOrder: 'Raise this order',
+    badAmount: 'Enter an amount like 12.50.',
+
+    recallTitle: 'Trace a batch',
+    recallSubtitle:
+      'Given a batch: who has it, and where it came from. Looking changes nothing, so check freely.',
+    recallSearchLabel: 'Batch number printed on the carton',
+    recallSearchHint: 'The number on the supplier notice, not an internal identifier.',
+    recallSearch: 'Find it',
+    recallNoMatch: 'No batch carries that number',
+    recallNoMatchBody:
+      'Check the number against the carton. The same number can also belong to more than one medicine.',
+    recallCandidates: 'Batches with that number',
+    recallStartHere: 'Enter a batch number to begin',
+    recallStartBody:
+      'Nothing is recalled by looking. This only answers who received it and where it came from.',
+    recallTracing: 'Tracing this batch',
+    recallCouldNotTrace: 'That batch could not be traced.',
+    recallChoose: 'Trace this one',
+    onHand: 'Still on the shelf',
+    forwardTitle: 'Who received it',
+    forwardBody: 'Every shop this batch reached, with the number to ring.',
+    forwardNone: 'None of this batch has left the warehouse.',
+    backwardTitle: 'Where it came from',
+    predatesPurchasing:
+      'This batch was booked in before purchase orders were recorded, so there is no supplier against it. That is a different answer from "we do not know", and it is the one to give an inspector.',
+    despatched: 'Sent out',
+    stillHeld: 'Still held',
+    unaccounted: 'Cannot be accounted for',
+    unaccountedBody:
+      'Received, less what went out, less what is on the shelf. Anything other than zero is damaged, expired, written off or returned stock, and it is a question to answer before a recall is closed.',
+    shopsAffected: 'Shops affected',
+    quantitySent: 'How many',
+    invoicedOn: 'Invoiced',
+    deliveredOn: 'Delivered',
+    receivedBy: 'Signed for by',
+    blocked: 'Blocked',
+    quarantined: 'Held back',
+
+    registerTitle: 'Prescription register',
+    registerSubtitle:
+      'What came in and what went out for every prescription medicine, and whether the arithmetic matches the shelf.',
+    registerLoading: 'Building the register',
+    registerCouldNotLoad: 'The register could not be built.',
+    registerNone: 'No prescription medicines are recorded',
+    registerNoneBody: 'A medicine has to be marked as prescription-only to appear here.',
+    from: 'From',
+    to: 'To',
+    apply: 'Show this period',
+    opening: 'At the start',
+    closing: 'At the end',
+    variance: 'Difference',
+    varianceHint:
+      'What the movements say, against what the shelf says. Anything other than zero is a question somebody has to answer.',
+    writtenOff: 'Written off',
+    returned: 'Returned',
+    byShopTitle: 'Which shops bought them',
+    byShopNone: 'No prescription medicines were sold in this period.',
+    invoices: 'On invoices',
+    badRange: 'Give a start date before the end date.',
+  },
+
   inventory: {
     title: 'Stock',
     subtitle: 'What is on the shelf, what it is doing, and every movement that got it there.',
@@ -1840,6 +1992,8 @@ export const en = {
 
   nav: {
     sections: 'Sections',
+    breadcrumb: 'Where you are',
+    searchSections: 'Search sections',
     goTo: 'Go to…',
     myAccount: 'My account',
     appearance: 'Appearance',
@@ -1859,6 +2013,89 @@ export const en = {
    * the seventeen headers a rider or a storekeeper reads at the top of a pushed
    * screen, and they were the last hard-coded English on that client's chrome.
    */
+  /**
+   * The sidebar, the tab bar and the search results.
+   *
+   * `NAV_ITEMS` and `NAV_GROUP_LABEL` carry English labels because
+   * `@medsupply/navigation` is shared with a client that has no catalogue
+   * dependency and must stay plain data. That meant the one part of the
+   * interface present on **every** screen — the navigation itself — stayed in
+   * English when the language was switched, which reads as the switch being
+   * broken rather than as a translation gap.
+   *
+   * Keyed by the navigation id, so a renamed label does not silently orphan a
+   * translation, and an id with no entry falls back to the English label rather
+   * than rendering a dotted path.
+   */
+  navGroup: {
+    work: 'Work',
+    catalogue: 'Catalogue',
+    purchasing: 'Buying in',
+    money: 'Money',
+    insight: 'Reports',
+    administration: 'Administration',
+    account: 'My account',
+  } as Record<string, string>,
+
+  navItem: {
+    dashboard: 'Home',
+    orders: 'Orders',
+    'order-detail': 'Order',
+    approvals: 'Approvals',
+    'approval-review': 'Review order',
+    fulfilment: 'Picking',
+    'fulfilment-work': 'Pick list',
+    'fulfilment-ready': 'Ready to hand over',
+    deliveries: 'Deliveries',
+    'delivery-detail': 'Delivery',
+    returns: 'Returns',
+    'return-detail': 'Return',
+    'return-new': 'Request a return',
+    medicines: 'Medicines',
+    'medicine-detail': 'Medicine',
+    'medicine-new': 'Add a medicine',
+    inventory: 'Stock',
+    cart: 'Cart',
+    checkout: 'Checkout',
+    payments: 'Payments',
+    'payment-detail': 'Payment',
+    'payment-new': 'Record a payment',
+    collections: 'Rider collections',
+    'shop-ledger': 'Customer ledger',
+    'shop-statement': 'Customer statement',
+    'report-outstanding': 'Outstanding money',
+    'report-overdue': 'Overdue money',
+    'report-collections': 'Collection summary',
+    suppliers: 'Suppliers',
+    'supplier-new': 'Add a supplier',
+    'purchase-orders': 'Purchase orders',
+    'purchase-order-new': 'Raise a purchase order',
+    'purchase-order-detail': 'Purchase order',
+    recall: 'Trace a batch',
+    'controlled-register': 'Prescription register',
+    analytics: 'Overview',
+    'analytics-sales': 'Sales report',
+    'analytics-returns': 'Returns report',
+    'analytics-inventory': 'Stock report',
+    'analytics-deliveries': 'Delivery report',
+    'analytics-receivables': 'Receivables report',
+    shops: 'Shops',
+    'shop-detail': 'Shop',
+    'shop-new': 'Add a shop',
+    users: 'People',
+    settings: 'Settings',
+    audit: 'Audit log',
+    'shop-account': 'My account',
+    'my-payments': 'My payments',
+    'my-payment-detail': 'Payment',
+    'my-statement': 'My statement',
+    notifications: 'Notifications',
+    'notification-preferences': 'Notification settings',
+    activity: 'Activity',
+    'change-password': 'Change your password',
+    security: 'Sign-in and security',
+  } as Record<string, string>,
+
   screens: {
     medicineDetails: 'Medicine details',
     checkout: 'Checkout',
@@ -1945,6 +2182,19 @@ export const en = {
     [ReturnStatus.COMPLETED]: 'Completed',
     [ReturnStatus.CANCELLED]: 'Cancelled',
   } as Record<ReturnStatus, string>,
+
+  /**
+   * `Record<PurchaseOrderStatus, string>` — a new status in the shared types is
+   * a build failure here rather than a `PARTIALLY_RECEIVED` on a storekeeper's
+   * screen.
+   */
+  purchaseOrderStatus: {
+    [PurchaseOrderStatus.DRAFT]: 'Draft',
+    [PurchaseOrderStatus.ISSUED]: 'Sent to the supplier',
+    [PurchaseOrderStatus.PARTIALLY_RECEIVED]: 'Part of it has arrived',
+    [PurchaseOrderStatus.RECEIVED]: 'All of it has arrived',
+    [PurchaseOrderStatus.CANCELLED]: 'Called off',
+  } as Record<PurchaseOrderStatus, string>,
 
   shopStatus: {
     [ShopStatus.PENDING]: 'Awaiting approval',

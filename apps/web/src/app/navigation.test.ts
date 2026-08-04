@@ -7,6 +7,7 @@ import {
   landingRouteFor,
   navItemsFor,
 } from '@medsupply/navigation';
+import { bn, en, LANGUAGES, catalogueFor } from '@medsupply/i18n';
 import { describe, expect, it } from 'vitest';
 import { ROUTES, resolvedRoutes } from './routes';
 
@@ -144,6 +145,46 @@ describe('mobile tabs', () => {
       }
     }
     expect(wrong).toEqual([]);
+  });
+});
+
+describe('navigation labels', () => {
+  /*
+   * `NAV_ITEMS` carries English labels because `@medsupply/navigation` is
+   * imported by Metro and cannot depend on the catalogue. That is the right
+   * split, and it is also how the one part of the interface present on **every**
+   * screen stayed in English when the language was switched — which reads as
+   * the switch being broken rather than as a translation gap.
+   */
+  it('has words in every language for every navigation item', () => {
+    const missing: string[] = [];
+    for (const language of LANGUAGES) {
+      const catalogue = catalogueFor(language) as unknown as {
+        navItem: Record<string, string>;
+        navGroup: Record<string, string>;
+      };
+      for (const item of NAV_ITEMS) {
+        if (!catalogue.navItem[item.id]) missing.push(`${language}: navItem.${item.id}`);
+        if (!catalogue.navGroup[item.group]) missing.push(`${language}: navGroup.${item.group}`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('has no entries for navigation items that no longer exist', () => {
+    // The list may only shrink with the manifest, same discipline as the
+    // waiver lists: a key for a deleted screen hides nothing and confuses.
+    const ids = new Set(NAV_ITEMS.map((item) => item.id));
+    const stale = Object.keys(en.navItem).filter((id) => !ids.has(id));
+    expect(stale).toEqual([]);
+  });
+
+  it('translates rather than transliterating, so the two catalogues differ', () => {
+    // A Bangla entry identical to its English one is almost always a key that
+    // was copied and never translated. Proper nouns would be a real exception;
+    // there are none among the navigation labels.
+    const untranslated = Object.keys(en.navItem).filter((id) => bn.navItem[id] === en.navItem[id]);
+    expect(untranslated).toEqual([]);
   });
 });
 

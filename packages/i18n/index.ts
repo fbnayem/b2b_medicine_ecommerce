@@ -115,3 +115,17 @@ export function translatorFor(language: Language): Translate {
     return typeof template === 'string' ? interpolate(template, values) : path;
   };
 }
+
+/**
+ * A translation, or the fallback the caller already has.
+ *
+ * For values whose English lives outside the catalogue — navigation labels,
+ * which are plain data in `@medsupply/navigation` because a package Metro
+ * imports cannot depend on this one. Rendering a dotted path in the sidebar
+ * would be worse than rendering English, so a missing key falls back rather
+ * than showing itself.
+ */
+export function translatedOr(t: Translate, path: string, fallback: string): string {
+  const value = t(path);
+  return value === path ? fallback : value;
+}

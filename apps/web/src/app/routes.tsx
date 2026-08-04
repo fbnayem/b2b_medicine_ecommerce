@@ -94,6 +94,32 @@ export const ROUTES: readonly RouteNode[] = [
   { id: 'cart', element: page(() => import('../pages/Cart'), 'Cart') },
   { id: 'checkout', element: page(() => import('../pages/Checkout'), 'Checkout') },
 
+  {
+    id: 'suppliers',
+    element: page(() => import('../pages/SupplierList'), 'SupplierList'),
+  },
+  {
+    id: 'supplier-new',
+    element: page(() => import('../pages/SupplierForm'), 'SupplierForm'),
+  },
+  {
+    id: 'purchase-orders',
+    element: page(() => import('../pages/PurchaseOrderList'), 'PurchaseOrderList'),
+  },
+  {
+    id: 'purchase-order-new',
+    element: page(() => import('../pages/PurchaseOrderForm'), 'PurchaseOrderForm'),
+  },
+  {
+    id: 'purchase-order-detail',
+    element: page(() => import('../pages/PurchaseOrderDetail'), 'PurchaseOrderDetail'),
+  },
+  { id: 'recall', element: page(() => import('../pages/RecallTrace'), 'RecallTrace') },
+  {
+    id: 'controlled-register',
+    element: page(() => import('../pages/ControlledRegister'), 'ControlledRegister'),
+  },
+
   { id: 'payments', element: page(() => import('../pages/PaymentList'), 'PaymentList') },
   { id: 'payment-detail', element: page(() => import('../pages/PaymentDetail'), 'PaymentDetail') },
   { id: 'payment-new', element: page(() => import('../pages/RecordPayment'), 'RecordPayment') },

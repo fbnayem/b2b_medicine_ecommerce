@@ -77,11 +77,12 @@ export interface Collection<T> {
 /**
  * A list, tolerating both response shapes the API actually returns.
  *
- * The API answers a list in three shapes. Some endpoints send
+ * The API answers a list in four shapes. Some endpoints send
  * `{ items, total, page, limit }`, some send `{ data: [...] }` with nothing
- * else, and some send `{ data: [...], meta: { page, limit, total, pages } }` —
- * `orderController`, `returnController` and `activityService` disagree about
- * this today. Normalising here means a page never has to know which kind it is
+ * else, some send `{ data: [...], meta: { page, limit, total, pages } }`, and
+ * the purchasing endpoints send `{ data: { items, total, page, limit } }` —
+ * `orderController`, `returnController`, `purchasingController` and
+ * `activityService` disagree about this today. Normalising here means a page never has to know which kind it is
  * talking to, and in particular that **a page cannot silently lose its
  * pagination** by reading `total` from the wrong place and getting the length
  * of the current page back.
@@ -90,6 +91,38 @@ export interface Collection<T> {
  * server-side, and it belongs with the API work rather than with a UI phase;
  * recorded so it is not mistaken for the intended design.
  */
+/**
+ * Normalises whichever of the four envelopes came back.
+ *
+ * Exported and pure so it can be tested against each real shape. It was inline,
+ * and the shape the purchasing endpoints use fell through every branch and
+ * produced an empty list with a total of zero — which renders as a working
+ * screen with nothing on it, the hardest kind of failure to notice.
+ */
+export function normaliseCollection<T>(payload: Record<string, unknown>): Collection<T> {
+  const nested =
+    payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+      ? (payload.data as Record<string, unknown>)
+      : undefined;
+  const source = nested && Array.isArray(nested.items) ? nested : payload;
+
+  const items = Array.isArray(source.items)
+    ? (source.items as T[])
+    : Array.isArray(source.data)
+      ? (source.data as T[])
+      : [];
+  const meta = (source.meta ?? source) as Record<string, unknown>;
+  const number = (value: unknown, fallback: number) =>
+    typeof value === 'number' ? value : fallback;
+
+  return {
+    items,
+    total: number(meta.total, items.length),
+    page: number(meta.page, 1),
+    limit: number(meta.limit, items.length),
+  };
+}
+
 export function useApiCollection<T>(
   key: readonly unknown[],
   url: string,
@@ -97,23 +130,10 @@ export function useApiCollection<T>(
 ): UseQueryResult<Collection<T>> {
   return useQuery<Collection<T>>({
     queryKey: key,
-    queryFn: async ({ signal }) => {
-      const payload = (await apiClient.get(url, { signal })).data as Record<string, unknown>;
-      const items = Array.isArray(payload.items)
-        ? (payload.items as T[])
-        : Array.isArray(payload.data)
-          ? (payload.data as T[])
-          : [];
-      const meta = (payload.meta ?? payload) as Record<string, unknown>;
-      const number = (value: unknown, fallback: number) =>
-        typeof value === 'number' ? value : fallback;
-      return {
-        items,
-        total: number(meta.total, items.length),
-        page: number(meta.page, 1),
-        limit: number(meta.limit, items.length),
-      };
-    },
+    queryFn: async ({ signal }) =>
+      normaliseCollection<T>(
+        (await apiClient.get(url, { signal })).data as Record<string, unknown>,
+      ),
     ...options,
   });
 }

@@ -28,15 +28,19 @@ export type NavIcon =
   | 'catalogue'
   | 'returns'
   | 'settings'
+  | 'purchasing'
+  | 'recall'
   | 'bell'
   | 'activity'
   | 'account';
 
-export type NavGroup = 'work' | 'catalogue' | 'money' | 'insight' | 'administration' | 'account';
+export type NavGroup =
+  'work' | 'catalogue' | 'purchasing' | 'money' | 'insight' | 'administration' | 'account';
 
 export const NAV_GROUP_LABEL: Record<NavGroup, string> = {
   work: 'Work',
   catalogue: 'Catalogue',
+  purchasing: 'Buying in',
   money: 'Money',
   insight: 'Reports',
   administration: 'Administration',
@@ -324,6 +328,87 @@ export const NAV_ITEMS: readonly NavItem[] = [
     roles: MANAGEMENT,
     group: 'money',
     icon: 'reports',
+  },
+
+  // ── Purchasing ────────────────────────────────────────────────────────────
+  /*
+   * Suppliers, purchase orders, goods receipt, the recall trace and the
+   * controlled-substance register.
+   *
+   * All five were built in phase 6, all five are covered by integration tests,
+   * and **none of them appeared in any of the 51 navigation items** — so for
+   * four phases the only way to reach them was curl. The two that matter most
+   * for a DGDA-inspected distributor are the two that were hardest to reach:
+   * the trace somebody needs under pressure, and the register an inspector
+   * asks for.
+   */
+  {
+    id: 'suppliers',
+    label: 'Suppliers',
+    path: '/purchasing/suppliers',
+    roles: WAREHOUSE,
+    group: 'purchasing',
+    icon: 'purchasing',
+  },
+  {
+    id: 'supplier-new',
+    label: 'Add a supplier',
+    path: '/purchasing/suppliers/new',
+    roles: MANAGEMENT,
+    group: 'purchasing',
+    icon: 'purchasing',
+    hidden: true,
+    parent: 'suppliers',
+  },
+  {
+    id: 'purchase-orders',
+    label: 'Purchase orders',
+    path: '/purchasing/orders',
+    roles: WAREHOUSE,
+    group: 'purchasing',
+    icon: 'purchasing',
+  },
+  {
+    id: 'purchase-order-new',
+    label: 'Raise a purchase order',
+    path: '/purchasing/orders/new',
+    roles: MANAGEMENT,
+    group: 'purchasing',
+    icon: 'purchasing',
+    hidden: true,
+    parent: 'purchase-orders',
+  },
+  {
+    id: 'purchase-order-detail',
+    label: 'Purchase order',
+    path: '/purchasing/orders/:id',
+    roles: WAREHOUSE,
+    group: 'purchasing',
+    icon: 'purchasing',
+    hidden: true,
+    parent: 'purchase-orders',
+  },
+  {
+    /*
+     * Open to the warehouse, not only to management. The person who first hears
+     * that a batch is suspect is usually the storekeeper holding the supplier's
+     * notice, and making them find a manager before they can even look it up is
+     * how an hour gets lost. Looking has no side effects.
+     */
+    id: 'recall',
+    label: 'Trace a batch',
+    path: '/purchasing/recall',
+    roles: WAREHOUSE,
+    group: 'purchasing',
+    icon: 'recall',
+  },
+  {
+    id: 'controlled-register',
+    label: 'Prescription register',
+    path: '/purchasing/controlled-register',
+    roles: MANAGEMENT,
+    group: 'purchasing',
+    icon: 'recall',
   },
 
   // ── Reports ───────────────────────────────────────────────────────────────

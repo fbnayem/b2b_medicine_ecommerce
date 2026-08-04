@@ -10,7 +10,7 @@ import {
   type NavItem,
 } from '@medsupply/navigation';
 import { UserRole } from '@medsupply/shared-types';
-import type { Language } from '@medsupply/i18n';
+import { translatedOr, type Language } from '@medsupply/i18n';
 import { useAuthStore } from '../store/useAuth';
 import { signOut } from '../api/client';
 import { connectRealtime, disconnectRealtime } from '../realtime/socket';
@@ -42,6 +42,7 @@ import { routeIdForPath } from '../app/routes';
 const GROUP_ORDER: NavGroup[] = [
   'work',
   'catalogue',
+  'purchasing',
   'money',
   'insight',
   'administration',
@@ -146,7 +147,7 @@ export function AppShell() {
             {grouped.map(({ group, items: groupItems }) => (
               <div key={group} className="mb-4">
                 <h2 className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
-                  {NAV_GROUP_LABEL[group]}
+                  {translatedOr(t, `navGroup.${group}`, NAV_GROUP_LABEL[group])}
                 </h2>
                 <ul className="flex flex-col gap-0.5">
                   {groupItems.map((item) => (
@@ -163,7 +164,7 @@ export function AppShell() {
                           ].join(' ')
                         }
                       >
-                        {item.label}
+                        {translatedOr(t, `navItem.${item.id}`, item.label)}
                       </NavLink>
                     </li>
                   ))}
@@ -196,7 +197,12 @@ export function AppShell() {
  * which no amount of path-prefix arithmetic would work out.
  */
 function Breadcrumbs() {
+  // Both hooks before the early returns: this component bails out on a route
+  // with no manifest entry, and a hook after that point runs on some renders
+  // and not others.
   const { pathname } = useLocation();
+  const { t } = useLanguage();
+
   const routeId = routeIdForPath(pathname);
   if (!routeId) return null;
 
@@ -204,7 +210,7 @@ function Breadcrumbs() {
   if (trail.length <= 1) return null;
 
   return (
-    <nav aria-label="Breadcrumb" className="mb-3">
+    <nav aria-label={t('nav.breadcrumb')} className="mb-3">
       <ol className="flex flex-wrap items-center gap-1 text-sm text-text-muted">
         {trail.map((item, index) => {
           const last = index === trail.length - 1;
@@ -213,11 +219,11 @@ function Breadcrumbs() {
               {index > 0 && <span aria-hidden="true">/</span>}
               {last ? (
                 <span aria-current="page" className="text-text">
-                  {item.label}
+                  {translatedOr(t, `navItem.${item.id}`, item.label)}
                 </span>
               ) : (
                 <Link to={item.path} className="underline underline-offset-2">
-                  {item.label}
+                  {translatedOr(t, `navItem.${item.id}`, item.label)}
                 </Link>
               )}
             </li>
@@ -236,22 +242,29 @@ function Breadcrumbs() {
  * navigator.
  */
 function NavigationSearch({ items }: { items: NavItem[] }) {
+  const { t } = useLanguage();
   const [query, setQuery] = useState('');
   const matches = query.trim()
-    ? items.filter((item) => item.label.toLowerCase().includes(query.trim().toLowerCase()))
+    ? items.filter((item) =>
+        // Searched on the label the person can actually see, so typing "ফেরত"
+        // finds Returns when the app is in Bangla.
+        translatedOr(t, `navItem.${item.id}`, item.label)
+          .toLowerCase()
+          .includes(query.trim().toLowerCase()),
+      )
     : [];
 
   return (
     <div className="relative hidden md:block">
       <label htmlFor="app-search" className="sr-only">
-        Search sections
+        {t('nav.searchSections')}
       </label>
       <input
         id="app-search"
         data-test="app-search"
         type="search"
         value={query}
-        placeholder="Go to…"
+        placeholder={t('nav.goTo')}
         onChange={(event) => setQuery(event.target.value)}
         className="min-h-11 w-64 rounded-md border border-border bg-surface px-3 text-sm"
       />
@@ -264,9 +277,9 @@ function NavigationSearch({ items }: { items: NavItem[] }) {
                 onClick={() => setQuery('')}
                 className="flex min-h-11 items-center px-3 text-sm hover:bg-surface-hover"
               >
-                {item.label}
+                {translatedOr(t, `navItem.${item.id}`, item.label)}
                 <span className="ms-auto text-xs text-text-muted">
-                  {NAV_GROUP_LABEL[item.group]}
+                  {translatedOr(t, `navGroup.${item.group}`, NAV_GROUP_LABEL[item.group])}
                 </span>
               </Link>
             </li>

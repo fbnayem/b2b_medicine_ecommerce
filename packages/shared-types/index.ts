@@ -1269,3 +1269,216 @@ export interface AnalyticsOverview {
   topMedicines: DimensionRow[];
   topShops: DimensionRow[];
 }
+
+/*
+ * ── Purchasing, goods receipt and the recall trace ───────────────────────────
+ *
+ * The models and the endpoints have existed since phase 6 and appeared in none
+ * of the 51 navigation items, so nothing outside the API ever needed a type for
+ * them. Phase 10 gives them screens, and a screen needs to know what it is
+ * looking at.
+ */
+
+export interface Supplier {
+  _id: string;
+  reference: string;
+  name: string;
+  /** The supplier's own licence, which an inspection checks. */
+  drugLicenceNumber?: string;
+  drugLicenceExpiryDate?: string;
+  contactName?: string;
+  primaryPhone: string;
+  email?: string;
+  address?: string;
+  /** Days from invoice to payment, as agreed. Money is settled outside this system. */
+  paymentTermsDays: number;
+  isActive: boolean;
+  notes?: string;
+  version: number;
+  createdAt: string;
+}
+
+export const PurchaseOrderStatus = {
+  DRAFT: 'DRAFT',
+  ISSUED: 'ISSUED',
+  PARTIALLY_RECEIVED: 'PARTIALLY_RECEIVED',
+  RECEIVED: 'RECEIVED',
+  CANCELLED: 'CANCELLED',
+} as const;
+export type PurchaseOrderStatus = (typeof PurchaseOrderStatus)[keyof typeof PurchaseOrderStatus];
+
+export interface PurchaseOrderLine {
+  _id: string;
+  medicineId: string;
+  medicineSnapshot: {
+    reference?: string;
+    sku?: string;
+    brandName?: string;
+    genericName?: string;
+    strength?: string;
+  };
+  orderedQuantity: number;
+  /** Running total of what has actually arrived, advanced by each receipt. */
+  receivedQuantity: number;
+  unitCostMinor: number;
+}
+
+export interface PurchaseOrder {
+  _id: string;
+  reference: string;
+  supplierId: string | Pick<Supplier, '_id' | 'reference' | 'name'>;
+  status: PurchaseOrderStatus;
+  lines: PurchaseOrderLine[];
+  expectedDate?: string;
+  /** The supplier's own reference, so a paper invoice can be matched to this. */
+  supplierReference?: string;
+  notes?: string;
+  issuedAt?: string;
+  version: number;
+  createdAt: string;
+}
+
+export interface GoodsReceiptLine {
+  purchaseOrderLineId: string;
+  medicineId: string;
+  batchId: string;
+  batchNumber: string;
+  expiryDate: string;
+  orderedQuantity: number;
+  receivedQuantity: number;
+  /**
+   * Ordered minus received at the moment of this receipt. Recorded rather than
+   * silently accepted: a short delivery is a conversation with the supplier and,
+   * on a controlled line, a question an inspector may ask.
+   */
+  varianceQuantity: number;
+  varianceReason?: string;
+  unitCostMinor: number;
+}
+
+export interface GoodsReceipt {
+  _id: string;
+  reference: string;
+  purchaseOrderId: string;
+  supplierId: string;
+  supplierInvoiceReference?: string;
+  receivedAt: string;
+  lines: GoodsReceiptLine[];
+  notes?: string;
+}
+
+/** One shop that received part of a batch. */
+export interface RecallRecipient {
+  shopId: string;
+  shopReference: string;
+  shopName: string;
+  /** The number somebody rings when the recall is real. */
+  primaryPhone: string;
+  invoiceId: string;
+  invoiceReference: string;
+  invoiceDate: string;
+  quantity: number;
+  deliveredAt?: string;
+  deliveryReference?: string;
+  receiverName?: string;
+}
+
+/** Where a batch came from. */
+export interface RecallOrigin {
+  supplierId?: string;
+  supplierName?: string;
+  supplierReference?: string;
+  supplierPhone?: string;
+  drugLicenceNumber?: string;
+  purchaseOrderReference?: string;
+  goodsReceiptReference?: string;
+  supplierInvoiceReference?: string;
+  supplierBatchReference?: string;
+  receivedAt?: string;
+  /**
+   * True when the batch predates purchasing. Said plainly rather than left as
+   * an absent supplier: "we do not know" and "this arrived before we recorded
+   * suppliers" are different answers to an inspector, and only one is
+   * defensible.
+   */
+  predatesPurchasing: boolean;
+}
+
+export interface RecallTrace {
+  batch: {
+    id: string;
+    batchNumber: string;
+    expiryDate: string;
+    manufacturingDate: string;
+    receivedQuantity: number;
+    remainingOnHand: number;
+    isBlocked: boolean;
+    isQuarantined: boolean;
+  };
+  medicine: {
+    id: string;
+    reference: string;
+    brandName: string;
+    genericName: string;
+    strength: string;
+    manufacturer: string;
+  };
+  recipients: RecallRecipient[];
+  origin: RecallOrigin;
+  totals: {
+    shopsAffected: number;
+    quantityDespatched: number;
+    quantityStillHeld: number;
+    /** Received, minus despatched, minus what is still on the shelf. */
+    quantityUnaccounted: number;
+  };
+}
+
+/** A candidate batch found by the number printed on the carton. */
+export interface RecallBatchCandidate {
+  _id: string;
+  batchNumber: string;
+  expiryDate: string;
+  medicineId: Pick<Medicine, '_id' | 'reference' | 'brandName' | 'genericName' | 'strength'> & {
+    manufacturer?: string;
+  };
+  quantities: { onHand: number; available: number };
+}
+
+/** One prescription medicine's movements over a period. */
+export interface ControlledRegisterRow {
+  medicineId: string;
+  reference: string;
+  brandName: string;
+  genericName: string;
+  strength: string;
+  openingQuantity: number;
+  receivedQuantity: number;
+  despatchedQuantity: number;
+  returnedQuantity: number;
+  writtenOffQuantity: number;
+  closingQuantity: number;
+  /**
+   * Opening + in − out, compared with what the shelf says.
+   *
+   * A register that only adds up its own movements can never disagree with
+   * itself, which makes it useless as a control. Anything other than zero is a
+   * question somebody has to answer.
+   */
+  varianceQuantity: number;
+}
+
+/** Which shop bought how much of a prescription medicine. */
+export interface ControlledByShopRow {
+  _id: { shopId: string; medicineId: string };
+  shopSnapshot?: { reference?: string; name?: string };
+  medicine?: { reference: string; brandName: string; genericName: string; strength: string };
+  quantity: number;
+  invoices: string[];
+}
+
+export interface ControlledRegister {
+  period: { from: string; to: string };
+  rows: ControlledRegisterRow[];
+  byShop: ControlledByShopRow[];
+}

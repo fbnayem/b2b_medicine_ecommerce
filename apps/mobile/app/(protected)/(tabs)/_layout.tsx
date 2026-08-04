@@ -3,6 +3,7 @@ import { UserRole } from '@medsupply/shared-types';
 import { useAuthStore } from '../../../src/store/useAuth';
 import { ALL_TAB_FILES, tabsFor } from '../../../src/navigation/tabs';
 import { colour, layout } from '../../../src/theme';
+import { useLanguage } from '../../../src/i18n/useLanguage';
 
 /**
  * The per-role bottom tab bar `AGENTS.md` has specified since the first phase.
@@ -22,8 +23,9 @@ import { colour, layout } from '../../../src/theme';
  * ordinary screen for a manager.
  */
 export default function TabsLayout() {
+  const { t } = useLanguage();
   const role = useAuthStore((state) => state.user?.role) as UserRole | undefined;
-  const active = role ? tabsFor(role) : [];
+  const active = role ? tabsFor(role, t) : [];
   const activeNames = new Set(active.map((tab) => tab.name));
 
   return (

@@ -1,4 +1,5 @@
 import { MOBILE_TABS, NAV_BY_ID } from '@medsupply/navigation';
+import { translatedOr, type Translate } from '@medsupply/i18n';
 import { UserRole } from '@medsupply/shared-types';
 
 /**
@@ -51,14 +52,24 @@ export const ALL_TAB_FILES: readonly string[] = [
  * fixed-length tuple so that count is a compile error rather than a rule
  * somebody remembers. A role with a sixth idea for a tab has to argue for it in
  * the shared package, where web can see the change too.
+ *
+ * The **titles come from the catalogue**, not from `nav.label`. The navigation
+ * package is plain data because Metro imports it and it cannot depend on the
+ * catalogue — which meant the five words present on every single screen of this
+ * application stayed in English when the language was switched. That reads as
+ * the switch being broken rather than as a translation gap, and it is the
+ * first thing anybody sees.
+ *
+ * `t` is optional so a test or a boot path with no provider still gets the
+ * English labels rather than five dotted paths.
  */
-export function tabsFor(role: UserRole): MobileTab[] {
+export function tabsFor(role: UserRole, t?: Translate): MobileTab[] {
   return MOBILE_TABS[role].map((id) => {
     const nav = NAV_BY_ID[id];
     const name = TAB_ROUTE_FILE[id];
     if (!nav || !name) {
       throw new Error(`Tab "${id}" for ${role} has no navigation entry or no screen file.`);
     }
-    return { id, name, title: nav.label };
+    return { id, name, title: t ? translatedOr(t, `navItem.${id}`, nav.label) : nav.label };
   });
 }
