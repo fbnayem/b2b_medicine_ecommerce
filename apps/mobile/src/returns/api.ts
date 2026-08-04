@@ -121,22 +121,6 @@ export function availableActions(role: UserRole | undefined, status: ReturnStatu
   return actions;
 }
 
-export const RETURN_STATUS_LABELS: Record<string, string> = {
-  REQUESTED: 'Requested',
-  UNDER_REVIEW: 'Under review',
-  APPROVED: 'Approved',
-  PARTIALLY_APPROVED: 'Partly approved',
-  REJECTED: 'Rejected',
-  COLLECTED: 'Collected',
-  RECEIVED: 'Awaiting credit',
-  COMPLETED: 'Completed',
-  CANCELLED: 'Cancelled',
-};
-
-export function returnStatusLabel(status: string) {
-  return RETURN_STATUS_LABELS[status] ?? status.replaceAll('_', ' ');
-}
-
 export interface DispositionDraft {
   restockQuantity: number;
   damagedQuantity: number;
@@ -144,25 +128,34 @@ export interface DispositionDraft {
   quarantinedQuantity: number;
 }
 
+/** What is wrong with a disposition, as a catalogue key rather than a sentence. */
+export type DispositionProblem =
+  | { key: 'returns.moreThanApproved'; values: { approved: number } }
+  | { key: 'returns.expiredCannotRestock'; values?: undefined };
+
 /**
  * Local guard mirroring the server rule, so a storekeeper standing at the
  * shelf sees the problem before a round trip rejects the whole receipt.
+ *
+ * It returned finished English — including "unit(s)", which is not a plural in
+ * any language — so the one message a storekeeper reads while holding the
+ * carton was the one part of the screen that could not be translated.
  */
 export function dispositionProblem(
   line: { approvedQuantity: number; expiryDate: string },
   draft: DispositionDraft,
   now = new Date(),
-): string | null {
+): DispositionProblem | null {
   const total =
     draft.restockQuantity +
     draft.damagedQuantity +
     draft.expiredQuantity +
     draft.quarantinedQuantity;
   if (total > line.approvedQuantity) {
-    return `Only ${line.approvedQuantity} unit(s) were approved for return.`;
+    return { key: 'returns.moreThanApproved', values: { approved: line.approvedQuantity } };
   }
   if (draft.restockQuantity > 0 && new Date(line.expiryDate) <= now) {
-    return 'This batch has expired and cannot be restocked.';
+    return { key: 'returns.expiredCannotRestock' };
   }
   return null;
 }

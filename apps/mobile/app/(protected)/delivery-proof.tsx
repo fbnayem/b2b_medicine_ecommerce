@@ -1,14 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Image,
-  PanResponder,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Image, PanResponder, Pressable, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
@@ -16,7 +7,11 @@ import Svg, { Path } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 import { DeliveryProofType } from '@medsupply/shared-types';
 import type { Delivery } from '@medsupply/shared-types';
+import { errorMessage } from '@medsupply/api-client';
+import { humaniseEnum } from '@medsupply/utilities';
+import { neutral } from '@medsupply/design-tokens';
 import { apiClient } from '../../src/api/client';
+import { createFinancialIdempotencyKey } from '../../src/finance/idempotency';
 import {
   deliveryCollectionMethods,
   validateDeliveryCollection,
@@ -24,12 +19,29 @@ import {
 } from '../../src/finance/collection';
 import { formatMoneyMinor } from '../../src/finance/money';
 import { FinancePaymentMethod } from '../../src/finance/types';
+import { useLanguage } from '../../src/i18n/useLanguage';
+import {
+  Button,
+  Card,
+  ErrorState,
+  Field,
+  FilterChips,
+  Input,
+  ListRow,
+  LoadingState,
+  Screen,
+  SectionTitle,
+  toast,
+} from '../../src/components';
+import { colour, layout } from '../../src/theme';
 
 type Point = { x: number; y: number };
-type ApiFailure = { response?: { status?: number; data?: { error?: { message?: string } } } };
+type ApiFailure = { response?: { status?: number } };
 
 export default function DeliveryProofScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t, language } = useLanguage();
+
   const [delivery, setDelivery] = useState<Delivery>();
   const [receiverName, setReceiverName] = useState('');
   const [receiverPhone, setReceiverPhone] = useState('');
@@ -57,24 +69,38 @@ export default function DeliveryProofScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const signatureRef = useRef<View>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  /**
+   * Held across retries, deliberately.
+   *
+   * A rider at a shop door with one bar of signal will tap Confirm again, and
+   * the second attempt must be recognised as the same delivery rather than post
+   * a second collection to the customer's account.
+   */
   const completionKey = useRef(
-    `mobile-complete-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    createFinancialIdempotencyKey('delivery-complete', String(id ?? 'unknown')),
   );
 
+  const load = useCallback(async () => {
+    try {
+      const value: Delivery = (await apiClient.get(`/deliveries/${id}`)).data.data;
+      setDelivery(value);
+      const pack = typeof value.packageId === 'string' ? undefined : value.packageId;
+      setPackageCount(String(pack?.packageCount ?? 1));
+      setError('');
+    } catch (caught) {
+      setError(errorMessage(caught, language, t('deliveryDetail.couldNotLoad')));
+    } finally {
+      setLoading(false);
+    }
+  }, [id, language, t]);
+
   useEffect(() => {
-    apiClient
-      .get(`/deliveries/${id}`)
-      .then((response) => {
-        const value: Delivery = response.data.data;
-        setDelivery(value);
-        const pack = typeof value.packageId === 'string' ? undefined : value.packageId;
-        setPackageCount(String(pack?.packageCount ?? 1));
-      })
-      .catch(() => setError('Unable to load delivery proof requirements.'));
-  }, [id]);
+    void load();
+  }, [load]);
 
   const panResponder = useMemo(
     () =>
@@ -101,7 +127,7 @@ export default function DeliveryProofScreen() {
 
   async function takePhoto() {
     if (!cameraReady) {
-      setError('Wait for the camera preview to become ready.');
+      toast.error(t('delivery.cameraNotReady'));
       return;
     }
     const picture = await cameraRef.current?.takePictureAsync({
@@ -110,33 +136,31 @@ export default function DeliveryProofScreen() {
       skipProcessing: false,
     });
     if (!picture?.base64) {
-      setError('The photograph could not be captured.');
+      toast.error(t('delivery.photoFailed'));
       return;
     }
     if (cameraTarget === 'payment') setPaymentPhoto(picture.base64);
     else setPhoto(picture.base64);
     setCameraTarget(undefined);
     setCameraReady(false);
-    setError('');
   }
 
   async function openCamera(target: 'delivery' | 'payment') {
     if (!permission?.granted) {
       const result = await requestPermission();
       if (!result.granted) {
-        setError('Camera permission was denied.');
+        toast.error(t('delivery.cameraDenied'));
         return;
       }
     }
     setCameraReady(false);
     setCameraTarget(target);
-    setError('');
   }
 
   async function captureLocation() {
     const permissionResult = await Location.requestForegroundPermissionsAsync();
     if (!permissionResult.granted) {
-      setError('Location permission was denied. GPS proof cannot be recorded.');
+      toast.error(t('delivery.locationDenied'));
       return;
     }
     const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
@@ -146,37 +170,46 @@ export default function DeliveryProofScreen() {
       accuracyMetres: position.coords.accuracy ?? undefined,
       capturedAt: new Date(position.timestamp).toISOString(),
     });
-    setError('');
   }
 
   async function submit() {
-    if (!delivery) return;
+    if (!delivery || submitting) return;
     const required = delivery.proofRequirements;
+
+    /*
+     * Still the Bangladesh regex, and still in a screen rather than in the
+     * jurisdiction pack. Phase 12 recorded that deliberately: phone validation
+     * is one of the three things left for the phase that adds a second country,
+     * because abstracting a format against a country nobody has named would be
+     * guessing. It is noted here so it is a deferral rather than an oversight.
+     */
     if (receiverName.trim().length < 2 || !/^(\+8801|01)[3-9]\d{8}$/.test(receiverPhone)) {
-      setError('Enter the receiver name and a valid Bangladesh phone number.');
+      toast.error(t('delivery.needReceiver'));
       return;
     }
     if (required.includes(DeliveryProofType.OTP) && !/^\d{6}$/.test(otp)) {
-      setError('Enter the six-digit OTP sent to the shop owner.');
+      toast.error(t('delivery.needOtp'));
       return;
     }
     if (required.includes(DeliveryProofType.PHOTOGRAPH) && !photo) {
-      setError('A delivery photograph is required.');
+      toast.error(t('delivery.needPhoto'));
       return;
     }
     if (required.includes(DeliveryProofType.SIGNATURE) && !paths.length) {
-      setError('The receiver signature is required.');
+      toast.error(t('delivery.needSignature'));
       return;
     }
     if (required.includes(DeliveryProofType.GPS) && !gps) {
-      setError('Location proof is required.');
+      toast.error(t('delivery.needLocation'));
       return;
     }
-    const count = Number(packageCount);
+
+    const count = Number(packageCount.replace(/[^0-9]/g, ''));
     if (!Number.isInteger(count) || count < 1) {
-      setError('Enter a valid delivered package count.');
+      toast.error(t('delivery.badPackageCount'));
       return;
     }
+
     const invoice = typeof delivery.invoiceId === 'string' ? undefined : delivery.invoiceId;
     const collection = validateDeliveryCollection(
       {
@@ -195,9 +228,12 @@ export default function DeliveryProofScreen() {
       invoice?.amountDueMinor,
     );
     if (!collection.ok) {
-      setError(collection.error);
+      // A key now, not a sentence: these are the four words standing between a
+      // rider and a mis-posted collection, and they were English only.
+      toast.error(t(collection.error));
       return;
     }
+
     setSubmitting(true);
     try {
       const signature =
@@ -227,6 +263,7 @@ export default function DeliveryProofScreen() {
         deliveredPackageCount: count,
         ...collection.payload,
       };
+
       try {
         const response = await apiClient.post<{
           data: Delivery;
@@ -237,81 +274,149 @@ export default function DeliveryProofScreen() {
           ...body,
         });
         const payment = response.data.meta?.payment;
-        setSuccess(
+        toast.success(
           payment
-            ? `Delivery confirmed. Collection ${payment.reference} is ${payment.status.replaceAll('_', ' ').toLowerCase()}.`
-            : 'Delivery completion confirmed by the server. No payment was collected.',
+            ? t('delivery.completedWithPayment', {
+                reference: payment.reference,
+                status: t(`paymentStatus.${payment.status}`),
+              })
+            : t('delivery.completedNoPayment'),
         );
         setError('');
-        setTimeout(() => router.replace('/(protected)/(tabs)/deliveries'), 900);
+        router.replace('/(protected)/(tabs)/deliveries');
       } catch (caught) {
-        const failure = caught as ApiFailure;
-        if (!failure.response || (failure.response.status ?? 0) >= 500) {
-          setError(
-            'Server confirmation is required. Keep this screen open, reconnect, and tap Confirm delivery again; the same idempotency key will be retried.',
-          );
-        } else setError(failure.response.data?.error?.message ?? 'Completion was rejected.');
+        const status = (caught as ApiFailure).response?.status ?? 0;
+        if (!(caught as ApiFailure).response || status >= 500) {
+          setError(t('delivery.keepOpenAndRetry'));
+        } else {
+          setError(errorMessage(caught, language, t('delivery.completionRejected')));
+        }
       }
     } catch {
-      setError('Unable to prepare the proof files.');
+      setError(t('delivery.proofFilesFailed'));
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (!delivery)
+  if (loading) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.error}>{error || 'Loading proof form...'}</Text>
-      </View>
+      <Screen>
+        <LoadingState label={t('deliveryDetail.loading')} />
+      </Screen>
     );
+  }
+
+  if (!delivery) {
+    return (
+      <Screen>
+        <ErrorState
+          message={error || t('deliveryDetail.couldNotLoad')}
+          onRetry={() => void load()}
+        />
+      </Screen>
+    );
+  }
+
   const renderedPaths = [...paths, ...(activePath.length ? [activePath] : [])];
   const invoice = typeof delivery.invoiceId === 'string' ? undefined : delivery.invoiceId;
+
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Text style={styles.heading}>Complete {delivery.reference}</Text>
-      <Text style={styles.notice}>
-        Ask for consent before capturing a photograph, signature, or location. Location is requested
-        only when you tap “Capture location”.
-      </Text>
-      <Text>Required proof: {delivery.proofRequirements.join(', ')}</Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {success ? <Text style={styles.success}>{success}</Text> : null}
-      <Field label="Receiver name" value={receiverName} onChangeText={setReceiverName} />
-      <Field
-        label="Receiver phone"
-        value={receiverPhone}
-        onChangeText={setReceiverPhone}
-        keyboardType="phone-pad"
-      />
-      <Field
-        label="Six-digit OTP"
-        value={otp}
-        onChangeText={setOtp}
-        keyboardType="number-pad"
-        maxLength={6}
-      />
-      <Field
-        label="Delivered package count"
-        value={packageCount}
-        onChangeText={setPackageCount}
-        keyboardType="number-pad"
-      />
-      <View style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.label}>Receiver signature</Text>
-          <Pressable onPress={() => setPaths([])}>
-            <Text style={styles.link}>Clear</Text>
+    <Screen>
+      <SectionTitle>{t('delivery.completeTitle', { reference: delivery.reference })}</SectionTitle>
+
+      {/*
+       * Consent before capture. Kept as a warning-bordered card rather than an
+       * `ErrorState`: nothing has gone wrong, and a red failure box at the top
+       * of every delivery would train riders to ignore red boxes.
+       */}
+      <Card style={{ borderColor: colour.warning }}>
+        <Text style={{ color: colour.text }}>{t('delivery.consentNotice')}</Text>
+      </Card>
+
+      {error ? <ErrorState message={error} /> : null}
+
+      <Card>
+        <SectionTitle>{t('delivery.requiredProof')}</SectionTitle>
+        {delivery.proofRequirements.map((requirement) => (
+          <ListRow
+            key={requirement}
+            // Was `proofRequirements.join(', ')` — `OTP, SIGNATURE, GPS`.
+            label={t(`deliveryProofType.${requirement}`)}
+            value=""
+          />
+        ))}
+      </Card>
+
+      <Field label={t('delivery.receiverName')}>
+        <Input
+          label={t('delivery.receiverName')}
+          value={receiverName}
+          onChangeText={setReceiverName}
+        />
+      </Field>
+      <Field label={t('delivery.receiverPhone')}>
+        <Input
+          label={t('delivery.receiverPhone')}
+          value={receiverPhone}
+          onChangeText={setReceiverPhone}
+          keyboardType="phone-pad"
+        />
+      </Field>
+      <Field label={t('delivery.otp')} hint={t('delivery.otpHint')}>
+        <Input
+          label={t('delivery.otp')}
+          value={otp}
+          onChangeText={setOtp}
+          keyboardType="number-pad"
+          maxLength={6}
+        />
+      </Field>
+      <Field label={t('deliveryDetail.packages')}>
+        <Input
+          label={t('deliveryDetail.packages')}
+          value={packageCount}
+          onChangeText={setPackageCount}
+          keyboardType="number-pad"
+        />
+      </Field>
+
+      <Card>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: layout.space[2],
+          }}
+        >
+          <SectionTitle>{t('delivery.receiverName')}</SectionTitle>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('delivery.clearSignature')}
+            onPress={() => setPaths([])}
+            style={{
+              minHeight: layout.minTapTarget,
+              justifyContent: 'center',
+              paddingHorizontal: layout.space[3],
+            }}
+          >
+            <Text style={{ color: colour.brand, fontWeight: '600' }}>
+              {t('delivery.clearSignature')}
+            </Text>
           </Pressable>
         </View>
         <View
           ref={signatureRef}
           collapsable={false}
-          style={styles.signature}
+          style={{
+            backgroundColor: colour.surface,
+            height: 180,
+            borderWidth: 1,
+            borderColor: colour.border,
+            borderRadius: layout.radius.md,
+            overflow: 'hidden',
+          }}
           {...panResponder.panHandlers}
         >
           <Svg width="100%" height="180">
@@ -321,7 +426,8 @@ export default function DeliveryProofScreen() {
                 d={points
                   .map((point, pointIndex) => `${pointIndex ? 'L' : 'M'}${point.x},${point.y}`)
                   .join(' ')}
-                stroke="#17251e"
+                // Ink, from the token ramp rather than a hand-picked near-black.
+                stroke={neutral[900]}
                 strokeWidth={3}
                 fill="none"
                 strokeLinecap="round"
@@ -329,194 +435,163 @@ export default function DeliveryProofScreen() {
               />
             ))}
           </Svg>
-          {!renderedPaths.length ? <Text style={styles.signHint}>Sign inside this box</Text> : null}
+          {!renderedPaths.length ? (
+            <Text
+              style={{
+                position: 'absolute',
+                alignSelf: 'center',
+                top: 78,
+                color: colour.textMuted,
+              }}
+            >
+              {t('delivery.signHere')}
+            </Text>
+          ) : null}
         </View>
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.label}>Delivery photograph</Text>
+      </Card>
+
+      <Card>
+        <SectionTitle>{t('delivery.deliveryPhoto')}</SectionTitle>
         {photo ? (
-          <Image source={{ uri: `data:image/jpeg;base64,${photo}` }} style={styles.photo} />
+          <Image
+            accessibilityIgnoresInvertColors
+            source={{ uri: `data:image/jpeg;base64,${photo}` }}
+            style={{ height: 220, borderRadius: layout.radius.md, resizeMode: 'cover' }}
+          />
         ) : null}
-        <Pressable style={styles.secondary} onPress={() => void openCamera('delivery')}>
-          <Text>{photo ? 'Retake delivery photograph' : 'Open camera for delivery proof'}</Text>
-        </Pressable>
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.label}>GPS proof</Text>
-        <Text>
+        <Button
+          variant="secondary"
+          label={photo ? t('delivery.retakeDeliveryPhoto') : t('delivery.openDeliveryCamera')}
+          onPress={() => void openCamera('delivery')}
+        />
+      </Card>
+
+      <Card>
+        <SectionTitle>{t('deliveryDetail.gps')}</SectionTitle>
+        <Text style={{ color: colour.text, fontVariant: ['tabular-nums'] }}>
           {gps
-            ? `${gps.latitude.toFixed(5)}, ${gps.longitude.toFixed(5)} · ±${Math.round(gps.accuracyMetres ?? 0)}m`
-            : 'No location captured'}
+            ? `${gps.latitude.toFixed(5)}, ${gps.longitude.toFixed(5)} · ±${Math.round(
+                gps.accuracyMetres ?? 0,
+              )}m`
+            : t('delivery.noLocation')}
         </Text>
-        <Pressable style={styles.secondary} onPress={() => void captureLocation()}>
-          <Text>Capture current location</Text>
-        </Pressable>
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.label}>Payment collection</Text>
+        <Button
+          variant="secondary"
+          label={t('delivery.captureLocation')}
+          onPress={() => void captureLocation()}
+        />
+      </Card>
+
+      <Card>
+        <SectionTitle>{t('delivery.paymentSection')}</SectionTitle>
         {invoice ? (
-          <Text style={styles.dueText}>
-            Invoice due: {formatMoneyMinor(invoice.amountDueMinor)}
-          </Text>
+          <ListRow
+            label={t('delivery.invoiceDue')}
+            value={formatMoneyMinor(invoice.amountDueMinor)}
+            numeric
+          />
         ) : null}
-        <Text>Choose explicitly whether any payment was collected.</Text>
-        <View style={styles.row}>
-          <Pressable
-            style={[styles.choice, noPaymentCollected && styles.selected]}
-            onPress={() => setNoPaymentCollected(true)}
-          >
-            <Text style={noPaymentCollected ? styles.selectedText : undefined}>
-              No payment collected
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.choice, !noPaymentCollected && styles.selected]}
-            onPress={() => setNoPaymentCollected(false)}
-          >
-            <Text style={!noPaymentCollected ? styles.selectedText : undefined}>
-              Payment collected
-            </Text>
-          </Pressable>
-        </View>
-      </View>
+        <Text style={{ color: colour.textMuted }}>{t('delivery.sayWhether')}</Text>
+        <FilterChips
+          label={t('delivery.paymentSection')}
+          value={noPaymentCollected ? 'none' : 'some'}
+          onChange={(next) => setNoPaymentCollected(next === 'none')}
+          options={[
+            { value: 'none', label: t('delivery.noPaymentCollected') },
+            { value: 'some', label: t('delivery.paymentCollected') },
+          ]}
+        />
+      </Card>
+
       {!noPaymentCollected ? (
-        <View style={styles.card}>
-          <Field
-            label="Collected amount (৳)"
-            value={collected}
-            onChangeText={setCollected}
-            keyboardType="decimal-pad"
+        <Card>
+          <Field label={t('delivery.amountCollected')}>
+            <Input
+              label={t('delivery.amountCollected')}
+              value={collected}
+              onChangeText={setCollected}
+              keyboardType="decimal-pad"
+            />
+          </Field>
+
+          <FilterChips
+            label={t('delivery.paymentMethod')}
+            value={collectionMethod}
+            onChange={(next) => setCollectionMethod(next as DeliveryCollectionMethod)}
+            options={deliveryCollectionMethods.map((method) => ({
+              value: method,
+              // Was `method.replaceAll('_', ' ')` — `MOBILE FINANCIAL SERVICE`.
+              label: t(`paymentMethod.${method}`),
+            }))}
           />
-          <Text style={styles.label}>Collection method</Text>
-          <View style={styles.row}>
-            {deliveryCollectionMethods.map((method) => (
-              <Pressable
-                key={method}
-                style={[styles.choice, collectionMethod === method && styles.selected]}
-                onPress={() => setCollectionMethod(method)}
-              >
-                <Text style={collectionMethod === method ? styles.selectedText : undefined}>
-                  {method.replaceAll('_', ' ')}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Field
-            label="Transaction / cheque reference"
-            value={transactionReference}
-            onChangeText={setTransactionReference}
-          />
-          <Text style={styles.label}>Payment proof</Text>
+
+          <Field label={t('delivery.referenceLabel')} hint={t('delivery.referenceNeeded')}>
+            <Input
+              label={t('delivery.referenceLabel')}
+              value={transactionReference}
+              onChangeText={setTransactionReference}
+              autoCapitalize="characters"
+            />
+          </Field>
+
+          <SectionTitle>{t('delivery.paymentProof')}</SectionTitle>
           {paymentPhoto ? (
             <Image
+              accessibilityIgnoresInvertColors
               source={{ uri: `data:image/jpeg;base64,${paymentPhoto}` }}
-              style={styles.photo}
+              style={{ height: 220, borderRadius: layout.radius.md, resizeMode: 'cover' }}
             />
           ) : null}
-          <Pressable style={styles.secondary} onPress={() => void openCamera('payment')}>
-            <Text>{paymentPhoto ? 'Retake payment proof' : 'Capture payment proof'}</Text>
-          </Pressable>
-          <Text style={styles.safety}>
-            Transfer, mobile financial service, and cheque collections require a reference and proof
-            photograph.
-          </Text>
-        </View>
+          <Button
+            variant="secondary"
+            label={
+              paymentPhoto ? t('delivery.retakePaymentProof') : t('delivery.capturePaymentProof')
+            }
+            onPress={() => void openCamera('payment')}
+          />
+        </Card>
       ) : null}
+
       {cameraTarget ? (
-        <View style={styles.card}>
-          <Text style={styles.label}>
-            {cameraTarget === 'payment' ? 'Payment proof camera' : 'Delivery proof camera'}
-          </Text>
+        <Card>
+          <SectionTitle>
+            {cameraTarget === 'payment' ? t('delivery.paymentProof') : t('delivery.deliveryPhoto')}
+          </SectionTitle>
           <CameraView
             ref={cameraRef}
-            style={styles.camera}
+            style={{ height: 330, borderRadius: layout.radius.md, overflow: 'hidden' }}
             facing="back"
             mode="picture"
             onCameraReady={() => setCameraReady(true)}
-            onMountError={(event) => setError(event.message)}
+            onMountError={(event) => setError(humaniseEnum(event.message))}
           />
-          <Pressable style={styles.action} onPress={() => void takePhoto()}>
-            <Text style={styles.actionText}>Take photograph</Text>
-          </Pressable>
-          <Pressable
-            style={styles.secondary}
+          <Button label={t('delivery.takePhoto')} onPress={() => void takePhoto()} />
+          <Button
+            variant="secondary"
+            label={t('delivery.closeCamera')}
             onPress={() => {
               setCameraTarget(undefined);
               setCameraReady(false);
             }}
-          >
-            <Text>Cancel camera</Text>
-          </Pressable>
-        </View>
+          />
+        </Card>
       ) : null}
-      <Field label="Delivery notes" value={notes} onChangeText={setNotes} multiline />
-      <Pressable
-        disabled={submitting}
-        style={[styles.action, submitting && styles.disabled]}
-        onPress={() => void submit()}
-      >
-        <Text style={styles.actionText}>
-          {submitting ? 'Confirming with server...' : 'Confirm delivery'}
-        </Text>
-      </Pressable>
-    </ScrollView>
-  );
-}
 
-function Field(props: {
-  label: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  keyboardType?: 'default' | 'phone-pad' | 'number-pad' | 'decimal-pad';
-  maxLength?: number;
-  multiline?: boolean;
-}) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{props.label}</Text>
-      <TextInput style={[styles.input, props.multiline && styles.multiline]} {...props} />
-    </View>
+      <Field label={t('delivery.notes')}>
+        <Input
+          label={t('delivery.notes')}
+          value={notes}
+          onChangeText={setNotes}
+          multiline
+          style={{ minHeight: layout.space[10], paddingTop: layout.space[3] }}
+        />
+      </Field>
+
+      <Button
+        label={t('delivery.confirmDelivery')}
+        busy={submitting}
+        onPress={() => void submit()}
+      />
+    </Screen>
   );
 }
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  content: { padding: 14, gap: 12 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  heading: { fontSize: 22, fontWeight: '900', color: '#126b45' },
-  notice: { backgroundColor: '#fff4d6', padding: 12, borderRadius: 9, lineHeight: 20 },
-  card: { backgroundColor: '#fff', padding: 14, borderRadius: 11, gap: 10 },
-  field: { gap: 5 },
-  label: { fontWeight: '700' },
-  input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#c7d2cb',
-    borderRadius: 8,
-    padding: 11,
-  },
-  multiline: { minHeight: 75, textAlignVertical: 'top' },
-  row: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 7 },
-  signature: {
-    backgroundColor: '#fff',
-    height: 180,
-    borderWidth: 1,
-    borderColor: '#8fa198',
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  signHint: { position: 'absolute', alignSelf: 'center', top: 78, color: '#8a9890' },
-  link: { color: '#126b45', fontWeight: '700' },
-  camera: { height: 330, borderRadius: 8, overflow: 'hidden' },
-  photo: { height: 220, borderRadius: 8, resizeMode: 'cover' },
-  action: { backgroundColor: '#126b45', padding: 15, borderRadius: 9 },
-  actionText: { color: '#fff', fontWeight: '800', textAlign: 'center' },
-  secondary: { backgroundColor: '#e6eee9', padding: 11, borderRadius: 8, alignItems: 'center' },
-  choice: { borderWidth: 1, borderColor: '#c7d2cb', padding: 8, borderRadius: 18 },
-  selected: { backgroundColor: '#183d2d' },
-  selectedText: { color: '#fff' },
-  dueText: { color: '#8b2525', fontWeight: '800' },
-  safety: { color: '#66756d', fontSize: 12, lineHeight: 18 },
-  disabled: { opacity: 0.55 },
-  error: { color: '#8b2525', backgroundColor: '#fff0ee', padding: 10 },
-  success: { color: '#126b45', backgroundColor: '#e9f7ef', padding: 10 },
-});

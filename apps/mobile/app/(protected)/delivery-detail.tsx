@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Linking, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   DeliveryFailureReason,
@@ -8,41 +8,90 @@ import {
   UserRole,
 } from '@medsupply/shared-types';
 import type { Delivery } from '@medsupply/shared-types';
+import { errorMessage } from '@medsupply/api-client';
 import { apiClient } from '../../src/api/client';
 import { isSafeOfflineDeliveryAction, queueDeliveryAction } from '../../src/delivery/offlineQueue';
+import { createFinancialIdempotencyKey } from '../../src/finance/idempotency';
 import { useAuthStore } from '../../src/store/useAuth';
 import { ActivityTimelineView } from '../../src/notifications/ActivityTimelineView';
 import { onRealtime } from '../../src/notifications/realtime';
 import { formatFinanceDateTime } from '../../src/finance/date';
+import { useLanguage } from '../../src/i18n/useLanguage';
+import {
+  Button,
+  Card,
+  ErrorState,
+  ListRow,
+  LoadingState,
+  Screen,
+  SectionTitle,
+  StatusPill,
+  requireReason,
+  statusLabel,
+  toast,
+  useAsk,
+} from '../../src/components';
+import { colour, layout } from '../../src/theme';
 
-type ApiFailure = { response?: { status?: number; data?: { error?: { message?: string } } } };
-const reasons = Object.values(DeliveryFailureReason);
+type ApiFailure = { response?: { status?: number } };
+
+/** The statuses from which a rider can still report that it did not work. */
+const FAILABLE: readonly DeliveryStatus[] = [
+  DeliveryStatus.ASSIGNED,
+  DeliveryStatus.HANDED_OVER,
+  DeliveryStatus.PICKED_UP,
+  DeliveryStatus.OUT_FOR_DELIVERY,
+  DeliveryStatus.ARRIVED,
+];
 
 export default function DeliveryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t, language } = useLanguage();
+  const ask = useAsk();
   const role = useAuthStore((state) => state.user?.role);
   const isDriver = role === UserRole.DELIVERY_PERSON;
   const isStorekeeper = role === UserRole.STOREKEEPER;
   const canManageReturn =
     role === UserRole.SUPER_ADMIN || role === UserRole.ADMIN || role === UserRole.MANAGER;
+
   const [delivery, setDelivery] = useState<Delivery>();
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [failureReason, setFailureReason] = useState<DeliveryFailureReason>(
-    DeliveryFailureReason.SHOP_CLOSED,
-  );
-  const [failureNotes, setFailureNotes] = useState('');
+
+  /**
+   * One key per action, held until the server has an opinion.
+   *
+   * It was built inline from `Date.now()` on every attempt, so a rider whose
+   * reply was lost — which on a cellular round is the normal failure, not the
+   * unusual one — retried under a **new** key and the server had no way to
+   * recognise the repeat. Replaced only after a 4xx, which means the request
+   * was understood and refused, so the next attempt is a genuinely new one.
+   */
+  const keys = useRef(new Map<string, string>());
+  const keyFor = (path: string) => {
+    const held = keys.current.get(path);
+    if (held) return held;
+    const next = createFinancialIdempotencyKey(`delivery-${path}`, String(id ?? 'unknown'));
+    keys.current.set(path, next);
+    return next;
+  };
+
   const load = useCallback(async () => {
     try {
       setDelivery((await apiClient.get(`/deliveries/${id}`)).data.data);
       setError('');
-    } catch {
-      setError('Unable to load this delivery. Return to the list to use cached assignments.');
+    } catch (caught) {
+      setError(errorMessage(caught, language, t('deliveryDetail.couldNotLoad')));
+    } finally {
+      setLoading(false);
     }
-  }, [id]);
+  }, [id, language, t]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
   // A storekeeper handover or manager reassignment refreshes this screen live.
   useEffect(
     () =>
@@ -51,248 +100,263 @@ export default function DeliveryDetailScreen() {
       }),
     [id, load],
   );
-  async function action(path: string, body: Record<string, unknown>, confirmation: string) {
-    if (!delivery) return;
+
+  async function act(path: string, body: Record<string, unknown>, confirmation: string) {
+    if (!delivery || busy) return;
+    setBusy(path);
     try {
       await apiClient.post(`/deliveries/${id}/${path}`, {
         version: delivery.version,
-        idempotencyKey: `mobile-${path}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        idempotencyKey: keyFor(path),
         ...body,
       });
-      setSuccess(confirmation);
+      keys.current.delete(path);
+      toast.success(confirmation);
       setError('');
       await load();
     } catch (caught) {
-      const failure = caught as ApiFailure;
-      if (
-        (!failure.response || (failure.response.status ?? 0) >= 500) &&
-        isSafeOfflineDeliveryAction(path)
-      ) {
+      const status = (caught as ApiFailure).response?.status ?? 0;
+      const unreachable = !(caught as ApiFailure).response || status >= 500;
+      if (unreachable && isSafeOfflineDeliveryAction(path)) {
         await queueDeliveryAction(delivery._id, path, delivery.version, body);
-        setSuccess(
-          'Action saved offline. The delivery is not complete until the server confirms it.',
-        );
-      } else if (!failure.response || (failure.response.status ?? 0) >= 500) {
-        setError('This action requires an immediate server response. Reconnect and retry.');
-      } else setError(failure.response.data?.error?.message ?? 'Action was rejected.');
+        toast.info(t('delivery.savedOffline'));
+      } else if (unreachable) {
+        toast.error(t('delivery.needsConnection'));
+      } else {
+        // Understood and refused: the next attempt is a new one.
+        keys.current.delete(path);
+        toast.error(errorMessage(caught, language, t('delivery.rejected')));
+      }
+    } finally {
+      setBusy('');
     }
   }
-  if (!delivery)
+
+  /**
+   * Reporting a failed attempt.
+   *
+   * The notes were a free `TextInput` guarded by `length >= 3`, so "no"
+   * explained a delivery that did not happen — on the record management reads
+   * to decide whether to send the rider back.
+   */
+  async function reportFailure() {
+    const reason = await ask.choose({
+      title: t('delivery.recordFailure'),
+      description: t('delivery.failureReason'),
+      options: Object.values(DeliveryFailureReason).map((value) => ({
+        value,
+        label: t(`deliveryFailureReason.${value}`),
+      })),
+    });
+    if (!reason) return;
+
+    const notes = await ask.prompt({
+      title: t(`deliveryFailureReason.${reason}`),
+      description: t('delivery.notes'),
+      label: t('delivery.notes'),
+      multiline: true,
+      confirmLabel: t('delivery.recordFailure'),
+      danger: true,
+      validate: requireReason(t),
+    });
+    if (!notes) return;
+
+    await act('fail', { reason, notes }, t('deliveryDetail.failedAttempt'));
+  }
+
+  if (loading) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.error}>{error || 'Loading delivery...'}</Text>
-        <Pressable style={styles.secondary} onPress={() => void load()}>
-          <Text>Retry</Text>
-        </Pressable>
-      </View>
+      <Screen>
+        <LoadingState label={t('deliveryDetail.loading')} />
+      </Screen>
     );
+  }
+
+  if (!delivery) {
+    return (
+      <Screen>
+        <ErrorState
+          message={error || t('deliveryDetail.couldNotLoad')}
+          onRetry={() => void load()}
+        />
+      </Screen>
+    );
+  }
+
   const pack = typeof delivery.packageId === 'string' ? undefined : delivery.packageId;
   const invoice = typeof delivery.invoiceId === 'string' ? undefined : delivery.invoiceId;
   const address = `${delivery.addressSnapshot.line1}, ${delivery.addressSnapshot.city}, ${delivery.addressSnapshot.district}`;
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.heading}>
-        <Text style={styles.reference}>{delivery.reference}</Text>
-        <Text style={styles.status}>{delivery.status.replaceAll('_', ' ')}</Text>
-      </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {success ? <Text style={styles.success}>{success}</Text> : null}
-      <View style={styles.card}>
-        <Text style={styles.title}>{delivery.contactSnapshot.name}</Text>
-        <Text>{delivery.contactSnapshot.phone}</Text>
-        <Text>{address}</Text>
-        <Text>
-          {pack?.reference} · {pack?.packageCount} package(s)
-        </Text>
-        <Text>{invoice?.reference}</Text>
-        {delivery.instructions ? (
-          <Text style={styles.instructions}>Instruction: {delivery.instructions}</Text>
+    <Screen>
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+
+      <Card>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: layout.space[2],
+          }}
+        >
+          <SectionTitle>{delivery.reference}</SectionTitle>
+          <StatusPill kind="delivery" status={delivery.status} />
+        </View>
+        <ListRow label={t('delivery.contact')} value={delivery.contactSnapshot.name} />
+        <ListRow label={t('fields.phone')} value={delivery.contactSnapshot.phone} />
+        <ListRow label={t('delivery.address')} value={address} />
+        {pack ? (
+          <ListRow
+            label={t('deliveryDetail.package')}
+            value={`${pack.reference} · ${t('deliveryDetail.packageCount', {
+              count: pack.packageCount ?? 0,
+            })}`}
+          />
         ) : null}
-        <View style={styles.row}>
-          <Pressable
-            style={styles.secondary}
+        {invoice ? <ListRow label={t('fields.reference')} value={invoice.reference} /> : null}
+        {delivery.instructions ? (
+          <ListRow label={t('delivery.instruction')} value={delivery.instructions} />
+        ) : null}
+
+        <View style={{ flexDirection: 'row', gap: layout.space[2] }}>
+          <Button
+            variant="secondary"
+            style={{ flex: 1 }}
+            label={t('delivery.callShop')}
             onPress={() => void Linking.openURL(`tel:${delivery.contactSnapshot.phone}`)}
-          >
-            <Text>Call shop</Text>
-          </Pressable>
-          <Pressable
-            style={styles.secondary}
+          />
+          <Button
+            variant="secondary"
+            style={{ flex: 1 }}
+            label={t('delivery.openMap')}
             onPress={() =>
               void Linking.openURL(
                 `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`,
               )
             }
-          >
-            <Text>Open map</Text>
-          </Pressable>
+          />
         </View>
-      </View>
+      </Card>
+
       {isStorekeeper && delivery.status === DeliveryStatus.ASSIGNED && pack && invoice ? (
-        <Action
-          label="Confirm store handover"
+        <Button
+          label={t('deliveryDetail.confirmHandover')}
+          busy={busy === 'handover'}
           onPress={() =>
-            void action(
+            void act(
               'handover',
               {
                 packageReference: pack.reference,
                 invoiceReference: invoice.reference,
                 packageCount: pack.packageCount,
               },
-              'Package handover confirmed.',
+              t('deliveryDetail.handoverDone'),
             )
           }
         />
       ) : null}
+
       {isStorekeeper && delivery.status === DeliveryStatus.RETURNING ? (
-        <Action
-          label="Confirm package returned to store"
-          onPress={() => void action('returned', {}, 'Returned package accepted.')}
+        <Button
+          label={t('deliveryDetail.confirmReturned')}
+          busy={busy === 'returned'}
+          onPress={() => void act('returned', {}, t('deliveryDetail.returnConfirmed'))}
         />
       ) : null}
+
       {isDriver &&
       delivery.status === DeliveryStatus.HANDED_OVER &&
       !delivery.handover?.acknowledgedAt ? (
-        <Action
-          label="Acknowledge package receipt"
-          onPress={() => void action('acknowledge', {}, 'Handover acknowledged.')}
+        <Button
+          label={t('delivery.acknowledge')}
+          busy={busy === 'acknowledge'}
+          onPress={() => void act('acknowledge', {}, t('delivery.acknowledged'))}
         />
       ) : null}
+
       {isDriver &&
       delivery.status === DeliveryStatus.HANDED_OVER &&
       delivery.handover?.acknowledgedAt ? (
-        <Action
-          label="Confirm pickup"
-          onPress={() => void action('pickup', {}, 'Pickup confirmed.')}
+        <Button
+          label={t('delivery.confirmPickup')}
+          busy={busy === 'pickup'}
+          onPress={() => void act('pickup', {}, t('delivery.pickedUp'))}
         />
       ) : null}
+
       {isDriver && delivery.status === DeliveryStatus.PICKED_UP ? (
-        <Action
-          label="Start delivery route"
-          onPress={() => void action('start', {}, 'Delivery route started.')}
+        <Button
+          label={t('delivery.startRoute')}
+          busy={busy === 'start'}
+          onPress={() => void act('start', {}, t('delivery.routeStarted'))}
         />
       ) : null}
+
       {isDriver && delivery.status === DeliveryStatus.OUT_FOR_DELIVERY ? (
-        <Action
-          label="I have arrived"
-          onPress={() => void action('arrived', {}, 'Arrival recorded.')}
+        <Button
+          label={t('delivery.markArrived')}
+          busy={busy === 'arrived'}
+          onPress={() => void act('arrived', {}, t('delivery.arrived'))}
         />
       ) : null}
+
       {isDriver && delivery.status === DeliveryStatus.ARRIVED ? (
-        <View style={styles.card}>
-          <Text style={styles.title}>At the shop</Text>
-          <Action
-            label="Send / resend receiver OTP"
-            onPress={() => void action('send-otp', {}, 'OTP sent to the shop owner.')}
+        <Card>
+          <SectionTitle>{t('delivery.atTheShop')}</SectionTitle>
+          <Button
+            variant="secondary"
+            label={t('delivery.sendOtp')}
+            busy={busy === 'send-otp'}
+            onPress={() => void act('send-otp', {}, t('delivery.otpSent'))}
           />
-          <Action
-            label="Capture proof and complete"
+          <Button
+            label={t('delivery.captureProof')}
             onPress={() =>
               router.push({ pathname: '/(protected)/delivery-proof', params: { id: delivery._id } })
             }
           />
-        </View>
+        </Card>
       ) : null}
-      {isDriver &&
-      [
-        DeliveryStatus.ASSIGNED,
-        DeliveryStatus.HANDED_OVER,
-        DeliveryStatus.PICKED_UP,
-        DeliveryStatus.OUT_FOR_DELIVERY,
-        DeliveryStatus.ARRIVED,
-      ].includes(delivery.status as typeof DeliveryStatus.ASSIGNED) ? (
-        <View style={styles.card}>
-          <Text style={styles.title}>Report failed delivery</Text>
-          <Text style={styles.label}>Reason</Text>
-          <View style={styles.wrap}>
-            {reasons.map((reason) => (
-              <Pressable
-                key={reason}
-                style={[styles.choice, failureReason === reason && styles.selected]}
-                onPress={() => setFailureReason(reason)}
-              >
-                <Text style={failureReason === reason ? styles.selectedText : undefined}>
-                  {reason.replaceAll('_', ' ')}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <TextInput
-            style={styles.input}
-            value={failureNotes}
-            onChangeText={setFailureNotes}
-            placeholder="Required notes"
-            multiline
-          />
-          <Pressable
-            style={styles.danger}
-            onPress={() =>
-              failureNotes.trim().length >= 3
-                ? void action(
-                    'fail',
-                    { reason: failureReason, notes: failureNotes.trim() },
-                    'Failure reported to management.',
-                  )
-                : setError('Enter at least three characters of notes.')
-            }
-          >
-            <Text style={styles.actionText}>Report failure</Text>
-          </Pressable>
-        </View>
-      ) : null}
-      {(isDriver || canManageReturn) && delivery.status === DeliveryStatus.FAILED ? (
-        <Action
-          label="Start return to store"
-          onPress={() => void action('returning', {}, 'Return trip started.')}
+
+      {isDriver && FAILABLE.includes(delivery.status) ? (
+        <Button
+          variant="danger"
+          label={t('delivery.recordFailure')}
+          busy={busy === 'fail'}
+          onPress={() => void reportFailure()}
         />
       ) : null}
-      <View style={styles.card}>
-        <Text style={styles.title}>Timeline</Text>
+
+      {(isDriver || canManageReturn) && delivery.status === DeliveryStatus.FAILED ? (
+        <Button
+          label={t('deliveryDetail.startReturn')}
+          busy={busy === 'returning'}
+          onPress={() => void act('returning', {}, t('deliveryDetail.returnStarted'))}
+        />
+      ) : null}
+
+      <Card>
+        <SectionTitle>{t('deliveryDetail.timeline')}</SectionTitle>
         {delivery.history.map((entry, index) => (
-          <View style={styles.timeline} key={`${entry.to}-${index}`}>
-            <Text style={styles.timelineTitle}>{entry.to.replaceAll('_', ' ')}</Text>
-            <Text>{formatFinanceDateTime(entry.at)}</Text>
-          </View>
+          <ListRow
+            key={`${entry.to}-${index}`}
+            // Was `entry.to.replaceAll('_', ' ')` — `OUT FOR DELIVERY` shouted
+            // at a rider, and English whatever the app was set to.
+            label={statusLabel(t, 'delivery', entry.to)}
+            value={formatFinanceDateTime(entry.at)}
+          />
         ))}
-      </View>
+        {delivery.history.length === 0 ? (
+          <Text style={{ color: colour.textMuted }}>{t('common.nothingHere')}</Text>
+        ) : null}
+      </Card>
+
       <ActivityTimelineView
         entityType="Delivery"
         entityId={String(delivery._id)}
-        title="Delivery activity"
+        title={t('deliveryDetail.activity')}
       />
-    </ScrollView>
+    </Screen>
   );
 }
-
-function Action({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="button" style={styles.action} onPress={onPress}>
-      <Text style={styles.actionText}>{label}</Text>
-    </Pressable>
-  );
-}
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  content: { padding: 14, gap: 12 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  heading: { flexDirection: 'row', justifyContent: 'space-between' },
-  reference: { fontWeight: '900', color: '#126b45', fontSize: 20 },
-  status: { fontSize: 12 },
-  card: { backgroundColor: '#fff', padding: 16, borderRadius: 12, gap: 9 },
-  title: { fontWeight: '800', fontSize: 18 },
-  instructions: { backgroundColor: '#fff4d6', padding: 9 },
-  row: { flexDirection: 'row', gap: 8 },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  label: { fontWeight: '700' },
-  choice: { borderWidth: 1, borderColor: '#ccd8d0', padding: 8, borderRadius: 20 },
-  selected: { backgroundColor: '#183d2d' },
-  selectedText: { color: '#fff' },
-  input: { borderWidth: 1, borderColor: '#c7d2cb', borderRadius: 8, padding: 11, minHeight: 70 },
-  action: { backgroundColor: '#126b45', padding: 14, borderRadius: 9, marginVertical: 3 },
-  actionText: { color: '#fff', fontWeight: '800', textAlign: 'center' },
-  secondary: { backgroundColor: '#e6eee9', padding: 11, borderRadius: 8 },
-  danger: { backgroundColor: '#8b2525', padding: 14, borderRadius: 9 },
-  error: { color: '#8b2525', backgroundColor: '#fff0ee', padding: 10 },
-  success: { color: '#126b45', backgroundColor: '#e9f7ef', padding: 10 },
-  timeline: { borderBottomWidth: 1, borderBottomColor: '#e5ece8', paddingVertical: 8 },
-  timelineTitle: { fontWeight: '700' },
-});

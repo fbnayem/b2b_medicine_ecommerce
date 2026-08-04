@@ -26,6 +26,17 @@ describe('mobile fulfilment flow payloads', () => {
     });
   });
 
+  it('never sends NaN for a quantity, whatever was typed', () => {
+    // A cleared field and a fat-fingered letter both reached the server as
+    // `NaN` on the payload that decides what gets invoiced.
+    const progress = (value: string) =>
+      buildPickingProgress(1, lines, { 'line-1': value }, 'SAVE').items[0]!.pickedQuantity;
+    expect(progress('')).toBe(0);
+    expect(progress('abc')).toBe(0);
+    expect(progress('2x')).toBe(2);
+    expect(buildPickingProgress(1, lines, {}, 'SAVE').items[0]!.pickedQuantity).toBe(0);
+  });
+
   it('adds a shortfall reason only to reduced packed lines', () => {
     expect(
       buildPackingConfirmation(5, lines, { 'line-1': '1' }, 'One unit missing', 'batch-1', 2, 750),

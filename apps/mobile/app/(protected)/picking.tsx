@@ -1,30 +1,56 @@
-import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, router } from 'expo-router';
+import { errorMessage } from '@medsupply/api-client';
 import { apiClient } from '../../src/api/client';
 import {
   buildPackingConfirmation,
   buildPickingProgress,
   findLineForBarcode,
 } from '../../src/fulfilment/flow';
+import { useLanguage } from '../../src/i18n/useLanguage';
+import {
+  Badge,
+  Button,
+  Card,
+  ErrorState,
+  Field,
+  Input,
+  ListRow,
+  LoadingState,
+  Screen,
+  SectionTitle,
+  toast,
+  useAsk,
+} from '../../src/components';
+import { colour, layout } from '../../src/theme';
 
-type PickingItem = {
+interface PickingItem {
   _id: string;
   medicineId: { _id: string; brandName: string; barcode?: string };
   batchId: string;
   quantity: number;
   pickedQuantity: number;
-};
-type PickingList = {
+}
+
+interface PickingList {
   _id: string;
   status: string;
   version: number;
   items: PickingItem[];
   orderId: { reference: string };
-};
-type ApiFailure = { response?: { data?: { error?: { message?: string } } } };
-const discrepancyTypes = [
+  /**
+   * Sent alongside the items rather than populated over `batchId`, because the
+   * client posts that id straight back when recording progress. This screen
+   * ignored it and rendered the 24-character id at the picker — U11 verbatim,
+   * fixed on the web client and still live here.
+   */
+  batchNumbers?: Record<string, { batchNumber: string; expiryDate: string }>;
+}
+
+/** Local to fulfilment; there is no shared enum for these. */
+const DISCREPANCY_TYPES = [
   'MISSING_QUANTITY',
   'DAMAGED_ITEM',
   'WRONG_BATCH',
@@ -34,22 +60,27 @@ const discrepancyTypes = [
   'OTHER',
 ] as const;
 
+const WORKING = ['PICKING', 'PAUSED', 'PACKING'];
+
 export default function PickingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t, language } = useLanguage();
+  const ask = useAsk();
   const [permission, requestPermission] = useCameraPermissions();
+
   const [list, setList] = useState<PickingList>();
   const [quantities, setQuantities] = useState<Record<string, string>>({});
-  const [reason, setReason] = useState('');
+  const [shortfall, setShortfall] = useState('');
   const [barcode, setBarcode] = useState('');
   const [packageCount, setPackageCount] = useState('1');
   const [weightGrams, setWeightGrams] = useState('');
-  const [discrepancyType, setDiscrepancyType] =
-    useState<(typeof discrepancyTypes)[number]>('MISSING_QUANTITY');
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [confirmedCodes, setConfirmedCodes] = useState<string[]>([]);
+  const [confirmedLines, setConfirmedLines] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const value: PickingList = (await apiClient.get(`/fulfilment/picking/${id}`)).data.data;
       setList(value);
@@ -59,313 +90,384 @@ export default function PickingScreen() {
         ),
       );
       setError('');
-    } catch {
-      setError('Unable to load picking list.');
+    } catch (caught) {
+      setError(errorMessage(caught, language, t('picking.couldNotLoad')));
+    } finally {
+      setLoading(false);
     }
-  }
+  }, [id, language, t]);
 
   useEffect(() => {
     void load();
-  }, [id]);
-  const failure = (caught: unknown, fallback: string) =>
-    (caught as ApiFailure).response?.data?.error?.message ?? fallback;
+  }, [load]);
+
+  const batchNumber = (item: PickingItem) => list?.batchNumbers?.[item.batchId]?.batchNumber ?? '—';
+
+  async function post(
+    path: string,
+    body: Record<string, unknown>,
+    done: string,
+    fallback: string,
+    andBack = false,
+  ) {
+    if (busy) return;
+    setBusy(path);
+    try {
+      await apiClient.post(`/fulfilment/picking/${id}/${path}`, body);
+      toast.success(done);
+      if (andBack) router.back();
+      else await load();
+    } catch (caught) {
+      toast.error(errorMessage(caught, language, fallback));
+    } finally {
+      setBusy('');
+    }
+  }
 
   function confirmBarcode(value: string) {
-    const normalized = value.trim();
-    const match = list ? findLineForBarcode(list.items, normalized) : undefined;
+    const code = value.trim();
+    const match = list ? findLineForBarcode(list.items, code) : undefined;
     if (!match) {
-      setError('The scanned code does not match an allocated medicine or batch.');
+      toast.error(t('picking.codeNoMatch'));
       return;
     }
-    setConfirmedCodes((current) => Array.from(new Set([...current, match._id])));
-    setBarcode(normalized);
+    setConfirmedLines((current) => Array.from(new Set([...current, match._id])));
+    setBarcode(code);
     setScannerOpen(false);
-    setError('');
+    toast.success(t('picking.codeConfirmed'));
   }
 
   async function openScanner() {
     if (!permission?.granted) {
       const result = await requestPermission();
       if (!result.granted) {
-        setError('Camera permission denied. Use manual confirmation below.');
+        toast.error(t('picking.cameraDenied'));
         return;
       }
     }
     setScannerOpen(true);
   }
 
-  async function start() {
+  /**
+   * A problem, recorded against the line it is actually on.
+   *
+   * This posted `items[0]` — the *first* line — whatever the picker was looking
+   * at, so a damaged item on line four was filed against line one's medicine and
+   * line one's batch. That record is what management reads to decide whether to
+   * re-pick, adjust stock or quarantine it, and it named the wrong carton.
+   */
+  async function reportDiscrepancy(item: PickingItem) {
     if (!list) return;
-    try {
-      await apiClient.post(`/fulfilment/picking/${id}/start`, { version: list.version });
-      await load();
-    } catch (caught: unknown) {
-      setError(failure(caught, 'Unable to start picking.'));
-    }
-  }
+    const type = await ask.choose({
+      title: t('picking.reportTitle'),
+      description: `${item.medicineId.brandName} · ${batchNumber(item)}`,
+      options: DISCREPANCY_TYPES.map((value) => ({
+        value,
+        label: t(`discrepancyType.${value}`),
+      })),
+    });
+    if (!type) return;
 
-  async function progress(action: 'SAVE' | 'PAUSE' | 'COMPLETE') {
-    if (!list) return;
-    try {
-      await apiClient.post(
-        `/fulfilment/picking/${id}/progress`,
-        buildPickingProgress(list.version, list.items, quantities, action),
-      );
-      await load();
-    } catch (caught: unknown) {
-      setError(failure(caught, 'Unable to update picking.'));
-    }
-  }
+    const affected = await ask.prompt({
+      title: t('picking.affectedQuantity'),
+      label: t('picking.affectedQuantity'),
+      numeric: true,
+      initialValue: '0',
+      confirmLabel: t('actions.confirm'),
+      validate: (value) =>
+        Number.isInteger(Number(value)) && Number(value) >= 0 ? null : t('inventory.badQuantity'),
+    });
+    if (affected === null) return;
 
-  async function resume() {
-    if (!list) return;
-    try {
-      await apiClient.post(`/fulfilment/picking/${id}/resume`, { version: list.version });
-      await load();
-    } catch (caught: unknown) {
-      setError(failure(caught, 'Unable to resume picking.'));
-    }
-  }
+    const notes = await ask.prompt({
+      title: t(`discrepancyType.${type}`),
+      description: t('picking.reportTitle'),
+      label: t('fields.notes'),
+      multiline: true,
+      confirmLabel: t('picking.report'),
+      danger: true,
+      validate: (value) => (value.trim().length >= 3 ? null : t('picking.needNotes')),
+    });
+    if (!notes) return;
 
-  async function discrepancy() {
-    if (!list?.items[0] || reason.length < 3) {
-      setError('Enter a reason before reporting a discrepancy.');
-      return;
-    }
-    try {
-      await apiClient.post(`/fulfilment/picking/${id}/discrepancies`, {
+    await post(
+      'discrepancies',
+      {
         version: list.version,
-        type: discrepancyType,
-        medicineId: list.items[0].medicineId._id,
-        batchId: list.items[0].batchId,
-        quantity: 0,
-        notes: reason,
-      });
-      router.back();
-    } catch (caught: unknown) {
-      setError(failure(caught, 'Unable to report discrepancy.'));
-    }
-  }
-
-  async function pack() {
-    if (!list) return;
-    try {
-      await apiClient.post(
-        `/fulfilment/picking/${id}/pack`,
-        buildPackingConfirmation(
-          list.version,
-          list.items,
-          quantities,
-          reason,
-          barcode,
-          Number(packageCount),
-          weightGrams ? Number(weightGrams) : undefined,
-        ),
-      );
-      Alert.alert('Packed', 'Invoice and package created from actual packed quantities.');
-      router.back();
-    } catch (caught: unknown) {
-      setError(failure(caught, 'Packing failed.'));
-    }
-  }
-
-  if (!list)
-    return (
-      <View style={styles.center}>
-        <Text>{error || 'Loading...'}</Text>
-      </View>
+        type,
+        medicineId: item.medicineId._id,
+        batchId: item.batchId,
+        quantity: Number(affected),
+        notes,
+      },
+      t('picking.reported'),
+      t('picking.reportFailed'),
     );
+  }
+
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState label={t('picking.loading')} />
+      </Screen>
+    );
+  }
+
+  if (!list) {
+    return (
+      <Screen>
+        <ErrorState message={error || t('picking.couldNotLoad')} onRetry={() => void load()} />
+      </Screen>
+    );
+  }
+
+  const working = WORKING.includes(list.status);
+  const editing = list.status === 'PICKING' || list.status === 'PACKING';
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.reference}>{list.orderId.reference}</Text>
-      <Text style={styles.heading}>{list.status.replaceAll('_', ' ')}</Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {list.items.map((item) => (
-        <View style={styles.card} key={item._id}>
-          <Text style={styles.title}>{item.medicineId.brandName}</Text>
-          <Text>Batch: {item.batchId}</Text>
-          <Text>Allocated: {item.quantity}</Text>
-          <Text>
-            {confirmedCodes.includes(item._id)
-              ? 'Barcode confirmed'
-              : 'Manual quantity confirmation available'}
-          </Text>
-          {list.status === 'PICKING' || list.status === 'PACKING' ? (
-            <TextInput
-              accessibilityLabel={`${list.status === 'PACKING' ? 'Packed' : 'Picked'} quantity for ${item.medicineId.brandName}`}
-              style={styles.input}
-              keyboardType="number-pad"
-              value={quantities[item._id] ?? ''}
-              onChangeText={(value) =>
-                setQuantities((current) => ({ ...current, [item._id]: value }))
-              }
-            />
-          ) : (
-            <Text>Picked: {item.pickedQuantity}</Text>
-          )}
+    <Screen>
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+
+      <Card>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: layout.space[2],
+          }}
+        >
+          <SectionTitle>{list.orderId.reference}</SectionTitle>
+          {/* Was `status.replaceAll('_', ' ')` — `BLOCKED DISCREPANCY`. */}
+          <Badge tone={list.status === 'PACKED' ? 'success' : 'info'}>
+            {t(`pickingStatus.${list.status}`)}
+          </Badge>
         </View>
-      ))}
-      {['PICKING', 'PAUSED', 'PACKING'].includes(list.status) ? (
-        <>
-          <Text style={styles.label}>Barcode confirmation</Text>
-          {scannerOpen ? (
-            <CameraView
-              style={styles.camera}
-              barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'code128', 'qr'] }}
-              onBarcodeScanned={({ data }) => confirmBarcode(data)}
+      </Card>
+
+      <SectionTitle>{t('picking.allocated')}</SectionTitle>
+      {list.items.map((item) => (
+        <Card key={item._id}>
+          <Text style={{ fontSize: layout.fontSize.base, fontWeight: '600', color: colour.text }}>
+            {item.medicineId.brandName}
+          </Text>
+          {/* The number printed on the carton, which is what a picker can check. */}
+          <ListRow label={t('fields.batch')} value={batchNumber(item)} />
+          <ListRow label={t('picking.columnAllocated')} value={item.quantity} numeric />
+          <Badge tone={confirmedLines.includes(item._id) ? 'success' : 'neutral'}>
+            {confirmedLines.includes(item._id)
+              ? t('picking.confirmedByScan')
+              : t('picking.notYetConfirmed')}
+          </Badge>
+
+          {editing ? (
+            <Field
+              label={
+                list.status === 'PACKING'
+                  ? t('picking.packedFor', { brand: item.medicineId.brandName })
+                  : t('picking.pickedFor', { brand: item.medicineId.brandName })
+              }
+            >
+              <Input
+                label={
+                  list.status === 'PACKING'
+                    ? t('picking.packedFor', { brand: item.medicineId.brandName })
+                    : t('picking.pickedFor', { brand: item.medicineId.brandName })
+                }
+                keyboardType="number-pad"
+                value={quantities[item._id] ?? ''}
+                onChangeText={(value) =>
+                  setQuantities((current) => ({ ...current, [item._id]: value }))
+                }
+              />
+            </Field>
+          ) : (
+            <ListRow label={t('picking.columnPicked')} value={item.pickedQuantity} numeric />
+          )}
+
+          {working ? (
+            <Button
+              variant="secondary"
+              label={t('picking.reportOnLine', { brand: item.medicineId.brandName })}
+              disabled={busy !== ''}
+              onPress={() => void reportDiscrepancy(item)}
             />
           ) : null}
-          <Pressable
-            accessibilityRole="button"
-            style={styles.secondary}
-            onPress={() => void openScanner()}
-          >
-            <Text>Scan with camera</Text>
-          </Pressable>
-          <TextInput
-            accessibilityLabel="Medicine or batch barcode"
-            style={styles.input}
-            placeholder="Enter medicine barcode or batch ID"
-            value={barcode}
-            onChangeText={setBarcode}
-          />
-          <Pressable
-            accessibilityRole="button"
-            style={styles.secondary}
+        </Card>
+      ))}
+
+      {working ? (
+        <Card>
+          <SectionTitle>{t('fulfilment.barcodeLabel')}</SectionTitle>
+          {scannerOpen ? (
+            <>
+              <CameraView
+                style={{
+                  height: 260,
+                  borderRadius: layout.radius.lg,
+                  overflow: 'hidden',
+                }}
+                barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'code128', 'qr'] }}
+                onBarcodeScanned={({ data }) => confirmBarcode(data)}
+              />
+              <Button
+                variant="secondary"
+                label={t('picking.closeScanner')}
+                onPress={() => setScannerOpen(false)}
+              />
+            </>
+          ) : (
+            <Button
+              variant="secondary"
+              label={t('picking.scanWithCamera')}
+              onPress={() => void openScanner()}
+            />
+          )}
+
+          <Field label={t('fulfilment.barcodeLabel')} hint={t('picking.barcodeHint')}>
+            <Input
+              label={t('fulfilment.barcodeLabel')}
+              value={barcode}
+              onChangeText={setBarcode}
+              autoCapitalize="none"
+            />
+          </Field>
+          <Button
+            variant="secondary"
+            label={t('picking.confirmCodeManually')}
             onPress={() => confirmBarcode(barcode)}
-          >
-            <Text>Confirm code manually</Text>
-          </Pressable>
-          <TextInput
-            accessibilityLabel="Shortfall or discrepancy reason"
-            style={styles.notes}
-            placeholder="Required shortfall/discrepancy reason"
-            multiline
-            value={reason}
-            onChangeText={setReason}
           />
-        </>
+
+          <Field label={t('picking.columnShortfall')}>
+            <Input
+              label={t('picking.columnShortfall')}
+              multiline
+              value={shortfall}
+              onChangeText={setShortfall}
+              style={{ minHeight: layout.space[10], paddingTop: layout.space[3] }}
+            />
+          </Field>
+        </Card>
       ) : null}
+
       {list.status === 'PENDING' ? (
-        <Pressable accessibilityRole="button" style={styles.primary} onPress={() => void start()}>
-          <Text style={styles.primaryText}>Start picking</Text>
-        </Pressable>
+        <Button
+          label={t('picking.startPicking')}
+          busy={busy === 'start'}
+          onPress={() =>
+            void post(
+              'start',
+              { version: list.version },
+              t('picking.started'),
+              t('picking.startFailed'),
+            )
+          }
+        />
       ) : null}
+
       {list.status === 'PICKING' ? (
         <>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.secondary}
-            onPress={() => void progress('SAVE')}
-          >
-            <Text>Save progress</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.secondary}
-            onPress={() => void progress('PAUSE')}
-          >
-            <Text>Pause picking</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.primary}
-            onPress={() => void progress('COMPLETE')}
-          >
-            <Text style={styles.primaryText}>Complete picking</Text>
-          </Pressable>
+          <Button
+            variant="secondary"
+            label={t('picking.saveProgress')}
+            busy={busy === 'progress'}
+            onPress={() =>
+              void post(
+                'progress',
+                buildPickingProgress(list.version, list.items, quantities, 'SAVE'),
+                t('picking.saved'),
+                t('picking.updateFailed'),
+              )
+            }
+          />
+          <Button
+            variant="secondary"
+            label={t('picking.pause')}
+            busy={busy === 'progress'}
+            onPress={() =>
+              void post(
+                'progress',
+                buildPickingProgress(list.version, list.items, quantities, 'PAUSE'),
+                t('picking.paused'),
+                t('picking.updateFailed'),
+              )
+            }
+          />
+          <Button
+            label={t('picking.completePicking')}
+            busy={busy === 'progress'}
+            onPress={() =>
+              void post(
+                'progress',
+                buildPickingProgress(list.version, list.items, quantities, 'COMPLETE'),
+                t('picking.completed'),
+                t('picking.updateFailed'),
+              )
+            }
+          />
         </>
       ) : null}
+
       {list.status === 'PAUSED' ? (
-        <Pressable accessibilityRole="button" style={styles.primary} onPress={() => void resume()}>
-          <Text style={styles.primaryText}>Resume picking</Text>
-        </Pressable>
+        <Button
+          label={t('picking.resumePicking')}
+          busy={busy === 'resume'}
+          onPress={() =>
+            void post(
+              'resume',
+              { version: list.version },
+              t('picking.resumed'),
+              t('picking.updateFailed'),
+            )
+          }
+        />
       ) : null}
+
       {list.status === 'PACKING' ? (
-        <>
-          <Text style={styles.label}>Package count</Text>
-          <TextInput
-            accessibilityLabel="Package count"
-            style={styles.input}
-            keyboardType="number-pad"
-            value={packageCount}
-            onChangeText={setPackageCount}
+        <Card>
+          <Field label={t('picking.packageCount')}>
+            <Input
+              label={t('picking.packageCount')}
+              keyboardType="number-pad"
+              value={packageCount}
+              onChangeText={setPackageCount}
+            />
+          </Field>
+          <Field label={t('picking.weight')} hint={t('picking.weightHint')}>
+            <Input
+              label={t('picking.weight')}
+              keyboardType="number-pad"
+              value={weightGrams}
+              onChangeText={setWeightGrams}
+            />
+          </Field>
+          <Button
+            label={t('picking.confirmPacking')}
+            busy={busy === 'pack'}
+            onPress={() =>
+              void post(
+                'pack',
+                buildPackingConfirmation(
+                  list.version,
+                  list.items,
+                  quantities,
+                  shortfall,
+                  barcode,
+                  Number(packageCount.replace(/[^0-9]/g, '') || '1'),
+                  weightGrams ? Number(weightGrams.replace(/[^0-9]/g, '')) : undefined,
+                ),
+                // Was `Alert.alert('Packed', 'Invoice and package created from
+                // actual packed quantities.')` — outside React, untranslatable,
+                // invisible to a test, and it said "invoice" and "package"
+                // rather than what had happened.
+                t('picking.packed'),
+                t('picking.packFailed'),
+                true,
+              )
+            }
           />
-          <Text style={styles.label}>Weight in grams (optional)</Text>
-          <TextInput
-            accessibilityLabel="Package weight in grams"
-            style={styles.input}
-            keyboardType="number-pad"
-            value={weightGrams}
-            onChangeText={setWeightGrams}
-          />
-          <Pressable accessibilityRole="button" style={styles.primary} onPress={() => void pack()}>
-            <Text style={styles.primaryText}>Confirm packing</Text>
-          </Pressable>
-        </>
+        </Card>
       ) : null}
-      {['PICKING', 'PAUSED', 'PACKING'].includes(list.status) ? (
-        <>
-          <Text style={styles.label}>Discrepancy type</Text>
-          <View style={styles.typeGrid}>
-            {discrepancyTypes.map((type) => (
-              <Pressable
-                key={type}
-                accessibilityRole="button"
-                style={[styles.typeButton, discrepancyType === type && styles.typeSelected]}
-                onPress={() => setDiscrepancyType(type)}
-              >
-                <Text style={discrepancyType === type ? styles.typeSelectedText : undefined}>
-                  {type.replaceAll('_', ' ')}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.secondary}
-            onPress={() => void discrepancy()}
-          >
-            <Text>Report discrepancy</Text>
-          </Pressable>
-        </>
-      ) : null}
-    </ScrollView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5' },
-  content: { padding: 16 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  reference: { color: '#126b45' },
-  heading: { fontSize: 23, fontWeight: '800' },
-  card: { backgroundColor: '#fff', padding: 14, borderRadius: 10, marginTop: 10 },
-  title: { fontWeight: '700' },
-  input: { borderWidth: 1, borderColor: '#bdcbc2', borderRadius: 8, padding: 10, marginTop: 8 },
-  notes: { backgroundColor: '#fff', minHeight: 80, padding: 12, marginTop: 12 },
-  label: { fontWeight: '700', marginTop: 15 },
-  camera: { height: 260, marginTop: 10, borderRadius: 10, overflow: 'hidden' },
-  primary: { backgroundColor: '#126b45', padding: 14, borderRadius: 9, marginTop: 12 },
-  primaryText: { color: '#fff', fontWeight: '700', textAlign: 'center' },
-  secondary: {
-    backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 9,
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 8 },
-  typeButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#bdcbc2',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-  },
-  typeSelected: { backgroundColor: '#126b45', borderColor: '#126b45' },
-  typeSelectedText: { color: '#fff' },
-  error: { color: '#8b2525', padding: 10 },
-});

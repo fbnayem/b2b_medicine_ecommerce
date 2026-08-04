@@ -220,7 +220,10 @@ export function DeliveryDetail() {
                         : t('deliveryDetail.notAssigned')}
                     </Detail>
                     <Detail label={t('deliveryDetail.requiredProof')}>
-                      {record.proofRequirements.join(', ')}
+                      {/* Was the raw enum joined with commas: `OTP, SIGNATURE, GPS`. */}
+                      {record.proofRequirements
+                        .map((requirement) => t(`deliveryProofType.${requirement}`))
+                        .join(', ')}
                     </Detail>
                   </dl>
                   {invoice && (

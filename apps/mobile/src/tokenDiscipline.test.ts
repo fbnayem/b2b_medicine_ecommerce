@@ -48,20 +48,15 @@ const SOURCES: ReadonlyMap<string, string> = new Map(
 );
 
 /**
- * Screens and shared modules still carrying their own colours.
+ * Empty, and it stays empty.
  *
- * `push.ts` is here with the rest rather than exempted: its notification
- * colour has to match `app.json`, which no package can reach, and the token
- * package already asserts that pairing — so it is a real entry with a real
- * answer, not a special case.
+ * Thirty-four files carried their own colours when this list was written,
+ * including both of the brand greens the token package exists to collapse and a
+ * third and fourth nobody had noticed. Every one of them now takes its colours
+ * from `src/theme.ts`, so an entry appearing here again is a regression rather
+ * than a backlog item — the first rule below fails on it immediately.
  */
-const RAW_HEX: readonly string[] = [
-  'app/(protected)/delivery-detail.tsx',
-  'app/(protected)/delivery-proof.tsx',
-  'app/(protected)/picking.tsx',
-  'app/(protected)/return-detail.tsx',
-  'src/finance/components.tsx',
-];
+const RAW_HEX: readonly string[] = [];
 
 function offenders(): string[] {
   return [...SOURCES.entries()]

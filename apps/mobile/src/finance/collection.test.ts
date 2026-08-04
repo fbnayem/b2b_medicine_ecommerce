@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { translatorFor } from '@medsupply/i18n';
 import { validateDeliveryCollection } from './collection';
 import { FinancePaymentMethod } from './types';
 
@@ -64,9 +65,10 @@ describe('delivery collection payload safety', () => {
       },
       10_000,
     );
-    expect(aboveDue).toEqual({
-      ok: false,
-      error: 'Collected amount cannot exceed the invoice amount due.',
-    });
+    expect(aboveDue).toEqual({ ok: false, error: 'delivery.amountAboveDue' });
+    // The key has to be one the catalogue holds words for, or the rider reads
+    // a dotted path at the door.
+    expect(translatorFor('en')('delivery.amountAboveDue')).not.toBe('delivery.amountAboveDue');
+    expect(translatorFor('bn')('delivery.amountAboveDue')).not.toBe('delivery.amountAboveDue');
   });
 });

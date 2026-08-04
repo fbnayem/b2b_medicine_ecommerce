@@ -111,6 +111,7 @@ export function FulfilmentWork() {
   const [packageCount, setPackageCount] = useState(1);
   const [weight, setWeight] = useState(0);
   const [notes, setNotes] = useState('');
+  const [discrepancyLine, setDiscrepancyLine] = useState('');
   const [discrepancyType, setDiscrepancyType] = useState(DISCREPANCY_TYPES[0]!);
   const [discrepancyQuantity, setDiscrepancyQuantity] = useState(0);
   const [discrepancyNotes, setDiscrepancyNotes] = useState('');
@@ -164,8 +165,18 @@ export function FulfilmentWork() {
       t('picking.updateFailed'),
     );
 
+  /**
+   * Which line the problem is on, chosen rather than assumed.
+   *
+   * This posted `items[0]` — the *first* line — whatever the picker was
+   * actually looking at, so a damaged item on line four was recorded against
+   * line one's medicine and line one's batch. That record is what management
+   * reads to decide whether to re-pick, adjust stock or quarantine, and it was
+   * naming the wrong carton. Mobile had the same line, copied.
+   */
   async function reportDiscrepancy() {
-    if (!list?.items[0] || discrepancyNotes.trim().length < 3) {
+    const line = list?.items.find((item) => item._id === discrepancyLine) ?? list?.items[0];
+    if (!line || discrepancyNotes.trim().length < 3) {
       toast.error(t('picking.needNotes'));
       return;
     }
@@ -173,8 +184,8 @@ export function FulfilmentWork() {
       'discrepancies',
       {
         type: discrepancyType,
-        medicineId: list.items[0].medicineId._id,
-        batchId: list.items[0].batchId,
+        medicineId: line.medicineId._id,
+        batchId: line.batchId,
         quantity: discrepancyQuantity,
         notes: discrepancyNotes,
       },
@@ -512,6 +523,19 @@ export function FulfilmentWork() {
                     <h2 className="mb-2 text-lg font-semibold text-text">
                       {t('picking.reportTitle')}
                     </h2>
+                    <Field label={t('picking.reportLine')} className="mb-3">
+                      <Select
+                        value={discrepancyLine || (current.items[0]?._id ?? '')}
+                        onChange={(event) => setDiscrepancyLine(event.target.value)}
+                      >
+                        {current.items.map((item) => (
+                          <option key={item._id} value={item._id}>
+                            {item.medicineId.brandName} ·{' '}
+                            {current.batchNumbers?.[item.batchId]?.batchNumber ?? '—'}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <Field label={t('picking.reportType')}>
                         <Select

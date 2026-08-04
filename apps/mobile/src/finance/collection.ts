@@ -36,7 +36,20 @@ export type CollectionValidation =
         paymentProof?: PaymentProofInput;
       };
     }
-  | { ok: false; error: string };
+  | { ok: false; error: CollectionProblem };
+
+/**
+ * What is wrong, as a catalogue key rather than a sentence.
+ *
+ * These four are the only words standing between a rider and a mis-posted
+ * collection, and they were English however the app was set — on the one screen
+ * that decides whether money reaches the customer's account.
+ */
+export type CollectionProblem =
+  | 'delivery.amountMustBePositive'
+  | 'delivery.amountAboveDue'
+  | 'delivery.referenceRequired'
+  | 'delivery.proofRequired';
 
 const methodsRequiringReference = new Set<DeliveryCollectionMethod>([
   FinancePaymentMethod.BANK_TRANSFER,
@@ -54,22 +67,22 @@ export function validateDeliveryCollection(
 
   const amountMinor = parseMoneyToMinor(draft.amount);
   if (amountMinor === null || amountMinor <= 0) {
-    return { ok: false, error: 'Enter a collected amount greater than zero.' };
+    return { ok: false, error: 'delivery.amountMustBePositive' };
   }
   if (
     invoiceAmountDueMinor !== undefined &&
     Number.isSafeInteger(invoiceAmountDueMinor) &&
     amountMinor > invoiceAmountDueMinor
   ) {
-    return { ok: false, error: 'Collected amount cannot exceed the invoice amount due.' };
+    return { ok: false, error: 'delivery.amountAboveDue' };
   }
 
   const reference = draft.transactionReference.trim();
   if (methodsRequiringReference.has(draft.method) && reference.length < 3) {
-    return { ok: false, error: 'Enter the bank, mobile service, or cheque reference.' };
+    return { ok: false, error: 'delivery.referenceRequired' };
   }
   if (methodsRequiringReference.has(draft.method) && !draft.paymentProof) {
-    return { ok: false, error: 'Capture payment proof for this payment method.' };
+    return { ok: false, error: 'delivery.proofRequired' };
   }
 
   return {
