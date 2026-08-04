@@ -401,6 +401,7 @@ export const en = {
     packages: '{{count}} packages',
     onePackage: '1 package',
     barcode: 'Barcode {{code}}',
+    barcodeLabel: 'Barcode',
     handOver: 'Hand over',
   },
 

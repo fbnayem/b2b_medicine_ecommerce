@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import { errorMessage } from '@medsupply/api-client';
 import { apiClient } from '../../../src/api/client';
+import { useLanguage } from '../../../src/i18n/useLanguage';
+import {
+  Badge,
+  CardLink,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  Screen,
+} from '../../../src/components';
+import { colour, layout } from '../../../src/theme';
 
 type PickingList = {
   _id: string;
@@ -11,7 +22,9 @@ type PickingList = {
 };
 
 export default function FulfilmentScreen() {
+  const { t, language } = useLanguage();
   const [data, setData] = useState<PickingList[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
@@ -19,23 +32,35 @@ export default function FulfilmentScreen() {
     try {
       setData((await apiClient.get('/fulfilment/queue')).data.data);
       setError('');
-    } catch {
-      setError('Unable to load queue. Pull down to retry.');
+    } catch (caught) {
+      setError(errorMessage(caught, language, t('fulfilment.couldNotLoad')));
     } finally {
+      setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [language, t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState label={t('fulfilment.loading')} />
+      </Screen>
+    );
+  }
+
   return (
-    <View style={styles.screen}>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+    <Screen scroll={false}>
+      {/* Was "Pull down to retry", which is discoverable to whoever wrote it
+          and to nobody wearing gloves in a cold store. */}
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
       <FlatList
         data={data}
         keyExtractor={(item) => item._id}
+        contentContainerStyle={{ gap: layout.space[3], paddingBottom: layout.space[6] }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -46,36 +71,35 @@ export default function FulfilmentScreen() {
           />
         }
         ListEmptyComponent={
-          <View style={styles.center}>
-            <Text>No fulfilment work.</Text>
-          </View>
+          <EmptyState title={t('fulfilment.none')} description={t('fulfilment.noneBody')} />
         }
         renderItem={({ item }) => (
-          <Pressable
-            accessibilityRole="button"
-            style={styles.card}
+          <CardLink
+            accessibilityLabel={item.orderId.reference}
             onPress={() =>
               router.push({ pathname: '/(protected)/picking', params: { id: item._id } })
             }
           >
-            <View style={styles.row}>
-              <Text style={styles.title}>{item.orderId.reference}</Text>
-              <Text>{item.status.replaceAll('_', ' ')}</Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: layout.space[2],
+              }}
+            >
+              <Text style={{ fontSize: layout.fontSize.lg, fontWeight: '600', color: colour.text }}>
+                {item.orderId.reference}
+              </Text>
+              <Badge>{t(`pickingStatus.${item.status}`)}</Badge>
             </View>
-            <Text>{item.orderId.shopId.name}</Text>
-            <Text>{item.items.length} batch line(s)</Text>
-          </Pressable>
+            <Text style={{ color: colour.text }}>{item.orderId.shopId.name}</Text>
+            <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>
+              {t('fulfilment.lines', { count: item.items.length })}
+            </Text>
+          </CardLink>
         )}
       />
-    </View>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5', padding: 14 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  card: { backgroundColor: '#fff', padding: 15, borderRadius: 11, marginBottom: 9 },
-  row: { flexDirection: 'row', justifyContent: 'space-between' },
-  title: { fontWeight: '700' },
-  error: { color: '#8b2525', padding: 10 },
-});

@@ -371,6 +371,7 @@ export const bn: Catalogue = {
     packages: '{{count}}টি প্যাকেজ',
     onePackage: '1টি প্যাকেজ',
     barcode: 'বারকোড {{code}}',
+    barcodeLabel: 'বারকোড',
     handOver: 'বুঝিয়ে দিন',
   },
 

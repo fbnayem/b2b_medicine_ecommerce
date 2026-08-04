@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
+import { errorMessage } from '@medsupply/api-client';
 import { apiClient } from '../../../src/api/client';
 import { formatMoneyMinor } from '../../../src/finance/money';
+import { useLanguage } from '../../../src/i18n/useLanguage';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  ListRow,
+  LoadingState,
+  Screen,
+} from '../../../src/components';
+import { colour, layout } from '../../../src/theme';
 
 type ReadyPackage = {
   _id: string;
@@ -13,28 +24,43 @@ type ReadyPackage = {
 };
 
 export default function ReadyScreen() {
+  const { t, language } = useLanguage();
   const [data, setData] = useState<ReadyPackage[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+
   const load = useCallback(async () => {
     try {
       setData((await apiClient.get('/fulfilment/ready')).data.data);
       setError('');
-    } catch {
-      setError('Unable to load ready packages. Pull down to retry.');
+    } catch (caught) {
+      setError(errorMessage(caught, language, t('fulfilment.readyCouldNotLoad')));
     } finally {
+      setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [language, t]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState label={t('fulfilment.readyLoading')} />
+      </Screen>
+    );
+  }
+
   return (
-    <View style={styles.screen}>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+    <Screen scroll={false}>
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
       <FlatList
         data={data}
         keyExtractor={(item) => item._id}
+        contentContainerStyle={{ gap: layout.space[3], paddingBottom: layout.space[6] }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -45,31 +71,39 @@ export default function ReadyScreen() {
           />
         }
         ListEmptyComponent={
-          <View style={styles.center}>
-            <Text>No packages ready.</Text>
-          </View>
+          <EmptyState
+            title={t('fulfilment.readyNone')}
+            description={t('fulfilment.readyNoneBody')}
+          />
         }
         renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.title}>{item.reference}</Text>
-            <Text>{item.orderId.reference}</Text>
-            <Text>
-              {item.invoiceId.reference} · {formatMoneyMinor(item.invoiceId.grandTotalMinor)}
+          <Card>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                gap: layout.space[2],
+              }}
+            >
+              <Text style={{ fontSize: layout.fontSize.lg, fontWeight: '600', color: colour.text }}>
+                {item.reference}
+              </Text>
+              <Text style={{ color: colour.textMuted }}>{item.orderId.reference}</Text>
+            </View>
+            <ListRow
+              label={item.invoiceId.reference}
+              value={formatMoneyMinor(item.invoiceId.grandTotalMinor)}
+              numeric
+            />
+            <ListRow label={t('fulfilment.barcodeLabel')} value={item.barcode} />
+            <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>
+              {item.packageCount === 1
+                ? t('fulfilment.onePackage')
+                : t('fulfilment.packages', { count: item.packageCount })}
             </Text>
-            <Text style={styles.barcode}>{item.barcode}</Text>
-            <Text>{item.packageCount} package(s)</Text>
-          </View>
+          </Card>
         )}
       />
-    </View>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f4f7f5', padding: 14 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  card: { backgroundColor: '#fff', padding: 15, borderRadius: 11, marginBottom: 9 },
-  title: { fontWeight: '800', color: '#126b45' },
-  barcode: { fontFamily: 'monospace', marginTop: 7 },
-  error: { color: '#8b2525', padding: 10 },
-});
