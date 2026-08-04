@@ -27,6 +27,7 @@ import type { TemplateContext } from './notificationCatalogue';
 import { notify } from './notificationService';
 import { emitEntityUpdate } from './realtime';
 import { businessSettings } from './settingsService';
+import { currencySnapshot } from './localisation';
 import {
   assertCreditWithinInvoice,
   assertDispositionValid,
@@ -930,6 +931,8 @@ export async function issueCreditNote(
           {
             reference,
             returnId: record._id,
+            // What this credit note is denominated in, recorded on it.
+            currencySnapshot: currencySnapshot(),
             returnReference: record.reference,
             invoiceId: invoice._id,
             invoiceReference: invoice.reference,

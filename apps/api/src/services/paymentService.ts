@@ -36,6 +36,7 @@ import { ActivityVisibility, recordActivity } from './activityService';
 import { emitEntityUpdate } from './realtime';
 import { MANAGEMENT_ROLES, userIdsWithRoles } from './notificationAudience';
 import { businessSettings, financeSettings } from './settingsService';
+import { currencySnapshot } from './localisation';
 
 type RecordPaymentInput = {
   shopId: string;
@@ -188,6 +189,8 @@ async function createPendingPayment(
     [
       {
         reference: await nextReference('PAY'),
+        // What this receipt is denominated in, recorded on it.
+        currencySnapshot: currencySnapshot(),
         shopId: new Types.ObjectId(input.shopId),
         invoiceId: input.invoiceId ? new Types.ObjectId(input.invoiceId) : undefined,
         deliveryId: input.deliveryId ? new Types.ObjectId(input.deliveryId) : undefined,

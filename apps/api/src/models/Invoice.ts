@@ -51,6 +51,21 @@ const schema = new mongoose.Schema(
     footer: String,
     issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     issuedAt: { type: Date, required: true },
+    /**
+     * The currency this document was issued in.
+     *
+     * Read from the record, never from settings. `currencyCode` and
+     * `currencySymbol` are configurable, so rendering from the live setting
+     * would silently restate every document ever issued — including ones a
+     * customer holds on paper. The exponent rides along because it is what
+     * relates the stored integer to the printed amount, and taking that from a
+     * later configuration is a hundredfold error.
+     */
+    currencySnapshot: {
+      code: { type: String, trim: true, uppercase: true },
+      symbol: { type: String, trim: true },
+      exponent: { type: Number, min: 0, max: 4 },
+    },
   },
   { timestamps: true },
 );

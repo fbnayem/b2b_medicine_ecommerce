@@ -29,6 +29,7 @@ import { notify } from './notificationService';
 import { ActivityVisibility, recordActivity } from './activityService';
 import { userIdsWithRoles } from './notificationAudience';
 import { getSettings } from './settingsService';
+import { currencySnapshot } from './localisation';
 type Actor = { _id: Types.ObjectId; role: UserRole };
 export async function startPicking(id: string, version: number, actor: Actor) {
   const session = await mongoose.startSession();
@@ -507,6 +508,9 @@ export async function packAndInvoice(
             footer: settings.business.invoiceFooter,
             issuedBy: actor._id,
             issuedAt: new Date(),
+            // What this invoice is denominated in, recorded on it. The
+            // symbol and the code are administrable; an issued invoice is not.
+            currencySnapshot: currencySnapshot(),
           },
         ],
         { session },

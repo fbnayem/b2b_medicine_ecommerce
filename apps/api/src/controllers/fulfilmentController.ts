@@ -27,6 +27,7 @@ import {
   startPicking,
 } from '../services/fulfilmentService';
 import { formatDate, formatMoneyMinor, formatQuantity } from '@medsupply/utilities';
+import { documentFormatSettings } from '../services/localisation';
 import { createDocumentPdf } from '../services/pdfService';
 import { notify } from '../services/notificationService';
 import { ActivityVisibility, recordActivity } from '../services/activityService';
@@ -338,6 +339,19 @@ export async function pdf(req: AuthRequest, res: Response, next: NextFunction) {
      * documents the business actually issues were the last place in the system
      * printing ungrouped money and a UTC calendar date.
      */
+    /*
+     * The currency this invoice was issued in, from the invoice.
+     *
+     * Not from the live settings: `currencyCode` and `currencySymbol` are
+     * administrable, so rendering from them would mean a PDF regenerated next
+     * year carried a different symbol from the paper the customer signed for.
+     * Invoices issued before the snapshot existed fall back to the live
+     * settings, which is what they were rendered with anyway.
+     */
+    const money = documentFormatSettings(
+      value.currencySnapshot as { code?: string; symbol?: string } | undefined,
+    );
+
     const pdfBuffer = await createDocumentPdf(
       {
         brand: String(value.supplierSnapshot?.name ?? 'MedSupply B2B'),
@@ -372,23 +386,27 @@ export async function pdf(req: AuthRequest, res: Response, next: NextFunction) {
             item.batchNumber,
             formatDate(item.expiryDate),
             formatQuantity(item.quantity),
-            formatMoneyMinor(item.unitPriceMinor),
-            formatMoneyMinor(item.discountMinor),
-            formatMoneyMinor(item.lineTotalMinor),
+            formatMoneyMinor(item.unitPriceMinor, money),
+            formatMoneyMinor(item.discountMinor, money),
+            formatMoneyMinor(item.lineTotalMinor, money),
           ]),
         },
         totals: [
-          { label: 'Subtotal', value: formatMoneyMinor(value.subtotalMinor) },
-          { label: 'Order discount', value: formatMoneyMinor(value.orderDiscountMinor) },
-          { label: 'Delivery charge', value: formatMoneyMinor(value.deliveryChargeMinor) },
-          { label: 'Tax', value: formatMoneyMinor(value.taxMinor) },
-          { label: 'Grand total', value: formatMoneyMinor(value.grandTotalMinor), strong: true },
-          { label: 'Previous balance', value: formatMoneyMinor(value.previousBalanceMinor) },
-          { label: 'Amount paid', value: formatMoneyMinor(value.amountPaidMinor) },
-          { label: 'Current due', value: formatMoneyMinor(value.amountDueMinor) },
+          { label: 'Subtotal', value: formatMoneyMinor(value.subtotalMinor, money) },
+          { label: 'Order discount', value: formatMoneyMinor(value.orderDiscountMinor, money) },
+          { label: 'Delivery charge', value: formatMoneyMinor(value.deliveryChargeMinor, money) },
+          { label: 'Tax', value: formatMoneyMinor(value.taxMinor, money) },
+          {
+            label: 'Grand total',
+            value: formatMoneyMinor(value.grandTotalMinor, money),
+            strong: true,
+          },
+          { label: 'Previous balance', value: formatMoneyMinor(value.previousBalanceMinor, money) },
+          { label: 'Amount paid', value: formatMoneyMinor(value.amountPaidMinor, money) },
+          { label: 'Current due', value: formatMoneyMinor(value.amountDueMinor, money) },
           {
             label: 'Total outstanding',
-            value: formatMoneyMinor(value.totalOutstandingMinor),
+            value: formatMoneyMinor(value.totalOutstandingMinor, money),
             strong: true,
           },
         ],

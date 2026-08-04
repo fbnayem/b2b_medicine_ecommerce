@@ -1646,3 +1646,24 @@ export interface Warehouse {
   /** What it is holding. Unassigned batches count against the default. */
   stock: { batches: number; onHand: number; available: number };
 }
+
+/**
+ * The currency a document was issued in, recorded on the document.
+ *
+ * Not read from settings at render time. `currencyCode` and `currencySymbol`
+ * are configurable, so a deployment that changes either would silently restate
+ * every invoice it has ever issued — including ones a customer is holding on
+ * paper and an auditor may read years later. The exponent is carried too,
+ * because it is what relates the stored integer to the printed amount and
+ * getting it from a later configuration is a hundredfold error.
+ *
+ * The same principle as `medicineSnapshot` and the business-identity snapshot:
+ * an issued document says what it said.
+ */
+export interface CurrencySnapshot {
+  /** ISO 4217. */
+  code: string;
+  symbol: string;
+  /** Minor units per major unit, as a power of ten. BDT 2, JPY 0, KWD 3. */
+  exponent: number;
+}

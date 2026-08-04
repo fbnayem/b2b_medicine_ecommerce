@@ -1,8 +1,9 @@
-import type { LocalisationSettings } from '@medsupply/shared-types';
+import type { CurrencySnapshot, LocalisationSettings } from '@medsupply/shared-types';
 import { currencyFor, packFor, type CountryPack } from '@medsupply/jurisdictions';
 import {
   configureFormatting,
   fiscalYearOf,
+  formatSettings,
   formattingLocale,
   zonedYear,
   type DateFormat,
@@ -121,4 +122,56 @@ export function referenceYear(value: string | number | Date = new Date()): numbe
 /** Intended for tests, which must not inherit another case's configuration. */
 export function resetAppliedFormatting(): void {
   lastApplied = '';
+}
+
+/**
+ * The currency a document is being issued in, as a snapshot to store on it.
+ *
+ * Documents render from this rather than from the live setting, because
+ * `currencyCode` and `currencySymbol` are administrable: changing either would
+ * otherwise restate every invoice ever issued, including ones a customer holds
+ * on paper and an auditor may read years later. The exponent is carried because
+ * it relates the stored integer to the printed amount, and reading that from a
+ * later configuration is a hundredfold error rather than a cosmetic one.
+ *
+ * The same principle as `medicineSnapshot` and the business-identity snapshot.
+ */
+export function currencySnapshot(): CurrencySnapshot {
+  const settings = formatSettings();
+  const currency = currencyFor(settings.currencyCode);
+  return {
+    code: currency.code,
+    // The tenant's own symbol wins over the currency's default: a deployment
+    // that writes `Tk` rather than `৳` means it, and the document should say
+    // what the business says.
+    symbol: settings.currencySymbol || currency.symbol,
+    exponent: currency.exponent,
+  };
+}
+
+/**
+ * Formatting settings for one document, from what that document recorded.
+ *
+ * Rendering an invoice through the live settings would restate it the moment an
+ * administrator edits the currency — so a PDF regenerated next year would carry
+ * a different symbol from the paper the customer signed for. Documents issued
+ * before the snapshot existed fall back to the live settings, which is what
+ * they were rendered with anyway.
+ *
+ * The exponent is taken from the currency table keyed by the recorded code
+ * rather than from the recorded exponent itself: the two agree by construction,
+ * and reading the code keeps one source for how a currency is written. The
+ * stored exponent is the record of what the document was actually written with,
+ * which is what an auditor would need if the table were ever corrected.
+ */
+export function documentFormatSettings(
+  snapshot: Partial<CurrencySnapshot> | null | undefined,
+): FormatSettings {
+  const live = formatSettings();
+  if (!snapshot?.code) return live;
+  return {
+    ...live,
+    currencyCode: snapshot.code,
+    currencySymbol: snapshot.symbol || live.currencySymbol,
+  };
 }

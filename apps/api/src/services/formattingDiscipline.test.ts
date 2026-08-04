@@ -96,6 +96,11 @@ function withoutComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
+/** One offender per line, so the failure names the files rather than counting them. */
+function describe(names: readonly string[]): string {
+  return names.length === 0 ? '' : `\n${names.map((name) => `  ${name}`).join('\n')}`;
+}
+
 function offenders(pattern: RegExp, allowed: Set<string>) {
   const root = join(apiRoot(), 'src');
   return sourcesUnder(root)
@@ -138,12 +143,63 @@ test('nothing falls back to the package defaults instead of the tenant settings'
   );
 });
 
+/**
+ * A hundred multiplied into or divided out of a money figure.
+ *
+ * `100` is the minor-unit exponent for BDT and for most currencies, and for
+ * exactly that reason it is the number somebody types when they mean "convert
+ * between major and minor". JPY has no minor unit and KWD has three, so the
+ * same line is a hundredfold error in one direction and a tenfold error in the
+ * other — and it is invisible on a Bangladeshi deployment, which is what makes
+ * it worth a gate rather than a review comment.
+ *
+ * Deliberately narrow: only a literal `100` next to something that reads as
+ * money. Percentages, basis points and page sizes use the same number for
+ * unrelated reasons and are not this defect.
+ */
+/*
+ * Built with `RegExp` rather than written as a regex literal.
+ *
+ * A character class holding both a star and a slash is legal by the grammar and
+ * was nonetheless read differently by this toolchain: the compiled rule matched
+ * nothing at all. A gate that silently stops matching is worse than no gate,
+ * and the self-test below is what caught it.
+ *
+ * The comment cannot show the class either — writing a star next to a slash
+ * inside a block comment ends the comment, which is the second way this same
+ * pair of characters bit.
+ */
+const HUNDRED_MONEY = new RegExp(
+  '\\b\\w*[Mm]inor\\w*\\s*[*\\/]\\s*100\\b' + '|' + '\\b100\\s*\\*\\s*\\w*[Mm]inor\\w*\\b',
+);
+
+const HUNDRED_ALLOWED = new Set<string>([]);
+
+test('no money figure is converted by a hard-coded hundred', () => {
+  const found = offenders(HUNDRED_MONEY, HUNDRED_ALLOWED);
+  assert.deepEqual(
+    found.map(({ name }) => name),
+    [],
+    'The exponent belongs to the currency, not to the call site. JPY has none ' +
+      'and KWD has three, so a literal 100 is a hundredfold error in one ' +
+      'direction and a tenfold error in the other:' +
+      describe(found.map(({ name }) => name)),
+  );
+});
+
 test('the guards match the patterns they claim to, so a clean run means something', () => {
   // A rule that cannot fire is indistinguishable from a rule that passes.
   assert.ok(FLOAT_MONEY.test('const x = (minor / 100).toFixed(2);'));
   assert.ok(FLOAT_MONEY.test('`${(row.amountMinor/100).toFixed( 2 )}`'));
   assert.ok(!FLOAT_MONEY.test('formatMoneyMinor(row.amountMinor)'));
   assert.ok(UTC_DAY.test('value.toISOString().slice(0, 10)'));
+  assert.ok(HUNDRED_MONEY.test('const major = amountMinor / 100;'));
+  assert.ok(HUNDRED_MONEY.test('creditLimitMinor * 100'));
+  assert.ok(HUNDRED_MONEY.test('const m = 100 * priceMinor;'));
+  // Not this defect: a percentage, a page size, or basis points.
+  assert.ok(!HUNDRED_MONEY.test('const percent = (part / total) * 100;'));
+  assert.ok(!HUNDRED_MONEY.test('const limit = Math.min(100, Number(query.limit));'));
+  assert.ok(!HUNDRED_MONEY.test('basisPoints / 100'));
   assert.ok(UTC_DAY.test('d.toISOString().slice(0,10)'));
   assert.ok(!UTC_DAY.test('toDateInputValue(value)'));
   assert.ok(CONFIGURES_FORMATTING.test('configureFormatting({ timeZone })'));
