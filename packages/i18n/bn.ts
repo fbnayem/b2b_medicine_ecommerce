@@ -1779,9 +1779,9 @@ export const bn: Catalogue = {
 
   analyticsMobile: {
     rangeLabel: 'কোন সময়কাল',
-    last7: 'গত ৭ দিন',
+    last7: 'গত 7 দিন',
     thisMonth: 'এই মাস',
-    last90: 'গত ৯০ দিন',
+    last90: 'গত 90 দিন',
     loading: 'হিসাব লোড হচ্ছে',
     couldNotLoad: 'ব্যবসার হিসাব লোড করা যায়নি।',
     none: 'এই সময়ের কোনও হিসাব নেই',
