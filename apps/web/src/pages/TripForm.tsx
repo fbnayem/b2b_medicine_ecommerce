@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toDateInputValue } from '@medsupply/utilities';
-import type { PlannableDelivery } from '@medsupply/shared-types';
+import { UserRole, type PlannableDelivery } from '@medsupply/shared-types';
 import { apiClient, errorMessage, failureReference } from '../api/client';
 import {
   Button,
@@ -13,16 +13,19 @@ import {
   Input,
   LinkButton,
   PageHeader,
+  PickOrCreate,
   Resource,
-  Select,
   Textarea,
   toast,
   type FormProblem,
 } from '../components/ui';
-import { useApiResource } from '../lib/query';
+import { useApiCollection, useApiResource } from '../lib/query';
 import { keys } from '../lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
+import { useAuthStore } from '../store/useAuth';
+import { canAddPeople } from '../lib/permissions';
+import { UserForm } from './UserForm';
 import { entityReference, formatFinanceDate } from '../lib/finance';
 
 interface Rider {
@@ -62,8 +65,19 @@ export function TripForm() {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const queryClient = useQueryClient();
+  const mayAddPeople = canAddPeople(useAuthStore((state) => state.user?.role));
 
-  const riders = useApiResource<Rider[]>(keys.riders.list(), '/deliveries/personnel');
+  /*
+   * `useApiCollection`, matching `DeliveryDetail`.
+   *
+   * These two screens shared a cache key and disagreed about its *shape*: this
+   * one stored the raw array and the other stored a normalised collection,
+   * under one key with five-minute retention. Visit one and then the other
+   * inside five minutes and the page died on `.find is not a function` — on
+   * exactly the picker this phase is about. Naming the key from one factory
+   * fixed what it was called; agreeing on the hook is what fixes the crash.
+   */
+  const riders = useApiCollection<Rider>(keys.riders.list(), '/deliveries/personnel');
   const [deliveryPersonId, setDeliveryPersonId] = useState('');
   const [tripDate, setTripDate] = useState(() => toDateInputValue(new Date()));
   const [vehicleReference, setVehicleReference] = useState('');
@@ -86,7 +100,7 @@ export function TripForm() {
   const chosenIds = new Set(chosen.map((delivery) => delivery._id));
   const offered = (available.data ?? []).filter((delivery) => !chosenIds.has(delivery._id));
 
-  const chosenRider = (riders.data ?? []).find((rider) => rider._id === deliveryPersonId);
+  const chosenRider = (riders.data?.items ?? []).find((rider) => rider._id === deliveryPersonId);
   /*
    * Nothing to plan **with**, as distinct from nothing chosen yet. The whole
    * screen is a dead end in that case: no sequence of actions on it produces a
@@ -174,25 +188,50 @@ export function TripForm() {
 
         <Card>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label={t('trips.rider')} required id={RIDER_FIELD}>
-              <Select
-                required
-                value={deliveryPersonId}
-                onChange={(event) => {
-                  setDeliveryPersonId(event.target.value);
-                  // The offered list is scoped to the rider, so a rider change
-                  // would otherwise leave somebody else's stops on the round.
-                  setChosen([]);
-                }}
-              >
-                <option value="">{t('trips.chooseRider')}</option>
-                {(riders.data ?? []).map((rider) => (
-                  <option key={rider._id} value={rider._id}>
-                    {rider.firstName} {rider.lastName}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            {/*
+              The ask, in one control: choose a rider, or make the one that is
+              not there yet without losing the stops already on the round.
+
+              Leaving to create a person used to cost the whole ordered stop
+              list — no form in this application persists a draft or warns
+              before discarding one — which is why this is a dialog and not a
+              link.
+            */}
+            <PickOrCreate
+              label={t('trips.rider')}
+              id={RIDER_FIELD}
+              required
+              placeholder={t('trips.chooseRider')}
+              value={deliveryPersonId}
+              onChange={(value) => {
+                setDeliveryPersonId(value);
+                // The offered list is scoped to the rider, so a rider change
+                // would otherwise leave somebody else's stops on the round.
+                setChosen([]);
+              }}
+              options={(riders.data?.items ?? []).map((rider) => ({
+                value: rider._id,
+                label: `${rider.firstName} ${rider.lastName}`,
+              }))}
+              create={
+                mayAddPeople
+                  ? {
+                      label: t('people.addRider'),
+                      title: t('people.addRiderTitle'),
+                      description: t('people.addRiderBody'),
+                      invalidates: keys.riders.all,
+                      render: (done, cancel) => (
+                        <UserForm
+                          mode="dialog"
+                          fixedRole={UserRole.DELIVERY_PERSON}
+                          onCreated={done}
+                          onCancel={cancel}
+                        />
+                      ),
+                    }
+                  : undefined
+              }
+            />
             <Field label={t('trips.day')} required id={DAY_FIELD}>
               <Input
                 type="date"

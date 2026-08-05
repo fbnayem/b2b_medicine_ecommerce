@@ -66,6 +66,11 @@ test.describe('the screens people spend their day on', () => {
     { path: '/payments', as: 'manager' },
     { path: '/notifications', as: 'manager' },
     { path: '/activity', as: 'manager' },
+    // Two screens this phase created. The first is a form nobody could reach
+    // before; the second carries a picker with a dialog trigger beside it,
+    // which is a shape axe is good at judging.
+    { path: '/admin/users/new', as: 'admin' },
+    { path: '/deliveries/trips/new', as: 'manager' },
   ];
 
   for (const screen of screens) {

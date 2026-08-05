@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { ShopStatus, UserRole, UserStatus } from '@medsupply/shared-types';
 import { app } from '../app';
+import { AuditLog } from '../models/AuditLog';
 import { Session } from '../models/Session';
 import { Shop } from '../models/Shop';
 import { User } from '../models/User';
@@ -196,15 +197,64 @@ test('an administrator cannot create an account more privileged than their own',
     'creating an account is the obvious way around a rule that only guards edits',
   );
   assert.equal(await User.countDocuments({ email: 'sneaky-super@test.local' }), 0);
+});
 
-  const byManager = await post('/api/v1/users', manager, {
-    email: 'manager-made@test.local',
+test('a manager may staff the warehouse and nothing above it', async () => {
+  /*
+   * A deliberate widening, and the reason is the shape of the work: planning a
+   * round and assigning a delivery are `MANAGEMENT`, so the person who needed a
+   * delivery person was precisely the person who could not make one.
+   *
+   * The limit is what makes it safe. A manager may create the two
+   * warehouse-side roles and nothing that could go on to create further
+   * accounts — including their own role, which is not *privileged* and would
+   * therefore have passed the rule that guards Admin and Super Admin.
+   */
+  const rider = await post('/api/v1/users', manager, {
+    email: 'manager-made-rider@test.local',
     password: PASSWORD,
     firstName: 'Manager',
     lastName: 'Made',
+    role: UserRole.DELIVERY_PERSON,
+  });
+  assert.equal(rider.status, 201, JSON.stringify(rider.body));
+
+  const storekeeper = await post('/api/v1/users', manager, {
+    email: 'manager-made-store@test.local',
+    password: PASSWORD,
+    firstName: 'Store',
+    lastName: 'Keeper',
     role: UserRole.STOREKEEPER,
   });
-  assert.equal(byManager.status, 403, 'a manager reads the directory and does not staff it');
+  assert.equal(storekeeper.status, 201, JSON.stringify(storekeeper.body));
+
+  for (const role of [UserRole.MANAGER, UserRole.ADMIN, UserRole.SALES, UserRole.SHOP_OWNER]) {
+    const refused = await post('/api/v1/users', manager, {
+      email: `manager-made-${role}@test.local`.toLowerCase(),
+      password: PASSWORD,
+      firstName: 'Not',
+      lastName: 'Allowed',
+      role,
+    });
+    assert.equal(refused.status, 403, `a manager created a ${role}`);
+    assert.equal(await User.countDocuments({ role, email: /manager-made/ }), 0);
+  }
+
+  /*
+   * The audit row names the manager who did it.
+   *
+   * This mattered less when only administrators could create an account; it
+   * matters now, because a storekeeper can move stock and the only record of
+   * who let them is this one.
+   */
+  const created = await User.findOne({ email: 'manager-made-rider@test.local' }).lean();
+  const record = await AuditLog.findOne({
+    action: 'USER_CREATED',
+    entityId: created!._id,
+  }).lean();
+  assert.ok(record, 'creating an account wrote no audit row');
+  assert.equal(String(record.actorId), String(manager._id));
+  assert.equal(record.actorRole, UserRole.MANAGER);
 });
 
 // ─── Customers ───────────────────────────────────────────────────────────────

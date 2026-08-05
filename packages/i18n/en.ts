@@ -2291,7 +2291,9 @@ export const en = {
       'Changing an offer never restates an order already placed \u2014 each order records the terms it was given.',
     name: 'Name',
     medicine: 'Medicine',
-    chooseMedicine: 'Choose a medicine',
+    chooseMedicine: 'Type a brand or a stock code',
+    medicineHint: 'Start typing and pick from the list. The search runs over the whole catalogue.',
+    chosenMedicine: 'Chosen: {{name}}',
     terms: 'Offer',
     buyGet: 'Buy {{buy}}, get {{free}} free',
     buyQuantity: 'Buy',
@@ -2728,6 +2730,7 @@ export const en = {
     'shop-detail': 'Shop',
     'shop-new': 'Add a shop',
     users: 'People',
+    'user-new': 'Add a person',
     settings: 'Settings',
     audit: 'Audit log',
     'shop-account': 'My account',
@@ -2758,6 +2761,38 @@ export const en = {
     collectionReview: 'Collection review',
     myCollections: 'My collections',
     paymentDetails: 'Payment details',
+  },
+
+  /**
+   * Adding somebody to the system.
+   *
+   * "A person", not "a user": the word for somebody who drives a van is not
+   * "user", and the screen that creates a rider is the same screen either way.
+   */
+  people: {
+    addTitle: 'Add a person',
+    addSubtitle: 'They sign in with the email below and choose their own password the first time.',
+    directory: 'Everybody',
+    firstName: 'First name',
+    lastName: 'Last name',
+    email: 'Email',
+    emailHint: 'This is what they sign in with.',
+    emailHelp:
+      'It has to be different from everybody else’s, and it is where anything sent to them goes. It cannot be changed here afterwards.',
+    password: 'A password to start with',
+    passwordHint: 'At least 8 characters. They will be asked to change it when they first sign in.',
+    passwordHelp:
+      'Type something and tell it to them once. They set their own the first time they sign in, so this one stops working almost immediately — never reuse a password of your own.',
+    role: 'What they do',
+    roleHelp:
+      'This decides every screen they can open. You can only give somebody a job at or below your own, so the list here is already what you are allowed to choose from.',
+    about: 'About {{field}}',
+    add: 'Add this person',
+    added: '{{name}} can sign in now.',
+    addFailed: 'This person could not be added.',
+    addRider: 'Add a delivery person',
+    addRiderTitle: 'Add a delivery person',
+    addRiderBody: 'They will be on the list as soon as you save, with nothing else to fill in.',
   },
 
   roles: {

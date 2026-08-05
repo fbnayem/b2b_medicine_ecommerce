@@ -716,6 +716,27 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: 'account',
   },
   {
+    /*
+     * Adding somebody, which nothing in this product could do.
+     *
+     * `POST /api/v1/users` has worked and been tested since phase 22 and never
+     * had a caller: riders, storekeepers and administrators existed only
+     * because the seed script made them.
+     *
+     * `MANAGEMENT`, matching the route. Which roles each of them may actually
+     * grant is narrower and is decided by `assertAdministrable` — a manager
+     * gets a delivery person or a storekeeper and nothing else.
+     */
+    id: 'user-new',
+    label: 'Add a person',
+    path: '/admin/users/new',
+    roles: MANAGEMENT,
+    group: 'administration',
+    icon: 'account',
+    hidden: true,
+    parent: 'users',
+  },
+  {
     id: 'settings',
     label: 'Settings',
     path: '/admin/settings',

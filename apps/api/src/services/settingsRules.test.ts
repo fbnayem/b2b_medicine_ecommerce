@@ -262,6 +262,37 @@ test('an Admin cannot administer or create privileged accounts', async () => {
   );
 });
 
+test('a Manager may create the two warehouse-side roles and nothing else', async () => {
+  const actor = { _id: objectId(), role: UserRole.MANAGER };
+
+  // The case this exists for: planning a round is a manager's job, so making
+  // the person who drives it has to be too.
+  await assert.doesNotReject(assertAdministrable({ actor, nextRole: UserRole.DELIVERY_PERSON }));
+  await assert.doesNotReject(assertAdministrable({ actor, nextRole: UserRole.STOREKEEPER }));
+
+  // Everything that could then create further accounts, refused — including
+  // their own role, which the privileged-role branch would have let through
+  // because MANAGER is not a privileged role.
+  for (const role of [UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN]) {
+    await expectRejection(assertAdministrable({ actor, nextRole: role }), 'ROLE_NOT_PERMITTED');
+  }
+
+  // Not a back door into the roles that carry money and customers either.
+  for (const role of [UserRole.SALES, UserRole.SHOP_OWNER]) {
+    await expectRejection(assertAdministrable({ actor, nextRole: role }), 'ROLE_NOT_PERMITTED');
+  }
+
+  // Creation only. A manager still administers nobody's existing account, and
+  // this is the assertion that keeps the new branch from widening `updateUser`.
+  await expectRejection(
+    assertAdministrable({
+      actor,
+      target: { _id: objectId(), role: UserRole.ADMIN, status: UserStatus.ACTIVE },
+    }),
+    'PRIVILEGED_TARGET',
+  );
+});
+
 test('nobody can change or disable their own account', async () => {
   const id = objectId();
   const actor = { _id: id, role: UserRole.SUPER_ADMIN };

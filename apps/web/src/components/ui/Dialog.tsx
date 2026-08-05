@@ -33,7 +33,14 @@ export interface DialogProps {
   title: string;
   description?: ReactNode;
   children?: ReactNode;
-  footer?: ReactNode;
+  /**
+   * The action row. Omit for a Close button; pass `null` for none at all.
+   *
+   * `null` is for a dialog hosting a form that owns its own actions — the
+   * submit has to be inside the `<form>` to be the form's submit, and a second
+   * row of buttons under it is furniture.
+   */
+  footer?: ReactNode | null;
 }
 
 export function Dialog({ open, onOpenChange, title, description, children, footer }: DialogProps) {
@@ -51,13 +58,15 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
             </DialogPrimitive.Description>
           )}
           <div className="mt-4">{children}</div>
-          <div className="mt-6 flex justify-end gap-2">
-            {footer ?? (
-              <DialogPrimitive.Close asChild>
-                <Button variant="secondary">Close</Button>
-              </DialogPrimitive.Close>
-            )}
-          </div>
+          {footer !== null && (
+            <div className="mt-6 flex justify-end gap-2">
+              {footer ?? (
+                <DialogPrimitive.Close asChild>
+                  <Button variant="secondary">Close</Button>
+                </DialogPrimitive.Close>
+              )}
+            </div>
+          )}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

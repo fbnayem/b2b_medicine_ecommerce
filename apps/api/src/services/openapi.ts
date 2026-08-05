@@ -202,8 +202,16 @@ export const OPERATIONS: Operation[] = [
     method: 'post',
     path: '/api/v1/users',
     summary: 'Create a user',
+    /*
+     * `MANAGEMENT`, with a narrower rule inside. The route admits a manager;
+     * `assertAdministrable` then permits them exactly DELIVERY_PERSON and
+     * STOREKEEPER and refuses everything else — including their own role, which
+     * is not privileged and would otherwise pass. The document states who may
+     * call it, which is what a caller needs; which roles they may then grant is
+     * a rule about privilege and lives in one place.
+     */
     tag: 'Users',
-    roles: ADMINS,
+    roles: MANAGEMENT,
     body: CreateUserSchema,
   },
   {

@@ -23,6 +23,25 @@ const PRIVILEGED_ROLES: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN];
 const isPrivileged = (role: UserRole) => PRIVILEGED_ROLES.includes(role);
 
 /**
+ * The only accounts a Manager may bring into existence.
+ *
+ * Planning a round and assigning a delivery are `MANAGEMENT` operations, so the
+ * person who needs a delivery person was precisely the person who could not
+ * make one — `POST /users` was Admin and above, and the product had no screen
+ * for it in any case.
+ *
+ * A storekeeper is included, which is wider than the rider case strictly needs
+ * and is worth stating plainly: **a storekeeper can move stock, so this hands a
+ * Manager the ability to create an account that changes inventory.** It is
+ * defensible — a Manager already approves orders and posts stocktake variances,
+ * both of which move more value than a warehouse account does — and the record
+ * of who did it is written either way. What keeps it safe is that the set is
+ * exactly these two: never MANAGER, never ADMIN, never SUPER_ADMIN, which are
+ * the roles that could then create further accounts.
+ */
+const MANAGER_MAY_CREATE: UserRole[] = [UserRole.DELIVERY_PERSON, UserRole.STOREKEEPER];
+
+/**
  * Central guard rails for every administrative change to an account.
  *
  * These exist because the failure modes are not recoverable from the product:
@@ -48,6 +67,23 @@ export async function assertAdministrable(input: {
 }) {
   const { actor, target, nextRole, nextStatus } = input;
   const sameUser = target ? String(actor._id) === String(target._id) : false;
+
+  /*
+   * A Manager creating an account, which is the only administrative act they
+   * have. `target` absent means creation; the branch below cannot express this
+   * because it is about which roles are *privileged*, and every role a Manager
+   * must be refused here — including MANAGER itself — is an ordinary one.
+   */
+  if (actor.role === UserRole.MANAGER && !target) {
+    if (!nextRole || !MANAGER_MAY_CREATE.includes(nextRole)) {
+      throw adminError(
+        'A manager may only create a delivery person or a storekeeper',
+        'ROLE_NOT_PERMITTED',
+        403,
+      );
+    }
+    return;
+  }
 
   if (actor.role !== UserRole.SUPER_ADMIN) {
     if (target && isPrivileged(target.role)) {

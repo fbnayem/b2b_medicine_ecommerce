@@ -1320,7 +1320,7 @@
           "Users"
         ],
         "summary": "Create a user",
-        "description": "Permitted roles: SUPER_ADMIN, ADMIN.",
+        "description": "Permitted roles: SUPER_ADMIN, ADMIN, MANAGER.",
         "security": [
           {
             "bearerAuth": []

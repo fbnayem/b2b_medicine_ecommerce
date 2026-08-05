@@ -12,6 +12,8 @@ import type { Delivery, User } from '@medsupply/shared-types';
 import { toDateInputValue } from '@medsupply/utilities';
 import { apiClient, errorMessage } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
+import { canAddPeople } from '../lib/permissions';
+import { UserForm } from './UserForm';
 import { ActivityTimeline } from '../components/ActivityTimeline';
 import { useRealtimeEvent } from '../realtime/useRealtime';
 import {
@@ -21,6 +23,7 @@ import {
   Input,
   LinkButton,
   PageHeader,
+  PickOrCreate,
   Resource,
   Select,
   StatusPill,
@@ -56,6 +59,7 @@ export function DeliveryDetail() {
   const queryClient = useQueryClient();
   const role = useAuthStore((state) => state.user?.role);
   const canManage = role ? MANAGER_ROLES.includes(role) : false;
+  const mayAddPeople = canAddPeople(role);
 
   const query = useApiResource<Delivery>(keys.deliveries.one(id!), `/deliveries/${id}`);
   const delivery = query.data;
@@ -261,22 +265,38 @@ export function DeliveryDetail() {
                         void assign();
                       }}
                     >
-                      <Field label={t('deliveryDetail.person')} required>
-                        <Select
-                          value={personId}
-                          onChange={(event) => setPersonId(event.target.value)}
-                        >
-                          <option value="">{t('deliveryDetail.selectPerson')}</option>
-                          {(people.data?.items ?? []).map((candidate) => (
-                            <option key={candidate._id} value={candidate._id}>
-                              {candidate.firstName} {candidate.lastName} ·{' '}
-                              {t('deliveryDetail.activeCount', {
-                                count: candidate.activeDeliveries,
-                              })}
-                            </option>
-                          ))}
-                        </Select>
-                      </Field>
+                      <PickOrCreate
+                        label={t('deliveryDetail.person')}
+                        required
+                        placeholder={t('deliveryDetail.selectPerson')}
+                        value={personId}
+                        onChange={setPersonId}
+                        options={(people.data?.items ?? []).map((candidate) => ({
+                          value: candidate._id,
+                          label: `${candidate.firstName} ${candidate.lastName} · ${t(
+                            'deliveryDetail.activeCount',
+                            { count: candidate.activeDeliveries },
+                          )}`,
+                        }))}
+                        create={
+                          mayAddPeople
+                            ? {
+                                label: t('people.addRider'),
+                                title: t('people.addRiderTitle'),
+                                description: t('people.addRiderBody'),
+                                invalidates: keys.riders.all,
+                                render: (done, cancel) => (
+                                  <UserForm
+                                    mode="dialog"
+                                    fixedRole={UserRole.DELIVERY_PERSON}
+                                    onCreated={done}
+                                    onCancel={cancel}
+                                  />
+                                ),
+                              }
+                            : undefined
+                        }
+                      />
                       <Field label={t('deliveryDetail.expectedDate')} required>
                         <Input
                           type="date"

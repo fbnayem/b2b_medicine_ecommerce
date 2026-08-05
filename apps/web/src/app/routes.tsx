@@ -220,6 +220,7 @@ export const ROUTES: readonly RouteNode[] = [
     id: 'users',
     element: page(() => import('../pages/UserAdministration'), 'UserAdministration'),
   },
+  { id: 'user-new', element: page(() => import('../pages/UserForm'), 'UserForm') },
   { id: 'settings', element: page(() => import('../pages/SystemSettings'), 'SystemSettings') },
   { id: 'audit', element: page(() => import('../pages/AuditLogViewer'), 'AuditLogViewer') },
 

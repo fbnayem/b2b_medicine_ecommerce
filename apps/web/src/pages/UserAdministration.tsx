@@ -3,12 +3,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { UserRole, UserStatus, type User } from '@medsupply/shared-types';
 import { apiClient, errorMessage } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
+import { canAddPeople } from '../lib/permissions';
 import {
   Button,
   Card,
   EmptyState,
   Field,
   Input,
+  LinkButton,
   PageHeader,
   Pagination,
   Resource,
@@ -158,7 +160,19 @@ export function UserAdministration() {
         routeId="users"
         title={t('users.title')}
         description={t('users.subtitle')}
-        actions={<Button onClick={() => void users.refetch()}>{t('users.reload')}</Button>}
+        actions={
+          <>
+            {/*
+              The directory could change a role and reset a password and never
+              add anybody. `POST /users` has worked since phase 22 with no
+              caller at all.
+            */}
+            {canAddPeople(currentUser?.role) && (
+              <LinkButton to="/admin/users/new">{t('people.add')}</LinkButton>
+            )}
+            <Button onClick={() => void users.refetch()}>{t('users.reload')}</Button>
+          </>
+        }
       />
 
       <form

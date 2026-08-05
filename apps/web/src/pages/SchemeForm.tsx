@@ -12,6 +12,7 @@ import {
   LinkButton,
   LoadingState,
   PageHeader,
+  SearchPicker,
   Select,
   Textarea,
   toast,
@@ -42,9 +43,19 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
   const queryClient = useQueryClient();
   const editing = mode === 'edit';
 
+  /*
+   * A search, not the first hundred.
+   *
+   * This picker was `?limit=100` in a plain `<select>`, so a catalogue past a
+   * hundred lines could not be fully chosen from — the list simply ended, with
+   * nothing on the screen saying so. The term goes to the server, so the answer
+   * is not filtered from a page that was already cut short.
+   */
+  const [term, setTerm] = useState('');
   const medicines = useApiCollection<Medicine>(
-    keys.medicines.picker(),
-    '/inventory/medicines?limit=100',
+    keys.medicines.search(term),
+    `/inventory/medicines?limit=25&search=${encodeURIComponent(term)}`,
+    { enabled: term.trim().length > 1 },
   );
   const shops = useApiCollection<Shop>(keys.shops.picker('all'), '/shops?limit=100');
   const existing = useApiResource<SchemeRecord>(
@@ -63,6 +74,13 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
     isActive: true,
     notes: '',
   });
+  // The chosen medicine's own name. A search box holds a term, not a record, so
+  // the current choice has to come from somewhere that survives clearing it.
+  const chosen = useApiResource<Medicine>(
+    keys.medicines.one(form.medicineId),
+    `/inventory/medicines/${form.medicineId}`,
+    { enabled: Boolean(form.medicineId) },
+  );
   const [shopIds, setShopIds] = useState<string[]>([]);
   const [version, setVersion] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -150,20 +168,28 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
                 onChange={(event) => setForm({ ...form, name: event.target.value })}
               />
             </Field>
-            <Field label={t('schemes.medicine')} required>
-              <Select
-                required
-                value={form.medicineId}
-                onChange={(event) => setForm({ ...form, medicineId: event.target.value })}
-              >
-                <option value="">{t('schemes.chooseMedicine')}</option>
-                {(medicines.data?.items ?? []).map((medicine) => (
-                  <option key={medicine._id} value={medicine._id}>
-                    {medicine.brandName} · {medicine.strength}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <SearchPicker
+              label={t('schemes.medicine')}
+              required
+              placeholder={t('schemes.chooseMedicine')}
+              hint={t('schemes.medicineHint')}
+              term={term}
+              onTermChange={setTerm}
+              emptyLabel={t('catalogue.none')}
+              options={(medicines.data?.items ?? []).map((medicine) => ({
+                value: medicine._id,
+                label: `${medicine.brandName} ${medicine.strength ?? ''}`.trim(),
+                note: medicine.sku,
+              }))}
+              onChoose={(value) => setForm({ ...form, medicineId: value })}
+              chosen={
+                chosen.data
+                  ? t('schemes.chosenMedicine', {
+                      name: `${chosen.data.brandName} ${chosen.data.strength ?? ''}`.trim(),
+                    })
+                  : undefined
+              }
+            />
             <Field label={t('schemes.buyQuantity')} hint={t('schemes.buyQuantityHint')} required>
               <Input
                 required

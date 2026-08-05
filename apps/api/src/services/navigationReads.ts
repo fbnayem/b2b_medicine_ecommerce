@@ -117,6 +117,7 @@ export const SCREEN_READS: Readonly<Record<string, readonly string[]>> = {
 export const SCREENS_WITHOUT_READS: Readonly<Record<string, string>> = {
   dashboard: 'assembles itself from the tiles each role is permitted, with no read of its own',
   'medicine-new': 'a create form; it posts and never reads',
+  'user-new': 'a create form; it posts and never reads',
   'warehouse-new': 'a create form; it posts and never reads',
   'stocktake-new': 'a create form; it posts and never reads',
   'supplier-new': 'a create form; it posts and never reads',

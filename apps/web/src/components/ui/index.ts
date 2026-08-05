@@ -47,8 +47,10 @@ export {
 export { DataTable, type Column, type DataTableProps } from './DataTable';
 export { ListToolbar, type ListToolbarProps } from './ListToolbar';
 export { TableLink } from './TableLink';
+export { PickOrCreate, type PickOrCreateOption, type PickOrCreateProps } from './PickOrCreate';
 export { ProductImage, type ProductImageProps } from './ProductImage';
 export { Resource, type ResourceProps } from './Resource';
+export { SearchPicker, type SearchPickerOption, type SearchPickerProps } from './SearchPicker';
 export { StatusPill, statusLabel, type StatusKind } from './StatusPill';
 export { toast, Toaster } from './toast';
 export { AskProvider, requireReason, useAsk } from './ask';

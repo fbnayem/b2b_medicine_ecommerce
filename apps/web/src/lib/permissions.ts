@@ -90,3 +90,34 @@ export const canEditCommercial = (role: Role) => has(CATALOGUE_MANAGERS, role);
  * but an empty labelled row is still a worse answer than no row.
  */
 export const canSeeCost = (role: Role) => has(CATALOGUE_MANAGERS, role);
+
+/**
+ * Which accounts this person may bring into existence.
+ *
+ * `assertAdministrable` in `userAdminService.ts` is the authority; this says
+ * the same thing so the form can offer the right options and hide the button
+ * entirely when the list is empty. An empty list is a real answer — a
+ * storekeeper, a rider, a rep and a shop owner staff nobody.
+ *
+ * A manager gets exactly the two warehouse-side roles. Never MANAGER, ADMIN or
+ * SUPER_ADMIN: those could go on to create further accounts, and that is the
+ * limit that makes the widening defensible at all.
+ */
+export function creatableRoles(role: Role): readonly UserRole[] {
+  switch (role) {
+    case UserRole.SUPER_ADMIN:
+      return Object.values(UserRole);
+    case UserRole.ADMIN:
+      // Everything but the two the server calls privileged.
+      return Object.values(UserRole).filter(
+        (candidate) => candidate !== UserRole.SUPER_ADMIN && candidate !== UserRole.ADMIN,
+      );
+    case UserRole.MANAGER:
+      return [UserRole.DELIVERY_PERSON, UserRole.STOREKEEPER];
+    default:
+      return [];
+  }
+}
+
+/** Whether to draw an "Add a person" affordance at all. */
+export const canAddPeople = (role: Role) => creatableRoles(role).length > 0;
