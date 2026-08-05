@@ -40,22 +40,37 @@ export const toast = {
 
 export function Toaster() {
   return (
-    <SonnerToaster
-      position="bottom-right"
-      // The tokens rather than sonner's own palette, so a toast is the same
-      // green as everything else and follows the theme.
-      toastOptions={{
-        classNames: {
-          toast: 'bg-surface text-text border border-border shadow-lg',
-          description: 'text-text-muted',
-          actionButton: 'bg-brand text-on-brand',
-          error: 'border-danger',
-          success: 'border-success',
-        },
-      }}
-      // Long enough to read a sentence in a second language.
-      duration={6000}
-      closeButton
-    />
+    /*
+     * The landmark `docs/TESTING.md` froze, finally emitted by something.
+     *
+     * `TEST_IDS.toast` has been in the browser-test contract since phase 3 and
+     * nothing has ever rendered it: sonner draws its own `[data-sonner-toast]`
+     * elements and takes no attribute we could put it on, so the first spec to
+     * reach for the landmark found nothing and timed out on an action that had
+     * in fact succeeded. A wrapper is the whole fix — the toaster itself is
+     * fixed-position, so a static element around it changes no layout, and a
+     * container that is present but empty fails with "the text is not there"
+     * rather than "the element is not there", which is the more useful of the
+     * two messages by some distance.
+     */
+    <div data-test="toast">
+      <SonnerToaster
+        position="bottom-right"
+        // The tokens rather than sonner's own palette, so a toast is the same
+        // green as everything else and follows the theme.
+        toastOptions={{
+          classNames: {
+            toast: 'bg-surface text-text border border-border shadow-lg',
+            description: 'text-text-muted',
+            actionButton: 'bg-brand text-on-brand',
+            error: 'border-danger',
+            success: 'border-success',
+          },
+        }}
+        // Long enough to read a sentence in a second language.
+        duration={6000}
+        closeButton
+      />
+    </div>
   );
 }

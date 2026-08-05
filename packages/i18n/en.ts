@@ -300,6 +300,64 @@ export const en = {
     location: 'Where it is',
   },
 
+  /**
+   * Managing one medicine from its own page.
+   *
+   * Four of these actions call endpoints that had never had a caller anywhere
+   * in this product: correcting a count, blocking a batch, changing a price
+   * without retyping the whole record, and reading a medicine's own stock
+   * history. The wording carries the weight the buttons cannot — "take off the
+   * catalogue" rather than "delete", because nothing is deleted and every past
+   * order still names it.
+   */
+  medicinePage: {
+    edit: 'Edit',
+    delist: 'Take off the catalogue',
+    list: 'Put back on the catalogue',
+    delistTitle: 'Take this off the catalogue?',
+    delistBody:
+      '{{brand}} will stop appearing to shops and cannot be ordered. Orders already placed are not affected, and you can put it back at any time.',
+    listTitle: 'Put this back on the catalogue?',
+    listBody: 'Shops will be able to see and order {{brand}} again.',
+    delisted: 'It is off the catalogue.',
+    listed: 'It is back on the catalogue.',
+    pricing: 'Price',
+    margin: 'Margin',
+    marginNote: 'What a shop makes against the price printed on the pack.',
+    noMrp: 'No printed price recorded',
+    noMrpSet: 'Not recorded',
+    perUnit: 'For one {{unit}}',
+    priceOrder:
+      'An order uses this price unless the shop has its own discount or a price list, and both of those come first.',
+    newPrice: 'New price for a shop',
+    newPriceHint: 'In taka. It applies to every order placed from now on.',
+    changePrice: 'Change the price',
+    priceChanged: 'The price is now {{amount}}.',
+    aboveMrp: 'The price cannot be above the price printed on the pack.',
+    onPriceLists: 'Price lists carrying this',
+    noPriceLists: 'No price list names this medicine, so every shop pays the price above.',
+    history: 'Stock history',
+    receiveInto: 'This stock goes against {{brand}}.',
+    correctCount: 'Correct the count',
+    correctTitle: 'Correct the counted stock',
+    correctBody:
+      'Batch {{batch}} is recorded as {{recorded}}. Enter what is actually on the shelf.',
+    countedLabel: 'What you counted',
+    badCount: 'Enter a whole number, zero or more.',
+    correctIt: 'Correct it',
+    correctWhy:
+      'This replaces the recorded count, so the reason is all anybody reading it later has to go on.',
+    corrected: 'Batch {{batch}} has been corrected.',
+    block: 'Block',
+    unblock: 'Unblock',
+    blockTitle: 'Block this batch',
+    blockBody: 'Nothing from batch {{batch}} can be picked or sold while it is blocked.',
+    unblockTitle: 'Unblock this batch',
+    unblockBody: 'Batch {{batch}} can be picked and sold again.',
+    blocked: 'The batch is blocked.',
+    unblocked: 'The batch is available again.',
+  },
+
   cart: {
     title: 'Your order',
     subtitle: 'Nothing is set aside until a manager approves it.',
@@ -2581,6 +2639,19 @@ export const en = {
     administration: 'Administration',
     account: 'My account',
   } as Record<string, string>,
+
+  /**
+   * Whether a pharmacist has to see a prescription first.
+   *
+   * The medicine page rendered `item.classification` straight from the record,
+   * so it printed the word PRESCRIPTION in capitals at whoever opened it —
+   * the same defect the status wording rule exists to stop, in the one place
+   * that rule was not looking.
+   */
+  classification: {
+    PRESCRIPTION: 'On prescription',
+    OTC: 'Over the counter',
+  },
 
   productType: {
     MEDICINE: 'Medicine',

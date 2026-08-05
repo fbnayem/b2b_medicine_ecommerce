@@ -102,6 +102,19 @@ export default defineConfig({
       testMatch: /screens\.spec\.ts/,
       use: { baseURL: `http://127.0.0.1:${PREVIEW_PORT}` },
     },
+    {
+      /*
+       * The specs that *change* something — a price, a listing, a person.
+       *
+       * Their own project because they write to the seeded database, so they
+       * must run one after another and each must undo what it did; and because
+       * they are the tier that proves an endpoint has a caller at all rather
+       * than that a page renders.
+       */
+      name: 'manage',
+      testMatch: /(catalogue|people)\.spec\.ts/,
+      use: { baseURL: `http://127.0.0.1:${PREVIEW_PORT}` },
+    },
   ],
 
   webServer: [
