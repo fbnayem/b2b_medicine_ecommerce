@@ -1,5 +1,98 @@
 # Changelog
 
+## Phase 27 — a catalogue you can actually run
+
+Four things were asked for. Three turned out to be holes rather than polish.
+
+### You could create a medicine and never afterwards change one
+
+`PATCH /api/v1/inventory/medicines/:id` has been mounted, documented and tested
+since the catalogue was built, and **nothing had ever called it**. Three more
+endpoints were in the same state: correcting a counted quantity, blocking a
+batch, and reading one medicine's stock history. A typo in a stock code, an MRP
+nobody recorded, a supplier's new trade price, a line that should be withdrawn —
+every one of those was a job for somebody with database access.
+
+The medicine page is now stacked sections — about, price, offers, stock, history
+— each with an id and a heading you can link to. What each person sees comes
+from four role sets the server enforces separately, not from one guess about
+seniority: a storekeeper reads stock and no money, a sales rep reads money and no
+stock, a manager reads all of it, a shop owner reads what it is and how many.
+The predicate this replaces was `role !== SHOP_OWNER`, which answers `true` for
+the rep whom `GET /inventory/batches` refuses.
+
+A price change is one field in the pricing card as well as the full edit form,
+because reacting to a supplier's new price should not mean re-satisfying
+nineteen controls. Delisting is what "delete" means here — a medicine is named by
+every order that ever contained it — and the confirmation says so.
+
+### Nobody understood the fields
+
+The medicine form had nineteen controls, zero hints and zero placeholders. "Sold
+as" and "Pack size" with nothing anywhere saying what either meant, and the money
+format appearing only after somebody got it wrong.
+
+Every field now carries an example, the rule it needs before typing, and an "i"
+you can hover for how it works and what it changes. It is a **Popover, not a
+Tooltip** — a Radix tooltip does not open on tap, and storekeepers are on phones.
+
+Writing the first test that pressed Save found that **the form could not be
+submitted at all**: the shared schema's optional fields are optional _or_
+well-formed, and a control nobody has typed into holds an empty string, which is
+neither.
+
+### A change in one place did not reach the others
+
+The catalogue was cached under five key shapes, two of which fetched the same URL
+into separate entries. **Twenty-three mutations left the screen you came from
+showing the old answer** — approve an order, press Back, it is still in the
+queue. Seven realtime events were emitted to the right rooms and thrown away.
+And `['delivery-personnel']` was read as a raw array by one screen and as a paged
+collection by another under one key with five-minute retention: visit both and
+the page died on `.find is not a function`, on the exact picker this phase is
+about.
+
+There is one key factory now, hierarchical so a prefix reaches a whole family.
+The browser test for it is the one that matters: change a price on a medicine,
+press Back, and the catalogue list shows the new figure.
+
+**The cart was a money defect, not a caching one.** It kept whole medicine
+objects in browser storage with no expiry and multiplied the stored price, while
+submission reprices server-side — so a week-old basket showed one total and
+charged another.
+
+### You could not add a person at all
+
+Not "the rider picker lacks a button": **nothing in this product could create a
+user.** `POST /api/v1/users` works and is tested; there was no page, no route, no
+form. Riders and storekeepers existed because the seed script made them.
+
+There is a real page now, and the same form inside a dialog beside every rider
+picker. The argument for the dialog is not convenience — no form here persists a
+draft or warns before discarding one, so leaving to create a rider cost the whole
+ordered stop list on a half-planned round. The browser spec asserts exactly that:
+what was typed is still typed afterwards.
+
+**A manager may now create a delivery person or a storekeeper.** Trip planning is
+a manager's job, so making the person who drives it has to be too. The
+storekeeper half is wider than the rider case needs and is written down as such
+in `ASSUMPTIONS.md`, along with the limit that makes it safe.
+
+### Gates
+
+Two new ones, each proved by planting the defect it claims to catch: every query
+key comes from the factory and every mutation invalidates through it, and every
+`e2e/*.spec.ts` is selected by a Playwright project — Playwright reports zero
+tests for a file no project matches and prints a green run.
+
+One gate had gone quietly blind. Moving to the key factory broke the API path
+reconciliation's extraction pattern, and it fell from checking **121 request
+sites to 63** with a floor of 60. Floor raised to 110.
+
+`TEST_IDS.toast` had been in the frozen browser-test contract since phase 3 and
+nothing ever emitted it. The first spec to use it timed out on an action that had
+succeeded.
+
 ## Phase 26 — a form that is not finished is not a malfunction
 
 One screenshot: the round-planning form with a rider chosen, a day chosen, notes

@@ -1181,3 +1181,92 @@ pre-existing fast-refresh warnings in files not touched here.
 
 None. Go-live items remain as listed in Phase 24: SMS provider procurement, an
 `ERROR_REPORTING_DSN` adapter, and a scheduled backup.
+
+## Phase 27 — A catalogue you can actually run
+
+**Status:** COMPLETED
+
+### Scope and completed work
+
+Four requests, three of which were holes rather than polish.
+
+**Managing a medicine where you look at it.** `PATCH /inventory/medicines/:id`,
+`POST /inventory/batches/:id/adjust`, `PATCH /inventory/batches/:id/block` and
+`GET /inventory/movements?medicineId=` were all mounted, documented and tested,
+and **none had ever had a caller.** `/medicines/:id` is rebuilt as stacked
+sections — about, price, offers, stock, history — with role-filtered stats, a
+one-field price change, list/delist, book-in-stock in a dialog, batch movements,
+count correction and block/unblock. `MedicineForm` dual-mounts at
+`/medicines/:id/edit`.
+
+**Every field says what it is for.** `HelpTip` (Radix Popover, hover _and_ tap),
+`Field.help`, and placeholder/hint/help copy on all nineteen catalogue fields in
+both languages. `TEXT_FIELDS` became a `FieldSpec[]` of resolved strings so all
+~60 `t('…')` calls are literal and gated.
+
+**One name for every cached thing.** `lib/queryKeys.ts`; all 74 query sites and
+23 broken mutations converted; seven previously-ignored realtime events wired
+through one map; the cart repriced from `POST /orders/quote` instead of from
+`localStorage`; `useBranding`'s module cache removed.
+
+**Add a person.** `/admin/users/new`, the same form hosted in `PickOrCreate`'s
+dialog beside every rider picker, and `POST /users` widened so a MANAGER may
+create a `DELIVERY_PERSON` or a `STOREKEEPER`.
+
+**Offers on a medicine.** `medicineId` filter on `GET /pricing/schemes`,
+`objectIdParam` lifted into `requestSanitiser`, and a real schema for
+`PATCH /batches/:id/block` — one of four hand-validated writes, and this phase
+ships its first caller.
+
+### New gates, each proved by planting its defect
+
+- `queryKeyDiscipline.test.ts` — every key from the factory; every mutation
+  invalidates through it. Both waiver lists empty.
+- `browserSpecs.test.ts` — every `e2e/*.spec.ts` is selected by a Playwright
+  project. Playwright reports zero tests for an unmatched file and prints green.
+
+### Defects found while building
+
+- The medicine form **could not be submitted at all**: optional fields with shape
+  rules were sent an empty string.
+- `apiPaths.test.ts` had silently fallen from 121 request sites to 63; its floor
+  of 60 allowed it. Raised to 110.
+- `TripForm` and `DeliveryDetail` shared a cache key and disagreed about its
+  shape — a live crash on the rider picker.
+- `TEST_IDS.toast` was in the frozen contract and emitted by nothing.
+- The medicine page printed `PRESCRIPTION` as a raw enum.
+- The `cart` entry in `SCREEN_READS` claimed the server was never asked
+  anything, which stopped being true when the basket started quoting.
+
+### Test results
+
+Web 276 (34 files). Browser 113 — 44 smoke/accessibility/navigation on the built
+bundle, 10 smoke on the dev server, 9 journey, 42 screens, 8 manage. API 170
+unit, 194 integration, 5 reconciliation. Mobile 93.
+Typecheck, lint and build clean apart from the seven pre-existing fast-refresh
+warnings in files not touched here.
+
+### Known limitations
+
+- `SearchPicker` is adopted by the offers form only. The medicine pickers in
+  `PriceListForm`, `PurchaseOrderForm` and `InventoryDashboard`, and the supplier
+  and shop pickers, still read one unpaged page — 100, 50 or 25 records — and
+  still say nothing when the list is cut short. The primitive and the pattern
+  are in place; the remaining four are mechanical.
+- `PickOrCreate` is adopted by the rider pickers only. The medicine, supplier,
+  customer, delivery-address and warehouse cases named in the phase plan are not
+  wired.
+- **No SALES user is seeded**, in `e2e/fixtures.ts` or `seed.ts`, so the sales
+  variant of the medicine page is covered by the page test rather than in the
+  browser.
+- Resolving each customer's _true_ price on the catalogue remains out of scope
+  and is its own phase; the label says "List price" and states that the
+  customer's own price is confirmed at ordering.
+- Optimistic concurrency on `Medicine` is deliberately absent — see
+  `ASSUMPTIONS.md`.
+
+### Next phase dependencies
+
+None. The two adoption gaps above are the natural first slice of whatever comes
+next. Go-live items remain as listed in Phase 24: SMS provider procurement, an
+`ERROR_REPORTING_DSN` adapter, and a scheduled backup.

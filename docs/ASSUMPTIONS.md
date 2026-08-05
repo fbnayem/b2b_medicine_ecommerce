@@ -451,3 +451,75 @@ reads a decision rather than guesses at an intention.
   the form used to let somebody pick a vehicle and type notes before telling
   them. That state is now named at the top with a link to where the work
   actually starts.
+
+## Phase 27 — managing a medicine, explaining a field, keeping the app in step
+
+- **Sections, not tabs, on the medicine page.** Tabs would hide three quarters
+  of the page from the accessibility scan, break Ctrl-F and printing, need a
+  keyboard model that exists nowhere else in forty-three pages, and force a rule
+  for what happens when a manager pastes `?tab=offers` to a storekeeper who has
+  no such tab. A one-tab tablist for a shop owner is furniture. Sections give
+  deep links for nothing: each card carries an `id` and an `<h2>`.
+- **No `version` field on `Medicine`.** `PriceList` and `Scheme` carry optimistic
+  concurrency and copying it here would be a migration wearing a one-line diff:
+  a Mongoose `default: 0` does not backfill documents that already exist, so
+  `undefined !== 0` would refuse the first edit of every medicine in the
+  catalogue as a conflict. The blast radius differs too — a price list is
+  replaced as a whole sheet, so a lost update destroys somebody's prices,
+  whereas a medicine is patched field-wise and two managers editing different
+  fields both land.
+- **A one-field price change as well as the edit form.** `UpdateMedicineSchema`
+  has always accepted a patch of one field, while the only UI that could produce
+  one demanded nineteen controls, three conditionally required and one pair
+  carrying a cross-field rule. It re-checks against the **stored** MRP, mirroring
+  the merge the server performs before running the same rule itself — comparing
+  against a field on screen would be comparing against a number nobody saved.
+- **Delisting is what "delete" means here, and the confirmation says so.** There
+  is no delete endpoint and there should not be: a medicine is named by every
+  order that ever contained it, and removing the row would leave those orders
+  pointing at nothing.
+- **Margin is measured against the MRP, never against cost.** A markup over cost
+  is a different figure and one keystroke away, so the label says which it is,
+  and margin is safe to show anyone who may see prices while cost is not.
+- **Popover, not Tooltip, for the "i" icon.** A Radix tooltip is hover and focus
+  only and **does not open on tap**; this audience includes storekeepers on
+  phones. Hover opens it with a mouse, a tap latches it, the pointer can travel
+  onto the panel, and Escape dismisses it — WCAG 2.1 SC 1.4.13.
+- **Three tiers of guidance, and the rule that separates them.** If omitting a
+  value causes an error it is a **hint**; if it causes a wrong-but-valid value it
+  is a **help tip**; a **placeholder** is only an example of the shape. A tooltip
+  is never a substitute for a hint — nobody should have to open a popover to
+  learn a required format.
+- **A manager may create a delivery person or a storekeeper, and nothing else.**
+  Trip planning and delivery assignment are `MANAGEMENT`, so the person who
+  needed a delivery person was precisely the person who could not make one. The
+  storekeeper half is wider than the rider case needs, and is worth stating
+  plainly: **a storekeeper can move stock, so this lets a manager create an
+  account that changes inventory.** It is defensible — a manager already approves
+  orders and posts stocktake variances, both of which move more value than a
+  warehouse account does — and it is the user's explicit decision. What keeps it
+  safe is that the permitted set is exactly those two, expressed once in
+  `assertAdministrable`: never MANAGER, ADMIN or SUPER_ADMIN, which are the roles
+  that could go on to create further accounts. Their own role is included in
+  that refusal and would otherwise have passed, because MANAGER is not
+  _privileged_. The `USER_CREATED` audit row names the actor and their role.
+- **`PickOrCreate` hides the create affordance rather than disabling it.** An
+  affordance that answers 403 is worse than none: it tells a person the product
+  can do something for them that it will not.
+- **One level of dialog only.** `Dialog` hard-codes `z-[100]`/`z-[200]` with no
+  depth counter, so a dialog opened from inside a dialog stacks by DOM order and
+  paints two overlays. A `PickOrCreate` on a page is fine; one inside an
+  `ask.confirm` is not. Recorded rather than solved.
+- **An unusable `?medicineId=` returns an empty page, not every offer.** Dropping
+  the filter would answer a question about one medicine with every offer in the
+  tenant — the most misleading of the three possible replies, and worse than the
+  cast error that handing it to Mongoose raises.
+- **Price lists carrying a medicine are filtered in the browser.** `listPriceLists`
+  already returns every list's `lines` inline, so no endpoint is needed. The
+  bound is written down in the code rather than left silent: a tenant with more
+  than fifty price lists would see only the first fifty there.
+- **Blank means absent, for every optional field with a shape rule.** The
+  server's optional fields are optional _or well-formed_ — a barcode is at least
+  six characters, a picture is an address — and a control nobody has typed into
+  holds `''`, which is neither. The inner rule is unwrapped from the shared
+  schema rather than restated.

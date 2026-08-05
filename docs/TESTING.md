@@ -29,17 +29,25 @@ pnpm e2e                                  # everything
 pnpm exec playwright test --project=smoke-preview   # built bundle
 pnpm exec playwright test --project=smoke-dev       # dev server
 pnpm exec playwright test --project=journey         # tier 1 workflows
+pnpm exec playwright test --project=manage          # tier 5, writes to the database
 ```
+
+**A spec no project selects never runs.** Playwright does not warn about it — it
+reports zero tests for that file and prints a green run, so the suite is quietly
+one file smaller than everybody believes. `apps/web/src/testing/browserSpecs.test.ts`
+reconciles every `e2e/*.spec.ts` against the `testMatch` patterns in
+`playwright.config.ts` and is proved by planting an orphan.
 
 ### Tiers
 
-| Tier                     | Files                   | Contract                                                                                                                    |
-| ------------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| 1 — domain workflows     | `journey.spec.ts`       | **Must survive the redesign untouched.** Navigates by URL and asserts on text a person reads, never on a class name.        |
-| 2 — page-level state     | `smoke.spec.ts`         | Signs in as each role and asserts the page mounted. Stable across restyling.                                                |
-| 3 — navigation and shell | `navigation.spec.ts`    | The sidebar, search, account menu, breadcrumbs and dark mode. Rewritten when the shell landed, as budgeted.                 |
-| 4 — every screen         | `screens.spec.ts`       | Opens **every** `NAV_ITEMS` destination as a role permitted to open it: no error card, no refused request, no broken image. |
-| — accessibility          | `accessibility.spec.ts` | Axe at strict zero across fifteen screens.                                                                                  |
+| Tier                     | Files                                 | Contract                                                                                                                                                                                    |
+| ------------------------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — domain workflows     | `journey.spec.ts`                     | **Must survive the redesign untouched.** Navigates by URL and asserts on text a person reads, never on a class name.                                                                        |
+| 2 — page-level state     | `smoke.spec.ts`                       | Signs in as each role and asserts the page mounted. Stable across restyling.                                                                                                                |
+| 3 — navigation and shell | `navigation.spec.ts`                  | The sidebar, search, account menu, breadcrumbs and dark mode. Rewritten when the shell landed, as budgeted.                                                                                 |
+| 4 — every screen         | `screens.spec.ts`                     | Opens **every** `NAV_ITEMS` destination as a role permitted to open it: no error card, no refused request, no broken image.                                                                 |
+| — accessibility          | `accessibility.spec.ts`               | Axe at strict zero across seventeen screens.                                                                                                                                                |
+| 5 — changing things      | `catalogue.spec.ts`, `people.spec.ts` | Writes to the seeded database, so it runs one test after another and each undoes what it did. This is the tier that proves an endpoint has a caller at all rather than that a page renders. |
 
 ### Why tier 4 exists
 
