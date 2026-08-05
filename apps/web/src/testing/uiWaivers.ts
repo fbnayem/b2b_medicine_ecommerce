@@ -111,3 +111,30 @@ export const ORPHAN_CLASSES: readonly string[] = [];
  * quietly does not apply to the sentence a confused user has stopped to read.
  */
 export const UNTRANSLATED_PRIMITIVES: readonly string[] = [];
+
+/**
+ * Files still writing a cache key as an array literal.
+ *
+ * Empty. Every one of the seventy-four query call sites now takes its key from
+ * `lib/queryKeys.ts`, which is what makes "invalidate the whole family" a thing
+ * anybody can write. Before that, the catalogue lived under five key shapes —
+ * two of them fetching the identical URL into separate entries — and
+ * `['delivery-personnel']` was written with two incompatible payload shapes
+ * under one key, which crashed the round-planning form outright.
+ */
+export const RAW_QUERY_KEYS: readonly string[] = [];
+
+/**
+ * Files with a write that refreshes nothing and goes nowhere.
+ *
+ * Empty, and it starts empty. Twenty-three sites were in this state: nine that
+ * refreshed nothing at all — approving an order left it in the queue you came
+ * from — and fourteen that navigated to a list which then rendered the
+ * pre-change row, two of them to the very list they had just edited.
+ *
+ * The rule this list guards is deliberately the weak one: that a mutation
+ * invalidates *something*. No regex can know that a goods receipt also changes
+ * the catalogue's availability. It catches the shape all twenty-three had — a
+ * write with nothing after it — and the rest is review.
+ */
+export const UNINVALIDATED_MUTATIONS: readonly string[] = [];

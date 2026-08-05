@@ -9,6 +9,7 @@ import {
   Resource,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useSavedFilter } from '../lib/savedFilter';
 import { useLanguage } from '../lib/useLanguage';
 
@@ -27,7 +28,7 @@ export function FulfilmentQueue() {
   const [status, setStatus] = useSavedFilter('fulfilment', '');
 
   const queue = useApiCollection<PickingList>(
-    ['fulfilment-queue', status],
+    keys.fulfilment.queue(status),
     `/fulfilment/queue${status ? `?status=${status}` : ''}`,
   );
 

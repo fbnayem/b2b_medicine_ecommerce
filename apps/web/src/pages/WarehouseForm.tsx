@@ -13,11 +13,14 @@ import {
   Textarea,
   toast,
 } from '../components/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
+import { keys } from '../lib/queryKeys';
 
 export function WarehouseForm() {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
   const [form, setForm] = useState({
     code: '',
     name: '',
@@ -48,6 +51,7 @@ export function WarehouseForm() {
         notes: form.notes || undefined,
         makeDefault,
       });
+      queryClient.invalidateQueries({ queryKey: keys.stock.all });
       toast.success(t('warehouses.saved', { name: form.name }));
       navigate('/inventory/warehouses');
     } catch (caught) {

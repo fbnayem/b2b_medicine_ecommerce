@@ -19,6 +19,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatFinanceDateTime, formatMinor } from '../lib/finance';
 
@@ -62,7 +63,10 @@ export function PurchaseOrderDetail() {
   const { t, language } = useLanguage();
   const queryClient = useQueryClient();
 
-  const query = useApiResource<OrderPayload>(['purchase-order', id], `/purchasing/orders/${id}`);
+  const query = useApiResource<OrderPayload>(
+    keys.purchasing.order(id!),
+    `/purchasing/orders/${id}`,
+  );
   const [drafts, setDrafts] = useState<Record<string, ReceiptDraft>>({});
   const [supplierInvoiceReference, setSupplierInvoiceReference] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -126,7 +130,11 @@ export function PurchaseOrderDetail() {
       toast.success(t('purchasing.receiptSaved'));
       setDrafts({});
       setSupplierInvoiceReference('');
-      await queryClient.invalidateQueries({ queryKey: ['purchase-order', id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.purchasing.all }),
+        queryClient.invalidateQueries({ queryKey: keys.stock.all }),
+        queryClient.invalidateQueries({ queryKey: keys.medicines.all }),
+      ]);
     } catch (caught) {
       toast.error(errorMessage(caught, language, t('purchasing.receiptFailed')));
     } finally {

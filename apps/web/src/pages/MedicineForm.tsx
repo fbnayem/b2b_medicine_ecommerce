@@ -16,7 +16,9 @@ import {
   Textarea,
 } from '../components/ui';
 import { useZodForm } from '../lib/form';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
+import { keys } from '../lib/queryKeys';
 
 /**
  * The catalogue entry form, validated against the server's own field rules.
@@ -128,6 +130,7 @@ const CLINICAL = new Set(['genericName', 'strength', 'dosageForm']);
 
 export function MedicineForm() {
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [failure, setFailure] = useState<{ message: string; reference?: string }>();
 
@@ -169,6 +172,7 @@ export function MedicineForm() {
         defaultSellingPriceMinor: selling.minor,
         mrpMinor: printed.ok ? printed.minor : undefined,
       });
+      queryClient.invalidateQueries({ queryKey: keys.medicines.all });
       navigate(`/medicines/${response.data.data._id}`);
     } catch (caught) {
       setFailure({

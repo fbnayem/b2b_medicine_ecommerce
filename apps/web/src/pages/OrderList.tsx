@@ -11,6 +11,7 @@ import {
   type Column,
 } from '../components/ui';
 import { usePagedCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
 
@@ -27,7 +28,7 @@ import { formatFinanceDate, formatMinor } from '../lib/finance';
  */
 export function OrderList() {
   const { t } = useLanguage();
-  const query = usePagedCollection<Order>(['orders'], '/orders');
+  const query = usePagedCollection<Order>(keys.orders.list('all'), '/orders');
 
   const columns: ReadonlyArray<Column<Order>> = [
     {

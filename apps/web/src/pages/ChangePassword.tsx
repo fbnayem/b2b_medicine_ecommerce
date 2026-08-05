@@ -7,7 +7,9 @@ import { useAuthStore } from '../store/useAuth';
 import { usePasswordPolicy } from '../lib/usePasswordPolicy';
 import { Button, Card, ErrorState, Field, Input, PageHeader, toast } from '../components/ui';
 import { errorMessage } from '../api/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
+import { keys } from '../lib/queryKeys';
 
 /**
  * Choosing your own password.
@@ -20,6 +22,7 @@ import { useLanguage } from '../lib/useLanguage';
  */
 export function ChangePassword() {
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -50,6 +53,7 @@ export function ChangePassword() {
         currentPassword,
         newPassword,
       });
+      queryClient.invalidateQueries({ queryKey: keys.security.all });
       const revoked = response.data?.data?.otherSessionsRevoked ?? 0;
 
       // The flag is cleared server-side; mirror it locally so the guard below

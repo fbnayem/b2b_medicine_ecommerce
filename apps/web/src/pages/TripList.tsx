@@ -16,6 +16,7 @@ import {
   type Column,
 } from '../components/ui';
 import { usePagedCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { useAuthStore } from '../store/useAuth';
 import { formatFinanceDate } from '../lib/finance';
@@ -40,7 +41,7 @@ export function TripList() {
   const isRider = user?.role === UserRole.DELIVERY_PERSON;
 
   const trips = usePagedCollection<Trip>(
-    ['trips', status],
+    keys.trips.list(status),
     `/trips${status ? `?status=${status}` : ''}`,
   );
 

@@ -12,7 +12,9 @@ import {
   Textarea,
   toast,
 } from '../components/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
+import { keys } from '../lib/queryKeys';
 
 const EMPTY = {
   name: '',
@@ -42,6 +44,7 @@ const FIELDS: Array<[FieldName, string, string, boolean]> = [
 export function SupplierForm() {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
   const [form, setForm] = useState(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [failure, setFailure] = useState<{ message: string; reference?: string }>();
@@ -62,6 +65,7 @@ export function SupplierForm() {
         paymentTermsDays: Number(form.paymentTermsDays) || 0,
         notes: form.notes || undefined,
       });
+      queryClient.invalidateQueries({ queryKey: keys.purchasing.all });
       toast.success(t('purchasing.supplierSaved', { name: form.name }));
       navigate('/purchasing/suppliers');
     } catch (caught) {

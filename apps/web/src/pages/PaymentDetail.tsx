@@ -16,6 +16,7 @@ import {
   useAsk,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { createActionKey, formatFinanceDateTime, formatMinor } from '../lib/finance';
 import { populatedName, type FinancePayment } from './financeTypes';
@@ -43,7 +44,7 @@ export function PaymentDetail({ ownerMode = false }: PaymentDetailProps) {
   const [working, setWorking] = useState(false);
   const canReverse = !ownerMode && (role === UserRole.SUPER_ADMIN || role === UserRole.ADMIN);
 
-  const query = useApiResource<FinancePayment>(['payment', id], `/payments/${id}`);
+  const query = useApiResource<FinancePayment>(keys.payments.one(id!), `/payments/${id}`);
 
   /*
    * One idempotency key per action, held until it succeeds. A double-click, or
@@ -65,7 +66,10 @@ export function PaymentDetail({ ownerMode = false }: PaymentDetailProps) {
         idempotencyKey: keyFor(action),
       });
       delete actionKeys.current[action];
-      await queryClient.invalidateQueries({ queryKey: ['payment', id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.payments.all }),
+        queryClient.invalidateQueries({ queryKey: keys.finance.all }),
+      ]);
       toast.success(done);
     } catch (caught) {
       toast.error(errorMessage(caught, language, t('finance.recordFailed')));

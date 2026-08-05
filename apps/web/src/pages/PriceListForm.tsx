@@ -17,6 +17,8 @@ import {
   toast,
 } from '../components/ui';
 import { useApiCollection, useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
 
@@ -62,14 +64,15 @@ export function PriceListForm({ mode = 'create' }: { mode?: 'create' | 'edit' })
   const navigate = useNavigate();
   const params = useParams();
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
   const editing = mode === 'edit';
 
   const medicines = useApiCollection<Medicine>(
-    ['medicines', 'all'],
+    keys.medicines.picker(),
     '/inventory/medicines?limit=100',
   );
   const existing = useApiResource<PriceListRecord>(
-    ['price-list', params.id],
+    keys.priceLists.one(params.id!),
     `/pricing/price-lists/${params.id}`,
     { enabled: editing },
   );
@@ -145,6 +148,7 @@ export function PriceListForm({ mode = 'create' }: { mode?: 'create' | 'edit' })
       } else {
         await apiClient.post('/pricing/price-lists', body);
       }
+      queryClient.invalidateQueries({ queryKey: keys.priceLists.all });
       toast.success(t('priceLists.saved', { name: form.name }));
       navigate('/pricing/price-lists');
     } catch (caught) {

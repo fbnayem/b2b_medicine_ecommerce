@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Card, EmptyState, LinkButton, PageHeader, Resource } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
 
@@ -24,7 +25,7 @@ interface ReadyPackage {
  */
 export function ReadyQueue() {
   const { t } = useLanguage();
-  const ready = useApiCollection<ReadyPackage>(['fulfilment-ready'], '/fulfilment/ready');
+  const ready = useApiCollection<ReadyPackage>(keys.fulfilment.ready(), '/fulfilment/ready');
 
   return (
     <>

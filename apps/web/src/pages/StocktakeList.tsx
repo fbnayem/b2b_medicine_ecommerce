@@ -16,6 +16,7 @@ import {
   type Column,
 } from '../components/ui';
 import { usePagedCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate } from '../lib/finance';
 
@@ -31,7 +32,7 @@ export function StocktakeList() {
   const [status, setStatus] = useState('');
 
   const counts = usePagedCollection<StocktakeListRow>(
-    ['stocktakes', status],
+    keys.stocktakes.list(status),
     `/stocktakes${status ? `?status=${status}` : ''}`,
   );
 

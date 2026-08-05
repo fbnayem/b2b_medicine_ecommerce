@@ -14,6 +14,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatFinanceDateTime, formatMinor } from '../lib/finance';
 import type { FinanceReportData, FinanceReportRow } from './financeTypes';
@@ -62,11 +63,11 @@ function FinancialReportPage({ kind }: { kind: ReportKind }) {
     kind === 'collections' ? `from=${applied.from}&to=${applied.to}` : `asOf=${applied.asOf}`;
 
   const report = useApiResource<FinanceReportData | FinanceReportRow[]>(
-    ['finance-report', kind, search],
+    keys.finance.report(kind, search),
     `/finance/reports/${kind}?${search}`,
   );
   const summary = useApiResource<ReportSummary>(
-    ['finance-report-summary', search],
+    keys.finance.reportSummary(search),
     `/finance/reports/summary?${search}`,
   );
 

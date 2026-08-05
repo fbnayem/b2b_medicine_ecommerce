@@ -12,6 +12,7 @@ import {
   Select,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime } from '../lib/finance';
 import { humaniseEnum } from '@medsupply/utilities';
@@ -44,7 +45,7 @@ export function AuditLogViewer() {
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const actions = useApiCollection<string>(['audit-actions'], '/admin/audit/actions');
+  const actions = useApiCollection<string>(keys.audit.actions(), '/admin/audit/actions');
 
   const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
   if (action) params.set('action', action);
@@ -53,7 +54,7 @@ export function AuditLogViewer() {
   if (to) params.set('to', to);
 
   const entries = useApiCollection<AuditRow>(
-    ['audit', action, entityType, from, to, page],
+    keys.audit.list({ action, entityType, from, to, page }),
     `/admin/audit?${params.toString()}`,
   );
 

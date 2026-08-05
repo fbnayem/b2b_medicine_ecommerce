@@ -19,6 +19,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useSavedFilter } from '../lib/savedFilter';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
@@ -55,13 +56,13 @@ export function ReturnList() {
   if (applied.status) search.set('status', applied.status);
   if (applied.q) search.set('q', applied.q);
   const returns = useApiCollection<ReturnRow>(
-    ['returns', applied.status, applied.q, page],
+    keys.returns.list({ ...applied, page }),
     `/returns?${search.toString()}`,
   );
 
   // A colleague approving or receiving a return should not require a refresh.
   useRealtimeEvent(RealtimeEvent.RETURN_UPDATED, () => {
-    void queryClient.invalidateQueries({ queryKey: ['returns'] });
+    void queryClient.invalidateQueries({ queryKey: keys.returns.all });
   });
 
   const columns: ReadonlyArray<Column<ReturnRow>> = [

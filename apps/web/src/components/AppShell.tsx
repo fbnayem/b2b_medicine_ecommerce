@@ -22,6 +22,7 @@ import { translatedOr, type Language } from '@medsupply/i18n';
 import { useAuthStore } from '../store/useAuth';
 import { signOut } from '../api/client';
 import { connectRealtime, disconnectRealtime } from '../realtime/socket';
+import { useLiveCache } from '../realtime/useLiveCache';
 import { NotificationBell } from './NotificationBell';
 import { Toaster } from './ui/toast';
 import { AskProvider } from './ui/ask';
@@ -76,6 +77,9 @@ export function AppShell() {
     connectRealtime();
     return () => disconnectRealtime();
   }, [isAuthenticated]);
+
+  // What each push makes stale, decided in one place rather than per page.
+  useLiveCache();
 
   // The sidebar is a sheet on small screens; leaving it open across a
   // navigation would cover the page the user just asked for.
@@ -166,8 +170,26 @@ export function AppShell() {
             navigation without adding another stop to the tab order.
           */}
           <main id="main" tabIndex={-1} className="min-w-0 flex-1 px-4 py-6">
-            <Breadcrumbs />
-            <Outlet />
+            {/*
+              An inner width limit, not one on `<main>` itself.
+
+              Every authenticated page ran the full width of the window, so on a
+              1920px monitor a two-column detail card is around 880px wide and a
+              label and its value sit the better part of a metre apart. That is
+              the loudest "unfinished" signal in the product and it applies to
+              all forty-three screens.
+
+              Inner, because `<main>` carries the print rule that zeroes its
+              padding and the `tabIndex={-1}` focus target — neither should have
+              to know about a layout constraint. And 100rem rather than
+              something tighter, because the batch table on the stock screen has
+              nine columns and a narrower page would put it back into a
+              horizontal scroll.
+            */}
+            <div className="mx-auto w-full max-w-[100rem]">
+              <Breadcrumbs />
+              <Outlet />
+            </div>
           </main>
         </div>
 

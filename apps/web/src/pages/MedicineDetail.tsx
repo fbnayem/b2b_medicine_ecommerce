@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
-import { UserRole } from '@medsupply/shared-types';
 import type { Medicine, MedicineBatch } from '@medsupply/shared-types';
 import { useAuthStore } from '../store/useAuth';
+import { canSeeStock } from '../lib/permissions';
 import {
   Card,
   DataTable,
@@ -14,6 +14,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection, useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
 
@@ -42,13 +43,19 @@ export function MedicineDetail() {
   const { id } = useParams();
   const { t } = useLanguage();
   const user = useAuthStore((state) => state.user);
-  const canSeeStock = user?.role !== UserRole.SHOP_OWNER;
+  /*
+   * The server's `stockReaders`, not "anybody who is not a shop owner". The
+   * old predicate answered `true` for a sales rep, who has just been allowed
+   * onto this page and whom `GET /inventory/batches` refuses — so the fix to
+   * the navigation manifest and the fix here are one change, not two.
+   */
+  const showStock = canSeeStock(user?.role);
 
-  const medicine = useApiResource<Medicine>(['medicine', id], `/inventory/medicines/${id}`);
+  const medicine = useApiResource<Medicine>(keys.medicines.one(id!), `/inventory/medicines/${id}`);
   const batches = useApiCollection<MedicineBatch>(
-    ['medicine-batches', id],
+    keys.medicines.batches(id!),
     `/inventory/batches?medicineId=${id}`,
-    { enabled: canSeeStock },
+    { enabled: showStock },
   );
 
   const batchColumns: ReadonlyArray<Column<MedicineBatch>> = [
@@ -117,7 +124,7 @@ export function MedicineDetail() {
                     {item.minimumOrderQuantity}–
                     {item.maximumOrderQuantity ?? t('catalogue.noMaximum')} {item.unit}
                   </Detail>
-                  <Detail label={t('catalogue.yourPrice')}>
+                  <Detail label={t('catalogue.listPrice')}>
                     {formatMinor(item.defaultSellingPriceMinor)}
                   </Detail>
                   <Detail label={t('catalogue.availability')}>
@@ -129,7 +136,7 @@ export function MedicineDetail() {
                 {item.description && <p className="mt-3 text-text-muted">{item.description}</p>}
               </Card>
 
-              {canSeeStock && (
+              {showStock && (
                 <Card>
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <h2 className="text-lg font-semibold text-text">{t('catalogue.batches')}</h2>

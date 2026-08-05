@@ -16,6 +16,7 @@ import {
   useAsk,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime, formatMinor } from '../lib/finance';
 
@@ -28,14 +29,14 @@ export function OrderDetail() {
   const queryClient = useQueryClient();
   const { clear, add, setQuantity, setDraftId } = useCart();
 
-  const order = useApiResource<Order>(['order', id], `/orders/${id}`);
+  const order = useApiResource<Order>(keys.orders.one(id!), `/orders/${id}`);
 
   /*
    * An order with no delivery yet answers 404, which is an ordinary state
    * rather than a failure — most orders spend their first day in it. So this
    * query never retries and its error is simply "no delivery to track".
    */
-  const delivery = useApiResource<Delivery>(['order-delivery', id], `/deliveries/order/${id}`, {
+  const delivery = useApiResource<Delivery>(keys.orders.delivery(id!), `/deliveries/order/${id}`, {
     retry: false,
   });
 
@@ -64,7 +65,7 @@ export function OrderDetail() {
     });
     if (!reason) return;
     await apiClient.post(`/orders/${id}/cancellation-request`, { reason });
-    await queryClient.invalidateQueries({ queryKey: ['order', id] });
+    await queryClient.invalidateQueries({ queryKey: keys.orders.all });
   }
 
   return (

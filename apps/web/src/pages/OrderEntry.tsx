@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PaymentMethod, type Medicine, type Shop } from '@medsupply/shared-types';
 import { apiClient, errorMessage, failureReference } from '../api/client';
 import {
@@ -17,6 +17,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
 import { useAuthStore } from '../store/useAuth';
@@ -104,6 +105,7 @@ function useDebounced<T>(value: T, delay = 200): T {
 
 export function OrderEntry() {
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
 
@@ -130,11 +132,11 @@ export function OrderEntry() {
    */
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
 
-  const shops = useApiCollection<Shop>(['shops', 'entry'], '/shops?limit=100');
+  const shops = useApiCollection<Shop>(keys.shops.picker('entry'), '/shops?limit=100');
   const debounced = useDebounced(term);
 
   const results = useQuery<Medicine[]>({
-    queryKey: ['medicine-search', debounced],
+    queryKey: keys.medicines.search(debounced),
     enabled: debounced.trim().length >= 2,
     queryFn: async ({ signal }) => {
       const response = await apiClient.get(
@@ -161,7 +163,10 @@ export function OrderEntry() {
    * basket is an error the operator did not make.
    */
   const quote = useQuery<Quote>({
-    queryKey: ['order-quote', shopId, lines.map((line) => `${line.medicineId}:${line.quantity}`)],
+    queryKey: keys.orders.quote(
+      shopId,
+      lines.map((line) => `${line.medicineId}:${line.quantity}`),
+    ),
     enabled: lines.length > 0 && Boolean(shopId || user?.role === 'SHOP_OWNER'),
     queryFn: async ({ signal }) => {
       const response = await apiClient.post(
@@ -240,6 +245,10 @@ export function OrderEntry() {
           requestedQuantity: line.quantity,
         })),
       });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.orders.all }),
+        queryClient.invalidateQueries({ queryKey: keys.approvals.all }),
+      ]);
       toast.success(t('orderEntry.placed', { reference: response.data.data.reference }));
       navigate(`/orders/${response.data.data._id}`);
     } catch (caught) {

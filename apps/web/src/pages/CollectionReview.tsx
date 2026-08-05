@@ -15,6 +15,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { createActionKey, formatFinanceDateTime, formatMinor } from '../lib/finance';
 import { populatedName, type FinancePayment } from './financeTypes';
@@ -26,7 +27,7 @@ export function CollectionReview() {
   const [workingId, setWorkingId] = useState('');
 
   const collections = useApiCollection<FinancePayment>(
-    ['pending-collections'],
+    keys.payments.pending(),
     '/payments?status=PENDING&source=DELIVERY_COLLECTION&limit=100',
   );
 
@@ -44,7 +45,10 @@ export function CollectionReview() {
         idempotencyKey: actionKeys.current[name],
       });
       delete actionKeys.current[name];
-      await queryClient.invalidateQueries({ queryKey: ['pending-collections'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.payments.all }),
+        queryClient.invalidateQueries({ queryKey: keys.finance.all }),
+      ]);
       toast.success(action === 'post' ? t('finance.postedOk') : t('finance.rejected'));
     } catch (caught) {
       toast.error(

@@ -22,6 +22,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
 
@@ -88,7 +89,7 @@ export function ApprovalReview() {
   const { t, language } = useLanguage();
   const queryClient = useQueryClient();
 
-  const query = useApiResource<ReviewData>(['approval', id], `/approvals/${id}`);
+  const query = useApiResource<ReviewData>(keys.approvals.one(id!), `/approvals/${id}`);
   const data = query.data;
 
   const [lines, setLines] = useState<Line[]>([]);
@@ -122,7 +123,12 @@ export function ApprovalReview() {
     [lines, orderDiscount, delivery],
   );
 
-  const reload = () => queryClient.invalidateQueries({ queryKey: ['approval', id] });
+  const reload = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: keys.approvals.all }),
+      queryClient.invalidateQueries({ queryKey: keys.orders.all }),
+      queryClient.invalidateQueries({ queryKey: keys.fulfilment.all }),
+    ]);
 
   /**
    * Answering a cancellation request.

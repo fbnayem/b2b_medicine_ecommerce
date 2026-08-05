@@ -12,11 +12,14 @@ import {
   Textarea,
   toast,
 } from '../components/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
+import { keys } from '../lib/queryKeys';
 
 export function StocktakeForm() {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
   const [warehouseLocation, setWarehouseLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -31,6 +34,7 @@ export function StocktakeForm() {
         warehouseLocation: warehouseLocation.trim() || undefined,
         notes: notes.trim() || undefined,
       });
+      queryClient.invalidateQueries({ queryKey: keys.stocktakes.all });
       const created = response.data.data as { _id: string; reference: string };
       toast.success(t('stocktake.opened', { reference: created.reference }));
       navigate(`/inventory/stocktakes/${created._id}`);

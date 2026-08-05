@@ -18,6 +18,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 
 /**
@@ -48,7 +49,7 @@ export function ControlledRegister() {
   const [applied, setApplied] = useState(initial);
 
   const register = useApiResource<Register>(
-    ['controlled-register', applied.from, applied.to],
+    keys.purchasing.controlledRegister(applied),
     `/purchasing/controlled-register?from=${applied.from}&to=${applied.to}`,
   );
 

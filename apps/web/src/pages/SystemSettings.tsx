@@ -17,6 +17,7 @@ import {
   useAsk,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 
 type GroupValues = Record<string, unknown>;
@@ -54,7 +55,7 @@ export function SystemSettings() {
   const ask = useAsk();
   const queryClient = useQueryClient();
 
-  const query = useApiResource<SettingsPayload>(['settings'], '/settings');
+  const query = useApiResource<SettingsPayload>(keys.settings.current(), '/settings');
   const payload = query.data;
 
   const [activeGroup, setActiveGroup] = useState<string>(SettingsGroup.BUSINESS);
@@ -67,7 +68,7 @@ export function SystemSettings() {
     if (payload) setDraft(structuredClone(payload.settings));
   }, [payload]);
 
-  const reload = () => queryClient.invalidateQueries({ queryKey: ['settings'] });
+  const reload = () => queryClient.invalidateQueries({ queryKey: keys.settings.all });
 
   function setField(group: string, field: string, value: unknown) {
     setDraft((current) => ({ ...current, [group]: { ...current[group], [field]: value } }));

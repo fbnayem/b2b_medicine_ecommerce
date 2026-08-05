@@ -29,6 +29,7 @@ import {
   useAsk,
 } from '../components/ui';
 import { useApiCollection, useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { createActionKey, formatFinanceDateTime } from '../lib/finance';
 
@@ -56,9 +57,9 @@ export function DeliveryDetail() {
   const role = useAuthStore((state) => state.user?.role);
   const canManage = role ? MANAGER_ROLES.includes(role) : false;
 
-  const query = useApiResource<Delivery>(['delivery', id], `/deliveries/${id}`);
+  const query = useApiResource<Delivery>(keys.deliveries.one(id!), `/deliveries/${id}`);
   const delivery = query.data;
-  const people = useApiCollection<DeliveryPerson>(['delivery-personnel'], '/deliveries/personnel', {
+  const people = useApiCollection<DeliveryPerson>(keys.riders.list(), '/deliveries/personnel', {
     enabled: canManage,
   });
 
@@ -84,7 +85,7 @@ export function DeliveryDetail() {
   // Another operator acting on this delivery refreshes the open detail view.
   useRealtimeEvent<{ entityId?: string }>(RealtimeEvent.DELIVERY_UPDATED, (payload) => {
     if (payload?.entityId === id)
-      void queryClient.invalidateQueries({ queryKey: ['delivery', id] });
+      void queryClient.invalidateQueries({ queryKey: keys.deliveries.all });
   });
 
   async function post(path: string, body: Record<string, unknown>, done: string) {
@@ -95,7 +96,11 @@ export function DeliveryDetail() {
         idempotencyKey: createActionKey(path),
         ...body,
       });
-      await queryClient.invalidateQueries({ queryKey: ['delivery', id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.deliveries.all }),
+        queryClient.invalidateQueries({ queryKey: keys.trips.all }),
+        queryClient.invalidateQueries({ queryKey: keys.orders.all }),
+      ]);
       toast.success(done);
     } catch (caught) {
       toast.error(errorMessage(caught, language, t('deliveryDetail.actionFailed')));

@@ -1,6 +1,11 @@
 import { NextFunction, Response } from 'express';
 import { Types } from 'mongoose';
-import { StockMovementType, UserRole } from '@medsupply/shared-types';
+import {
+  ActivityEntityType,
+  RealtimeEvent,
+  StockMovementType,
+  UserRole,
+} from '@medsupply/shared-types';
 import {
   AdjustmentSchema,
   AllocationSchema,
@@ -26,8 +31,44 @@ import {
 import { inventorySettings } from '../services/settingsService';
 import { correlationId } from '../services/logger';
 import { escapeRegex } from '../services/requestSanitiser';
+import { emitEntityUpdate } from '../services/realtime';
 
 const COST_ROLES = new Set<UserRole>([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER]);
+
+/**
+ * Who hears that the catalogue or the stock behind it moved.
+ *
+ * `INVENTORY_UPDATED` has been in `RealtimeEvent` since the realtime phase and
+ * **nothing has ever emitted it**. It matters now because this is the release
+ * that lets somebody change a price or correct a count from the medicine page:
+ * without a push, a rep quoting a customer and a storekeeper picking against
+ * the same line go on reading a figure that changed thirty seconds ago.
+ *
+ * Not shop owners. Their catalogue is served fresh on navigation, and the shop
+ * room exists to tell a customer about their *own* orders — broadcasting every
+ * warehouse movement into it would be both noise and a disclosure.
+ */
+const INVENTORY_AUDIENCE = [
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+  UserRole.STOREKEEPER,
+  UserRole.SALES,
+];
+
+function announceInventory(
+  entityType: ActivityEntityType,
+  entityId: unknown,
+  reference?: string,
+): void {
+  emitEntityUpdate({
+    event: RealtimeEvent.INVENTORY_UPDATED,
+    entityType,
+    entityId: entityId as never,
+    reference,
+    roles: INVENTORY_AUDIENCE,
+  });
+}
 const actor = (req: AuthRequest) => ({
   _id: req.user!._id as Types.ObjectId,
   role: req.user!.role as UserRole,
@@ -85,6 +126,7 @@ export async function createMedicine(req: AuthRequest, res: Response, next: Next
       createdBy: req.user!._id,
     });
     await audit(req, 'MEDICINE_CREATED', 'Medicine', medicine._id, undefined, medicine.toObject());
+    announceInventory(ActivityEntityType.MEDICINE, medicine._id, medicine.reference);
     res.status(201).json({ data: medicine });
   } catch (error) {
     next(error);
@@ -124,6 +166,7 @@ export async function updateMedicine(req: AuthRequest, res: Response, next: Next
     if (!medicine)
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Medicine not found' } });
     await audit(req, 'MEDICINE_UPDATED', 'Medicine', medicine._id, before, medicine.toObject());
+    announceInventory(ActivityEntityType.MEDICINE, medicine._id, medicine.reference);
     res.json({ data: medicine });
   } catch (error) {
     next(error);
@@ -256,7 +299,9 @@ export async function receive(req: AuthRequest, res: Response, next: NextFunctio
     const data = ReceiveStockSchema.parse(req.body);
     if (!(await Medicine.exists({ _id: data.medicineId })))
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Medicine not found' } });
-    res.status(201).json({ data: await receiveStock(data, actor(req)) });
+    const received = await receiveStock(data, actor(req));
+    announceInventory(ActivityEntityType.MEDICINE_BATCH, data.medicineId);
+    res.status(201).json({ data: received });
   } catch (error) {
     next(error);
   }
@@ -265,7 +310,9 @@ export async function receive(req: AuthRequest, res: Response, next: NextFunctio
 export async function operate(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const data = StockOperationSchema.parse(req.body);
-    res.json({ data: await applyStockOperation(String(req.params.id), data, actor(req)) });
+    const moved = await applyStockOperation(String(req.params.id), data, actor(req));
+    announceInventory(ActivityEntityType.MEDICINE_BATCH, req.params.id);
+    res.json({ data: moved });
   } catch (error) {
     next(error);
   }
@@ -274,15 +321,15 @@ export async function operate(req: AuthRequest, res: Response, next: NextFunctio
 export async function adjust(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const data = AdjustmentSchema.parse(req.body);
-    res.json({
-      data: await adjustStock(
-        String(req.params.id),
-        data.newOnHand,
-        data.reason,
-        data.idempotencyKey,
-        actor(req),
-      ),
-    });
+    const adjusted = await adjustStock(
+      String(req.params.id),
+      data.newOnHand,
+      data.reason,
+      data.idempotencyKey,
+      actor(req),
+    );
+    announceInventory(ActivityEntityType.MEDICINE_BATCH, req.params.id);
+    res.json({ data: adjusted });
   } catch (error) {
     next(error);
   }
@@ -313,6 +360,9 @@ export async function setBatchBlock(req: AuthRequest, res: Response, next: NextF
       undefined,
       { isBlocked: batch.isBlocked, reason: req.body.reason },
     );
+    // Blocking removes the batch from what can be sold, so the availability
+    // every other screen shows is wrong until they hear about it.
+    announceInventory(ActivityEntityType.MEDICINE_BATCH, batch._id, batch.batchNumber);
     res.json({ data: batch });
   } catch (error) {
     next(error);

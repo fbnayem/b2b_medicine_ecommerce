@@ -16,6 +16,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection, useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate } from '../lib/finance';
 import { deviceLabel, endedLabel, formatUptime } from './securityLabels';
@@ -71,15 +72,15 @@ export function SecurityCentre() {
   const isAdministrator =
     currentUser?.role === UserRole.SUPER_ADMIN || currentUser?.role === UserRole.ADMIN;
 
-  const sessions = useApiCollection<SessionRow>(['sessions'], '/auth/sessions');
-  const runtime = useApiResource<RuntimeStatus>(['runtime'], '/admin/runtime', {
+  const sessions = useApiCollection<SessionRow>(keys.security.sessions(), '/auth/sessions');
+  const runtime = useApiResource<RuntimeStatus>(keys.security.runtime(), '/admin/runtime', {
     // Supplementary. Failing to read it must not hide the session list, which
     // is the part every role depends on.
     enabled: isAdministrator,
     retry: false,
   });
 
-  const reload = () => queryClient.invalidateQueries({ queryKey: ['sessions'] });
+  const reload = () => queryClient.invalidateQueries({ queryKey: keys.security.all });
 
   async function revoke(session: SessionRow) {
     /*

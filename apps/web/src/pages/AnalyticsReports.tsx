@@ -25,6 +25,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
 import { downloadCsv, useReportRange } from './reportRange';
@@ -105,12 +106,12 @@ function AnalyticsReportPage({ kind }: { kind: ReportKind }) {
     : '';
 
   const report = useApiResource<unknown>(
-    ['analytics-report', kind, search],
+    keys.analytics.report(kind, search),
     `${ENDPOINTS[kind]}${search ? `?${search}` : ''}`,
   );
 
   const breakdown = useApiResource<{ data: BreakdownRow[] }>(
-    ['analytics-breakdown', search, dimension],
+    keys.analytics.breakdown(search, dimension),
     `/reports/sales/breakdown?${search}&dimension=${dimension}&limit=20`,
     { enabled: kind === 'sales' },
   );

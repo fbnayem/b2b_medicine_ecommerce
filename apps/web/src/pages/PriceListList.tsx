@@ -12,6 +12,7 @@ import {
   type Column,
 } from '../components/ui';
 import { usePagedCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 
 /**
@@ -25,7 +26,10 @@ import { useLanguage } from '../lib/useLanguage';
  */
 export function PriceListList() {
   const { t } = useLanguage();
-  const lists = usePagedCollection<PriceListRecord>(['price-lists'], '/pricing/price-lists');
+  const lists = usePagedCollection<PriceListRecord>(
+    keys.priceLists.list('all'),
+    '/pricing/price-lists',
+  );
 
   const columns: ReadonlyArray<Column<PriceListRecord>> = [
     {

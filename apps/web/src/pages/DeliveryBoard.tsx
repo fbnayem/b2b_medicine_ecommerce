@@ -17,6 +17,7 @@ import {
   StatusPill,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useSavedFilter } from '../lib/savedFilter';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate } from '../lib/finance';
@@ -32,14 +33,14 @@ export function DeliveryBoard() {
   if (status) params.set('status', status);
   if (query) params.set('q', query);
   const deliveries = useApiCollection<Delivery>(
-    ['deliveries', status, query],
+    keys.deliveries.list({ status, query }),
     `/deliveries${params.size ? `?${params.toString()}` : ''}`,
   );
 
   // Realtime is the primary signal; polling stays as the fallback for blocked sockets.
   useLiveRefresh(
     RealtimeEvent.DELIVERY_UPDATED,
-    () => void queryClient.invalidateQueries({ queryKey: ['deliveries'] }),
+    () => void queryClient.invalidateQueries({ queryKey: keys.deliveries.all }),
     30_000,
   );
 

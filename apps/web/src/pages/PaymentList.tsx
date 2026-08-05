@@ -17,6 +17,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime, formatMinor } from '../lib/finance';
 import type { FinancePayment } from './financeTypes';
@@ -43,7 +44,7 @@ export function PaymentList({ ownerMode = false }: PaymentListProps) {
   if (applied.to) params.set('to', applied.to);
 
   const payments = useApiCollection<FinancePayment>(
-    ['payments', status, applied.method, applied.q, applied.from, applied.to, page],
+    keys.payments.list({ status, ...applied, page }),
     `/payments?${params.toString()}`,
   );
 

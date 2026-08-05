@@ -19,6 +19,7 @@ import {
   useAsk,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { usePasswordPolicy } from '../lib/usePasswordPolicy';
 import { formatFinanceDateTime } from '../lib/finance';
@@ -54,11 +55,11 @@ export function UserAdministration() {
   if (query) params.set('q', query);
 
   const users = useApiCollection<DirectoryUser>(
-    ['admin-users', role, status, query, page],
+    keys.users.list({ role, status, query, page }),
     `/admin/users?${params.toString()}`,
   );
 
-  const reload = () => queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+  const reload = () => queryClient.invalidateQueries({ queryKey: keys.users.all });
 
   async function patch(user: DirectoryUser, changes: Record<string, unknown>, done: string) {
     setBusyId(user._id);

@@ -16,6 +16,8 @@ import {
   Textarea,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
 
 const EMPTY = {
@@ -48,6 +50,7 @@ const TEXT_FIELDS: Array<[FieldName, string, string, boolean]> = [
 export function ShopForm() {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
   const [form, setForm] = useState(EMPTY);
   const [priceListId, setPriceListId] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -61,7 +64,7 @@ export function ShopForm() {
    * from the default instead, which is a decision nobody made.
    */
   const priceLists = useApiCollection<PriceListRecord>(
-    ['price-lists', 'active'],
+    keys.priceLists.list('active'),
     '/pricing/price-lists?activeOnly=true',
   );
 
@@ -95,6 +98,7 @@ export function ShopForm() {
         paymentTermsDays: Number(form.paymentTermsDays),
         drugLicenceExpiryDate: form.drugLicenceExpiryDate || undefined,
       });
+      queryClient.invalidateQueries({ queryKey: keys.shops.all });
       navigate(`/shops/${response.data.data._id}`);
     } catch (caught) {
       setFailure({

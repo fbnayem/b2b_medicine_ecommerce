@@ -5,6 +5,19 @@ import type {
   UnreadNotificationSummary,
 } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
+import { activeQueryClient } from '../lib/query';
+import { keys } from '../lib/queryKeys';
+
+/**
+ * The bell and the notifications page read the same records two ways.
+ *
+ * This store holds what the bell shows; the page reads a paged query. Marking
+ * something read from the bell refreshed the store and left the page saying it
+ * was still unread — the same record, two answers, on one screen.
+ */
+function refreshNotificationQueries(): void {
+  void activeQueryClient()?.invalidateQueries({ queryKey: keys.notifications.all });
+}
 
 interface NotificationState {
   unread: UnreadNotificationSummary;
@@ -85,6 +98,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     });
     await apiClient.post('/notifications/read', { notificationIds });
     await get().loadUnread();
+    refreshNotificationQueries();
   },
 
   markAllRead: async (category) => {
@@ -93,6 +107,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       before: new Date().toISOString(),
     });
     await Promise.all([get().loadUnread(), get().loadRecent()]);
+    refreshNotificationQueries();
   },
 
   reset: () => set({ unread: emptyUnread, recent: [], error: '', loading: false }),

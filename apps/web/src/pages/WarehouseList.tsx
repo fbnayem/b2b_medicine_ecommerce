@@ -10,6 +10,7 @@ import {
   type Column,
 } from '../components/ui';
 import { usePagedCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 
 /**
@@ -24,7 +25,10 @@ import { useLanguage } from '../lib/useLanguage';
  */
 export function WarehouseList() {
   const { t } = useLanguage();
-  const warehouses = usePagedCollection<Warehouse>(['warehouses'], '/inventory/warehouses');
+  const warehouses = usePagedCollection<Warehouse>(
+    keys.stock.warehouses(),
+    '/inventory/warehouses',
+  );
 
   const columns: ReadonlyArray<Column<Warehouse>> = [
     {

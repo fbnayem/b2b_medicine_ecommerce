@@ -19,6 +19,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { createActionKey, formatFinanceDate } from '../lib/finance';
 
@@ -51,11 +52,16 @@ export function StocktakeSheet() {
   const ask = useAsk();
   const queryClient = useQueryClient();
 
-  const query = useApiResource<Stocktake>(['stocktake', id], `/stocktakes/${id}`);
+  const query = useApiResource<Stocktake>(keys.stocktakes.one(id!), `/stocktakes/${id}`);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [busy, setBusy] = useState('');
 
-  const reload = () => queryClient.invalidateQueries({ queryKey: ['stocktake', id] });
+  const reload = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: keys.stocktakes.all }),
+      queryClient.invalidateQueries({ queryKey: keys.stock.all }),
+      queryClient.invalidateQueries({ queryKey: keys.medicines.all }),
+    ]);
 
   const draftFor = (line: StocktakeLine): Draft =>
     drafts[line._id] ?? {

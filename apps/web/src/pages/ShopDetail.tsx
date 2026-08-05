@@ -17,6 +17,7 @@ import {
   useAsk,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
 
@@ -45,7 +46,7 @@ export function ShopDetail() {
   const ask = useAsk();
   const queryClient = useQueryClient();
 
-  const query = useApiResource<Shop>(['shop', id], `/shops/${id}`);
+  const query = useApiResource<Shop>(keys.shops.one(id!), `/shops/${id}`);
 
   /**
    * Every status change is confirmed, and the two that stop a customer trading
@@ -88,7 +89,7 @@ export function ShopDetail() {
 
     try {
       await apiClient.patch(`/shops/${id}/status`, { status, reason });
-      await queryClient.invalidateQueries({ queryKey: ['shop', id] });
+      await queryClient.invalidateQueries({ queryKey: keys.shops.all });
       toast.success(t('shops.statusChanged', { status: t(`shopStatus.${status}`) }));
     } catch (caught) {
       toast.error(errorMessage(caught, language, t('shops.statusFailed')));

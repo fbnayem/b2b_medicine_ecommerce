@@ -20,6 +20,8 @@ import {
   toast,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
 import { humaniseEnum } from '@medsupply/utilities';
 
@@ -61,12 +63,13 @@ interface Preference {
  */
 export function NotificationPreferences() {
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
   const catalogue = useApiResource<CatalogueResponse>(
-    ['notification-catalogue'],
+    keys.notifications.catalogue(),
     '/notifications/catalogue',
   );
   const saved = useApiResource<Partial<Preference>>(
-    ['notification-preferences'],
+    keys.notifications.preferences(),
     '/notifications/preferences',
   );
 
@@ -126,6 +129,7 @@ export function NotificationPreferences() {
         quietHours: preference.quietHours,
         mutedEvents: preference.mutedEvents,
       });
+      queryClient.invalidateQueries({ queryKey: keys.notifications.all });
       toast.success(t('notifications.saved'));
     } catch {
       toast.error(t('notifications.saveFailed'));

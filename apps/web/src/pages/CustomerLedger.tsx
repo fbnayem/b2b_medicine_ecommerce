@@ -13,6 +13,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection, useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime, formatMinor } from '../lib/finance';
 import type { AccountSummary, LedgerEntry } from './financeTypes';
@@ -25,7 +26,7 @@ export function CustomerLedger() {
   const [applied, setApplied] = useState({ from: '', to: '' });
 
   const summary = useApiResource<AccountSummary>(
-    ['shop-finance-summary', shopId],
+    keys.finance.shopSummary(shopId!),
     `/finance/shops/${shopId}/summary`,
   );
 
@@ -33,7 +34,7 @@ export function CustomerLedger() {
   if (applied.from) params.set('from', applied.from);
   if (applied.to) params.set('to', applied.to);
   const ledger = useApiCollection<LedgerEntry>(
-    ['shop-ledger', shopId, applied.from, applied.to],
+    keys.finance.shopLedger(shopId!, applied),
     `/finance/shops/${shopId}/ledger${params.size ? `?${params.toString()}` : ''}`,
   );
 

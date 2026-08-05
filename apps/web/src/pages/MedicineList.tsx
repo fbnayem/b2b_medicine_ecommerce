@@ -17,6 +17,7 @@ import {
   Resource,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
 
@@ -49,7 +50,7 @@ export function MedicineList() {
   const [query, setQuery] = useState('');
 
   const medicines = useApiCollection<Medicine>(
-    ['medicines', query],
+    keys.medicines.list(query),
     `/inventory/medicines?limit=100&search=${encodeURIComponent(query)}`,
   );
 
@@ -132,9 +133,20 @@ export function MedicineList() {
                       {describe([medicine.manufacturer, medicine.packSize])}
                     </p>
                     <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-                      <strong className="tabular-nums text-text">
-                        {formatMinor(medicine.defaultSellingPriceMinor)}
-                      </strong>
+                      {/*
+                        Labelled, because an unlabelled amount beside a product
+                        reads as "the price" — and this is the standard trade
+                        price, which a customer with a discount or a price list
+                        will not be charged.
+                      */}
+                      <span className="flex flex-col">
+                        <span className="text-xs uppercase tracking-wide text-text-muted">
+                          {t('catalogue.listPrice')}
+                        </span>
+                        <strong className="tabular-nums text-text">
+                          {formatMinor(medicine.defaultSellingPriceMinor)}
+                        </strong>
+                      </span>
                       <Badge tone={inStock ? 'success' : 'warning'}>
                         {inStock ? t('catalogue.available') : t('catalogue.outOfStock')}
                       </Badge>

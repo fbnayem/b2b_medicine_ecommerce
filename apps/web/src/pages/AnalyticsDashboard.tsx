@@ -5,6 +5,7 @@ import { LineChart, ShareBars } from '../components/Chart';
 import { RangeControls } from '../components/RangeControls';
 import { Card, EmptyState, LinkButton, PageHeader, Resource } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
 import { useReportRange } from './reportRange';
@@ -39,7 +40,7 @@ export function AnalyticsDashboard() {
     Object.entries(range.applied).filter(([, value]) => Boolean(value)) as [string, string][],
   );
   const overview = useApiResource<AnalyticsOverview>(
-    ['analytics-overview', search.toString()],
+    keys.analytics.overview(search.toString()),
     `/reports/overview?${search.toString()}`,
   );
 

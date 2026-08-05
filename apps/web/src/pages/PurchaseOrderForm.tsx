@@ -18,6 +18,8 @@ import {
   type FormProblem,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
 
@@ -44,10 +46,14 @@ const LINES_PANEL = 'purchase-order-lines';
 export function PurchaseOrderForm() {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
 
-  const suppliers = useApiCollection<Supplier>(['suppliers', false], '/purchasing/suppliers');
+  const suppliers = useApiCollection<Supplier>(
+    keys.purchasing.suppliers({ includeInactive: false }),
+    '/purchasing/suppliers',
+  );
   const medicines = useApiCollection<Medicine>(
-    ['medicines', 'all'],
+    keys.medicines.picker(),
     '/inventory/medicines?limit=100',
   );
 
@@ -104,6 +110,7 @@ export function PurchaseOrderForm() {
           unitCostMinor: minor(line.unitCost),
         })),
       });
+      queryClient.invalidateQueries({ queryKey: keys.purchasing.all });
       const created = response.data.data as { _id: string; reference: string };
       toast.success(t('purchasing.orderRaised', { reference: created.reference }));
       navigate(`/purchasing/orders/${created._id}`);

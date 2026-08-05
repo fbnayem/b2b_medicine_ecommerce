@@ -17,6 +17,8 @@ import {
   toast,
 } from '../components/ui';
 import { useApiCollection, useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
 
 /**
@@ -37,15 +39,16 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
   const navigate = useNavigate();
   const params = useParams();
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
   const editing = mode === 'edit';
 
   const medicines = useApiCollection<Medicine>(
-    ['medicines', 'all'],
+    keys.medicines.picker(),
     '/inventory/medicines?limit=100',
   );
-  const shops = useApiCollection<Shop>(['shops', 'all'], '/shops?limit=100');
+  const shops = useApiCollection<Shop>(keys.shops.picker('all'), '/shops?limit=100');
   const existing = useApiResource<SchemeRecord>(
-    ['scheme', params.id],
+    keys.schemes.one(params.id!),
     `/pricing/schemes/${params.id}`,
     { enabled: editing },
   );
@@ -104,6 +107,7 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
       } else {
         await apiClient.post('/pricing/schemes', body);
       }
+      queryClient.invalidateQueries({ queryKey: keys.schemes.all });
       toast.success(t('schemes.saved', { name: form.name }));
       navigate('/pricing/schemes');
     } catch (caught) {

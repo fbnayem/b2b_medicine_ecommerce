@@ -12,6 +12,7 @@ import {
   type Column,
 } from '../components/ui';
 import { usePagedCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 
 /**
@@ -24,7 +25,7 @@ import { useLanguage } from '../lib/useLanguage';
  */
 export function SchemeList() {
   const { t } = useLanguage();
-  const schemes = usePagedCollection<SchemeRecord>(['schemes'], '/pricing/schemes');
+  const schemes = usePagedCollection<SchemeRecord>(keys.schemes.list('all'), '/pricing/schemes');
 
   const columns: ReadonlyArray<Column<SchemeRecord>> = [
     {

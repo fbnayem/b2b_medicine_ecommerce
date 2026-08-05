@@ -25,8 +25,29 @@ import { apiClient } from '../api/client';
  * each time.
  */
 
+/**
+ * The client the application is currently using, for code outside React.
+ *
+ * `useNotifications` is a zustand store, so it cannot call `useQueryClient()` —
+ * and marking a notification read from the bell left the notifications *page*
+ * showing it unread, because the store refreshed its own state and the query
+ * cache heard nothing.
+ *
+ * A module-level reference, which is the same shape as the branding cache this
+ * phase removes — so the difference is worth stating. That one cached *data*
+ * and never expired it, which is why a settings change needed a hard reload.
+ * This holds a reference to the live client and caches nothing; every read
+ * still goes through the cache's own freshness rules. Tests that build their
+ * own client simply register it in turn.
+ */
+let active: QueryClient | undefined;
+
+export function activeQueryClient(): QueryClient | undefined {
+  return active;
+}
+
 export function createQueryClient(): QueryClient {
-  return new QueryClient({
+  active = new QueryClient({
     defaultOptions: {
       queries: {
         /*
@@ -53,6 +74,7 @@ export function createQueryClient(): QueryClient {
       mutations: { retry: 0 },
     },
   });
+  return active;
 }
 
 /** A single record: the API wraps these as `{ data: … }`. */

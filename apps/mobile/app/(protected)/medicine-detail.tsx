@@ -81,7 +81,7 @@ export default function MedicineDetailScreen() {
           }
         />
         <ListRow
-          label={t('catalogue.yourPrice')}
+          label={t('catalogue.listPrice')}
           value={formatMoneyMinor(item.defaultSellingPriceMinor)}
           numeric
         />

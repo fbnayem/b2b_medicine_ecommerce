@@ -160,6 +160,40 @@ function readLiteral(code: string, start: number): string | undefined {
 }
 
 /**
+ * Steps over one argument, to the character after its comma.
+ *
+ * The query helpers take the cache key first and the address second, and this
+ * used to skip the key by matching `\[[^\]]*\]` — an array literal, because
+ * that is what every key was. Keys now come from the factory in
+ * `lib/queryKeys.ts`, so they are calls (`keys.orders.list('all')`), and the
+ * pattern stopped matching: the gate found no request sites at all and its own
+ * "a clean run is not an empty one" assertion caught it. Reading *an argument*
+ * rather than *a shape* is what it should always have done.
+ */
+function skipArgument(code: string, start: number): number | undefined {
+  let depth = 0;
+  for (let index = start; index < code.length; index += 1) {
+    const character = code[index];
+    if (character === '(' || character === '[' || character === '{') depth += 1;
+    else if (character === ')' || character === ']' || character === '}') {
+      if (depth === 0) return undefined; // the call ended; there was no second argument
+      depth -= 1;
+    } else if (character === "'" || character === '"' || character === '`') {
+      // A quote inside the key — `keys.orders.list('all')` — is not a nesting
+      // character, and its contents must not be scanned for one.
+      const end = readLiteral(code, index);
+      if (end === undefined) return undefined;
+      index += end.length + 1;
+    } else if (character === ',' && depth === 0) {
+      let next = index + 1;
+      while (next < code.length && /\s/.test(code[next]!)) next += 1;
+      return next;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Every path literal handed to the request helpers.
  *
  * Anchored on the helper names rather than on "a string starting with a slash",
@@ -174,12 +208,17 @@ interface Request {
 function requestedPaths(): Request[] {
   const found = new Map<string, Request>();
   for (const [file, code] of SOURCES) {
-    const openers = [
-      ...code.matchAll(/use(?:Api|Paged)(?:Collection|Resource)<[^>]*>\(\s*\[[^\]]*\],\s*/g),
-      ...code.matchAll(/apiClient\.(?:get|post|patch|put|delete)\(\s*/g),
-    ];
-    for (const opener of openers) {
-      const path = readLiteral(code, opener.index + opener[0].length);
+    // The query helpers put the cache key first, so step over it; the request
+    // helpers put the address first.
+    const keyed = [...code.matchAll(/use(?:Api|Paged)(?:Collection|Resource)<[^>]*>\(\s*/g)].map(
+      (match) => skipArgument(code, match.index + match[0].length),
+    );
+    const direct = [...code.matchAll(/apiClient\.(?:get|post|patch|put|delete)\(\s*/g)].map(
+      (match) => match.index + match[0].length,
+    );
+    for (const start of [...keyed, ...direct]) {
+      if (start === undefined) continue;
+      const path = readLiteral(code, start);
       if (path?.startsWith('/') && !found.has(path)) found.set(path, { path, file });
     }
   }
@@ -191,8 +230,21 @@ describe('the web app only asks for addresses the API serves', () => {
     // A glob or a regex that matched nothing would satisfy the assertion below
     // in perfect silence, which is the failure mode this whole file is about.
     const paths = requestedPaths().map((request) => request.path);
-    expect(paths.length).toBeGreaterThan(60);
+    /*
+     * A floor near the real figure — 121 — rather than a token one.
+     *
+     * It was 60, and when the cache keys moved to a factory the extraction
+     * pattern stopped matching the query helpers entirely: the gate fell to 63
+     * paths, all of them from `apiClient` calls, and would still have passed a
+     * floor of 60 while checking barely half of what it claims to. It failed
+     * only because `/orders` is reached through a query helper and the
+     * `toContain` line named it. A floor this close to the truth turns the same
+     * regression into an immediate, obvious failure.
+     */
+    expect(paths.length).toBeGreaterThan(110);
+    // One from each extraction path: a query helper, and a direct request.
     expect(paths).toContain('/orders');
+    expect(paths).toContain('/auth/logout');
     expect(servedPaths().size).toBeGreaterThan(150);
   });
 

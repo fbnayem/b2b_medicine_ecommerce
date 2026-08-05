@@ -23,6 +23,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import {
   createActionKey,
@@ -103,7 +104,7 @@ export function ReturnDetail() {
   const role = useAuthStore((state) => state.user?.role);
   const queryClient = useQueryClient();
 
-  const query = useApiResource<ReturnDetailData>(['return', id], `/returns/${id}`);
+  const query = useApiResource<ReturnDetailData>(keys.returns.one(id!), `/returns/${id}`);
   const record = query.data;
 
   const [decision, setDecision] = useState<Record<string, string>>({});
@@ -144,7 +145,7 @@ export function ReturnDetail() {
 
   useRealtimeEvent<{ entityId?: string }>(RealtimeEvent.RETURN_UPDATED, (payload) => {
     if (!payload?.entityId || payload.entityId === id) {
-      void queryClient.invalidateQueries({ queryKey: ['return', id] });
+      void queryClient.invalidateQueries({ queryKey: keys.returns.all });
     }
   });
 
@@ -157,13 +158,23 @@ export function ReturnDetail() {
         idempotencyKey: createActionKey(`return-${action}`),
         ...body,
       });
-      await queryClient.invalidateQueries({ queryKey: ['return', id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.returns.all }),
+        queryClient.invalidateQueries({ queryKey: keys.stock.all }),
+        queryClient.invalidateQueries({ queryKey: keys.medicines.all }),
+        queryClient.invalidateQueries({ queryKey: keys.finance.all }),
+      ]);
       toast.success(done);
     } catch (caught) {
       // A stale version means somebody else moved it on. Reload before saying
       // so, or the reviewer reads the complaint against figures that are
       // already out of date.
-      await queryClient.invalidateQueries({ queryKey: ['return', id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.returns.all }),
+        queryClient.invalidateQueries({ queryKey: keys.stock.all }),
+        queryClient.invalidateQueries({ queryKey: keys.medicines.all }),
+        queryClient.invalidateQueries({ queryKey: keys.finance.all }),
+      ]);
       toast.error(errorMessage(caught, language, t('returnDetail.actionFailed')));
     } finally {
       setBusy('');

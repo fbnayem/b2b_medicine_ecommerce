@@ -18,6 +18,7 @@ import {
   useAsk,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { useAuthStore } from '../store/useAuth';
 import { entityReference, formatFinanceDate } from '../lib/finance';
@@ -37,7 +38,7 @@ export function TripSheet() {
   const ask = useAsk();
   const queryClient = useQueryClient();
 
-  const query = useApiResource<Trip>(['trip', id], `/trips/${id}`);
+  const query = useApiResource<Trip>(keys.trips.one(id!), `/trips/${id}`);
   const [order, setOrder] = useState<string[] | null>(null);
   const [busy, setBusy] = useState('');
 
@@ -46,7 +47,11 @@ export function TripSheet() {
     setOrder(null);
   }, [query.data?.version]);
 
-  const reload = () => queryClient.invalidateQueries({ queryKey: ['trip', id] });
+  const reload = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: keys.trips.all }),
+      queryClient.invalidateQueries({ queryKey: keys.deliveries.all }),
+    ]);
   const isRider = user?.role === UserRole.DELIVERY_PERSON;
 
   function stopsInOrder(trip: Trip): TripStop[] {

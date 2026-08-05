@@ -16,6 +16,8 @@ import {
   Textarea,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
 import { createActionKey, formatMinor, parseMajorToMinor } from '../lib/finance';
 import {
@@ -53,9 +55,10 @@ export function RecordPayment() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
 
   const shops = useApiCollection<FinanceShopSummary>(
-    ['active-shops'],
+    keys.shops.picker('active'),
     '/shops?status=ACTIVE&limit=100',
   );
 
@@ -74,7 +77,7 @@ export function RecordPayment() {
   const [failure, setFailure] = useState<{ message: string; reference?: string }>();
 
   const invoices = useApiCollection<FinanceInvoiceSummary>(
-    ['shop-open-invoices', shopId],
+    keys.finance.shopOpenInvoices(shopId),
     `/finance/shops/${shopId}/invoices?status=OPEN`,
     { enabled: Boolean(shopId) },
   );
@@ -145,6 +148,10 @@ export function RecordPayment() {
           return;
         }
       }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.payments.all }),
+        queryClient.invalidateQueries({ queryKey: keys.finance.all }),
+      ]);
       navigate(`/payments/${payment._id}?recorded=1`);
     } catch (caught) {
       const status = (caught as ApiFailure).response?.status;

@@ -23,6 +23,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { createActionKey, formatFinanceDate, formatFinanceDateTime } from '../lib/finance';
 
@@ -79,19 +80,22 @@ export function InventoryDashboard() {
   const [receiving, setReceiving] = useState(false);
 
   const medicines = useApiCollection<Medicine>(
-    ['medicines', 'for-receipt'],
+    keys.medicines.picker(),
     '/inventory/medicines?limit=100',
   );
   const batches = useApiCollection<MedicineBatch>(
-    ['batches', warning],
+    keys.stock.batches(warning),
     `/inventory/batches${warning ? `?warning=${warning}` : ''}`,
   );
-  const movements = useApiCollection<Movement>(['movements'], '/inventory/movements?limit=50');
+  const movements = useApiCollection<Movement>(
+    keys.stock.movements('recent'),
+    '/inventory/movements?limit=50',
+  );
 
   async function refresh() {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['batches'] }),
-      queryClient.invalidateQueries({ queryKey: ['movements'] }),
+      queryClient.invalidateQueries({ queryKey: keys.stock.all }),
+      queryClient.invalidateQueries({ queryKey: keys.medicines.all }),
     ]);
   }
 

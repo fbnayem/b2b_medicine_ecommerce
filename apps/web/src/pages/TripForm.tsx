@@ -20,6 +20,8 @@ import {
   type FormProblem,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
 import { entityReference, formatFinanceDate } from '../lib/finance';
 
@@ -59,8 +61,9 @@ const STOPS_PANEL = 'trip-available';
 export function TripForm() {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
 
-  const riders = useApiResource<Rider[]>(['delivery-personnel'], '/deliveries/personnel');
+  const riders = useApiResource<Rider[]>(keys.riders.list(), '/deliveries/personnel');
   const [deliveryPersonId, setDeliveryPersonId] = useState('');
   const [tripDate, setTripDate] = useState(() => toDateInputValue(new Date()));
   const [vehicleReference, setVehicleReference] = useState('');
@@ -76,7 +79,7 @@ export function TripForm() {
   const [failure, setFailure] = useState<{ message: string; reference?: string }>();
 
   const available = useApiResource<PlannableDelivery[]>(
-    ['plannable', deliveryPersonId],
+    keys.trips.plannable(deliveryPersonId),
     `/trips/plannable${deliveryPersonId ? `?deliveryPersonId=${deliveryPersonId}` : ''}`,
   );
 
@@ -122,6 +125,10 @@ export function TripForm() {
         vehicleReference: vehicleReference || undefined,
         notes: notes || undefined,
       });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.trips.all }),
+        queryClient.invalidateQueries({ queryKey: keys.deliveries.all }),
+      ]);
       const created = response.data.data as { _id: string; reference: string };
       toast.success(t('trips.planned', { reference: created.reference }));
       navigate(`/deliveries/trips/${created._id}`);

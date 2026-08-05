@@ -22,6 +22,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { applyScan, matchScan, parseScan, type ScannableLine } from '../lib/picking';
 import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
@@ -103,7 +104,10 @@ export function FulfilmentWork() {
     ? ([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER] as UserRole[]).includes(role)
     : false;
 
-  const query = useApiResource<PickingList>(['picking', id], `/fulfilment/picking/${id}`);
+  const query = useApiResource<PickingList>(
+    keys.fulfilment.picking(id!),
+    `/fulfilment/picking/${id}`,
+  );
   const list = query.data;
 
   const [picked, setPicked] = useState<Record<string, number>>({});
@@ -147,7 +151,13 @@ export function FulfilmentWork() {
     setPacked(seed);
   }, [list]);
 
-  const reload = () => queryClient.invalidateQueries({ queryKey: ['picking', id] });
+  const reload = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: keys.fulfilment.all }),
+      queryClient.invalidateQueries({ queryKey: keys.stock.all }),
+      queryClient.invalidateQueries({ queryKey: keys.medicines.all }),
+      queryClient.invalidateQueries({ queryKey: keys.orders.all }),
+    ]);
 
   /** The lines as the picker sees them: batch number on the carton, not an id. */
   function scannableLines(current: PickingList): ScannableLine[] {

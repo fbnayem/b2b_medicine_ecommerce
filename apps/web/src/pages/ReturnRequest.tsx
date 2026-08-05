@@ -19,6 +19,8 @@ import {
   type FormProblem,
 } from '../components/ui';
 import { useApiCollection, useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
 import { createActionKey, formatFinanceDate, formatMinor } from '../lib/finance';
 
@@ -51,6 +53,7 @@ export function ReturnRequest() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
 
   const [invoiceId, setInvoiceId] = useState(params.get('invoiceId') ?? '');
   const [draft, setDraft] = useState<Draft>({});
@@ -62,12 +65,12 @@ export function ReturnRequest() {
   const [attempt, setAttempt] = useState(0);
 
   const invoices = useApiCollection<InvoiceOption>(
-    ['my-invoices', 'returnable'],
+    keys.finance.myInvoices('returnable'),
     '/finance/my/invoices?limit=50',
   );
 
   const invoice = useApiResource<{ items?: InvoiceLine[] }>(
-    ['invoice-lines', invoiceId],
+    keys.finance.invoiceLines(invoiceId),
     `/fulfilment/invoices/${invoiceId}`,
     { enabled: Boolean(invoiceId) },
   );
@@ -144,6 +147,10 @@ export function ReturnRequest() {
         })),
         idempotencyKey: createActionKey('return-request'),
       });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.returns.all }),
+        queryClient.invalidateQueries({ queryKey: keys.finance.all }),
+      ]);
       navigate(`/returns/${response.data.data._id}`);
     } catch (caught) {
       setFailure({

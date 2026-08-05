@@ -76,17 +76,31 @@ export function Field({ label, hint, error, required, id, children, className }:
           )}
         </label>
         {children}
-        {error ? (
+        {/*
+          Both, not one or the other.
+
+          This used to render the error *instead of* the hint while still
+          naming both ids in `aria-describedby` — so whenever a field was
+          refused, the description pointed at an element that did not exist.
+          That is a fault on every one of the ~145 field sites in this
+          application, and it went unseen only because none of the nine screens
+          the axe gate scans has a field carrying both at once.
+
+          It is also wrong on its own terms. "Enter an amount like 12.50" is
+          exactly what somebody needs while being told the amount is wrong, and
+          taking the guidance away at the moment it becomes relevant is the
+          opposite of helping.
+        */}
+        {error && (
           // `role="alert"` so a refusal reaches somebody who cannot see it.
           <p id={errorId} role="alert" className="text-sm text-danger">
             {error}
           </p>
-        ) : (
-          hint && (
-            <p id={hintId} className="text-sm text-text-muted">
-              {hint}
-            </p>
-          )
+        )}
+        {hint && (
+          <p id={hintId} className="text-sm text-text-muted">
+            {hint}
+          </p>
         )}
       </div>
     </FieldContext.Provider>

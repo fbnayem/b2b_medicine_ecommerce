@@ -11,6 +11,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useSavedFilter } from '../lib/savedFilter';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime, formatMinor } from '../lib/finance';
@@ -30,7 +31,7 @@ export function ApprovalQueue() {
   const [status, setStatus] = useSavedFilter('approvals', '');
 
   const queue = useApiCollection<Order>(
-    ['approval-queue', status],
+    keys.approvals.queue(status),
     `/approvals/queue${status ? `?status=${status}` : ''}`,
   );
 

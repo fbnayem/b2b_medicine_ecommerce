@@ -22,6 +22,7 @@ import {
   toast,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime } from '../lib/finance';
 
@@ -40,17 +41,17 @@ export function Notifications() {
   if (unreadOnly) search.set('unreadOnly', 'true');
 
   const notifications = useApiCollection<NotificationRecord>(
-    ['notifications', category, unreadOnly, page],
+    keys.notifications.list({ category, unreadOnly, page }),
     `/notifications?${search.toString()}`,
   );
 
   useRealtimeEvent(RealtimeEvent.NOTIFICATION_CREATED, () => {
-    void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    void queryClient.invalidateQueries({ queryKey: keys.notifications.all });
   });
 
   async function refreshBoth() {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      queryClient.invalidateQueries({ queryKey: keys.notifications.all }),
       loadUnread(),
     ]);
   }

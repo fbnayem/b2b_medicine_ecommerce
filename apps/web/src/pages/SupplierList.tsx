@@ -13,6 +13,7 @@ import {
   type Column,
 } from '../components/ui';
 import { usePagedCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate } from '../lib/finance';
 
@@ -42,7 +43,7 @@ export function SupplierList() {
   const [includeInactive, setIncludeInactive] = useState(false);
 
   const suppliers = usePagedCollection<Supplier>(
-    ['suppliers', includeInactive],
+    keys.purchasing.suppliers({ includeInactive }),
     `/purchasing/suppliers${includeInactive ? '?includeInactive=true' : ''}`,
   );
 

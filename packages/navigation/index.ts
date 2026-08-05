@@ -276,10 +276,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: 'catalogue',
   },
   {
+    /*
+     * `SALES` reads the catalogue list, both pricing screens and every scheme —
+     * and until now could not open a medicine, so a rep who searched the
+     * catalogue and clicked a result was refused by their own client. The
+     * server's `catalogueReaders` has always allowed them the read.
+     */
     id: 'medicine-detail',
     label: 'Medicine',
     path: '/medicines/:id',
-    roles: [...WAREHOUSE, UserRole.SHOP_OWNER],
+    roles: [...WAREHOUSE, UserRole.SALES, UserRole.SHOP_OWNER],
     group: 'catalogue',
     icon: 'catalogue',
     hidden: true,

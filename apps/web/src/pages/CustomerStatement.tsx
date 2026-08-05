@@ -13,6 +13,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
 import type { CustomerStatementData } from './financeTypes';
@@ -41,7 +42,7 @@ export function CustomerStatement({ ownerMode = false }: CustomerStatementProps)
 
   const path = ownerMode ? '/finance/my/statement' : `/finance/shops/${shopId}/statement`;
   const statement = useApiResource<CustomerStatementData>(
-    ['statement', ownerMode ? 'mine' : shopId, applied.from, applied.to],
+    keys.finance.statement(ownerMode ? 'mine' : (shopId ?? ''), applied),
     `${path}?from=${applied.from}&to=${applied.to}`,
   );
 

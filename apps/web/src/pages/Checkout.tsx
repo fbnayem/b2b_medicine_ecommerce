@@ -20,7 +20,9 @@ import {
   Textarea,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useZodForm } from '../lib/form';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
 
 /**
@@ -57,7 +59,7 @@ function addressesOf(shop: Shop | undefined): Address[] {
 export function Checkout() {
   const { t } = useLanguage();
   const { items } = useCart();
-  const shops = useApiCollection<Shop>(['my-shops'], '/shops/my');
+  const shops = useApiCollection<Shop>(keys.shops.mine(), '/shops/my');
 
   if (items.length === 0) {
     return (
@@ -101,6 +103,7 @@ export function Checkout() {
 
 function CheckoutForm({ shop }: { shop: Shop | undefined }) {
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
   const { items, draftId, clear } = useCart();
   const navigate = useNavigate();
   const addresses = addressesOf(shop);
@@ -131,6 +134,10 @@ function CheckoutForm({ shop }: { shop: Shop | undefined }) {
       };
       const url = draftId ? `/orders/drafts/${draftId}/submit` : '/orders/submit';
       const response = await apiClient.post(url, body);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.orders.all }),
+        queryClient.invalidateQueries({ queryKey: keys.finance.all }),
+      ]);
       clear();
       navigate(`/orders/${response.data.data._id}?submitted=1`);
     } catch (caught) {

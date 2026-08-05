@@ -278,7 +278,17 @@ export const en = {
     no: 'No',
     orderLimits: 'How many you may order',
     noMaximum: 'no maximum',
-    yourPrice: 'Your price',
+    /*
+     * "List price", not "Your price".
+     *
+     * The catalogue serves the medicine's standard trade price, while an order
+     * is charged through `resolvePriceFrom` — the shop's own discount first,
+     * then its assigned price list, then this. For any customer with either,
+     * the figure on this screen is not the one they pay, and calling it "your
+     * price" made the page state something untrue.
+     */
+    listPrice: 'List price',
+    listPriceNote: 'Your own price is confirmed when you place the order.',
     availability: 'Availability',
     loadingOne: 'Loading this medicine',
     couldNotLoadOne: 'This medicine could not be loaded.',
@@ -303,6 +313,11 @@ export const en = {
     minimum: 'At least {{minimum}}',
     minimumAndMaximum: 'At least {{minimum}}, at most {{maximum}}',
     subtotal: 'Estimated subtotal',
+    discount: 'Discount',
+    total: 'Estimated total',
+    freeGoods: '{{count}} free with this',
+    pricing: 'Checking your prices',
+    couldNotPrice: 'Your prices could not be checked just now.',
     saveDraft: 'Save for later',
     draftSaved: 'Saved. You can come back to this order later.',
     checkout: 'Review and send',

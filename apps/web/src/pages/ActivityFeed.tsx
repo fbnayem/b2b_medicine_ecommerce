@@ -17,6 +17,7 @@ import {
   Resource,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime } from '../lib/finance';
 
@@ -35,14 +36,14 @@ export function ActivityFeed() {
   const search = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
   if (category) search.set('category', category);
   const activity = useApiCollection<ActivityEventRecord>(
-    ['activity', category, page],
+    keys.activity.list({ category, page }),
     `/activity?${search.toString()}`,
   );
 
   useRealtimeEvent(RealtimeEvent.ACTIVITY_CREATED, () => {
     // Only the first page: appending to page 7 while somebody is reading it
     // would shuffle rows out from under them.
-    if (page === 1) void queryClient.invalidateQueries({ queryKey: ['activity'] });
+    if (page === 1) void queryClient.invalidateQueries({ queryKey: keys.activity.all });
   });
 
   return (

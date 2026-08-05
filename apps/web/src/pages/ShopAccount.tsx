@@ -14,6 +14,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection, useApiResource } from '../lib/query';
+import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatFinanceDateTime, formatMinor } from '../lib/finance';
 import {
@@ -26,10 +27,13 @@ import {
 export function ShopAccount() {
   const { t } = useLanguage();
 
-  const summary = useApiResource<AccountSummary>(['my-finance-summary'], '/finance/my/summary');
-  const invoices = useApiCollection<FinanceInvoiceSummary>(['my-invoices'], '/finance/my/invoices');
+  const summary = useApiResource<AccountSummary>(keys.finance.mySummary(), '/finance/my/summary');
+  const invoices = useApiCollection<FinanceInvoiceSummary>(
+    keys.finance.myInvoices('all'),
+    '/finance/my/invoices',
+  );
   const payments = useApiCollection<FinancePayment>(
-    ['my-payments', 1],
+    keys.payments.mine(1),
     '/payments?page=1&limit=10',
   );
 
