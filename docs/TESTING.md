@@ -116,7 +116,7 @@ rather than summarised as a percentage — the endpoint that mattered was
 and a percentage would have read "88%" and named nothing. A waiver that goes
 stale fails the build, so the lists can only shrink.
 
-**As of 05 August 2026: 187 routes, 77 undocumented, 75 untested.**
+**As of 05 August 2026: 187 routes, 0 undocumented, 31 untested (156 covered).**
 
 (The route count in this line previously read 165, and the header comments in
 `routeCoverage.waivers.ts` read 150. Both were stale — the same drift that left
@@ -127,14 +127,49 @@ Tranches are ordered by what a real user's journey touches rather than by what
 is easy, so a shrinking number means the riskiest endpoints went first. Done so
 far, and what remains:
 
-| Tranche        | Documented                                         | Tested      |
-| -------------- | -------------------------------------------------- | ----------- |
-| Shop owner     | done — 12 endpoints                                | not started |
-| Warehouse      | not started                                        | not started |
-| Delivery       | not started                                        | not started |
-| Finance        | partial — the owner's four `/finance/my` endpoints | not started |
-| Management     | not started                                        | not started |
-| Administration | not started                                        | not started |
+| Tranche        | Documented | Tested                              |
+| -------------- | ---------- | ----------------------------------- |
+| Shop owner     | done       | done — through finance              |
+| Finance        | done       | done — 18 endpoints                 |
+| Administration | done       | done — 10 endpoints                 |
+| Warehouse      | done       | done — 10 endpoints                 |
+| Inbox          | done       | done — 6 endpoints                  |
+| Orders, drafts | done       | **not started** — 6                 |
+| Approvals      | done       | **not started** — 5                 |
+| Returns        | done       | **not started** — 5                 |
+| Delivery       | done       | **not started** — 5, plus 4 reports |
+| Fulfilment     | done       | **not started** — 2                 |
+
+Four of the 31 remaining are `/health`, `/health/ready`, `/health/version` and
+`/metrics`, which are mounted ahead of the coverage recorder on purpose and so
+cannot be seen by it. They are exercised in `hardeningIntegration.test.ts`. That
+leaves **27 genuinely untested**, all in the five tranches marked above.
+
+**Documentation reached zero.** The last 77 went in one pass, and could only be
+written honestly because the roles assertion checks each `roles` list against the
+mounted router as it is added. Keeping the list empty is now the gate's job: a
+new route with no `OPERATIONS` entry fails the build rather than joining a
+waiver list.
+
+Writing them out surfaced one thing worth acting on. **Four write endpoints
+validate their request body by hand rather than through a Zod schema** —
+`PATCH /inventory/batches/{id}/block`, `PATCH /shops/{id}/status`,
+`POST /shops/{id}/assign-owner` and `POST /shops/{id}/assign-manager` — so they
+are the only four operations in the published document with no request shape.
+Each is marked where it is declared.
+
+#### The defect this gate was built for, finally caught
+
+`POST /api/v1/users` shipped with a role bug — every account it created silently
+took the creator's own role — and it survived twelve phases because no test ever
+called it. That endpoint is the reason the waiver lists exist. It had still never
+had a test.
+
+`administrationIntegration.test.ts` now opens with one, and its assertion is
+phrased to go red against exactly that defect: the created account carries the
+role in the **request**, not the role of whoever sent it. Verified by restoring
+the original bug (`role: req.user!.role` in `createUser`) and confirming that one
+test fails and the other eight do not.
 
 Documentation goes first per tranche because it is the step that makes the next
 one honest: writing the summary, the tag and the roles forces somebody to state

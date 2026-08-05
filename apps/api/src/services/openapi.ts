@@ -44,6 +44,35 @@ import {
   ReturnReceiptSchema,
   SettingsUpdateSchema,
   SubmitOrderSchema,
+  AdjustmentSchema,
+  AdminSessionRevokeSchema,
+  AllocationSchema,
+  CreditReservationBackfillSchema,
+  DeliveryHandoverSchema,
+  DeliverySimpleActionSchema,
+  DiscrepancyResolutionSchema,
+  DiscrepancySchema,
+  HoldOrderSchema,
+  NotificationIdsSchema,
+  NotificationMarkAllReadSchema,
+  NotificationPreferenceUpdateSchema,
+  NotificationTestSendSchema,
+  PaymentFailSchema,
+  PaymentHandoverSchema,
+  PickingActionSchema,
+  PickingProgressSchema,
+  PushDeviceRegisterSchema,
+  PushDeviceUnregisterSchema,
+  ReturnCancelSchema,
+  ReturnCollectionSchema,
+  ReturnRejectionSchema,
+  ReturnReviewStartSchema,
+  ReviewVersionSchema,
+  SaveOrderDraftSchema,
+  SettingsResetSchema,
+  StockOperationSchema,
+  UpdateMedicineSchema,
+  UpdateShopSchema,
 } from '@medsupply/validation';
 import { UserRole } from '@medsupply/shared-types';
 
@@ -243,6 +272,57 @@ export const OPERATIONS: Operation[] = [
     body: ReceiveStockSchema,
   },
   {
+    method: 'patch',
+    path: '/api/v1/inventory/medicines/{id}',
+    summary: 'Amend a catalogue line',
+    tag: 'Inventory',
+    roles: MANAGEMENT,
+    body: UpdateMedicineSchema,
+  },
+  {
+    method: 'get',
+    path: '/api/v1/inventory/batches/{id}',
+    summary: 'One batch, with its quantities by state',
+    tag: 'Inventory',
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER],
+  },
+  {
+    method: 'post',
+    path: '/api/v1/inventory/batches/{id}/operations',
+    summary: 'Move stock between states — reserve, release, damage, quarantine',
+    tag: 'Inventory',
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER],
+    body: StockOperationSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/inventory/batches/{id}/adjust',
+    summary: 'Correct a batch quantity against a stated reason',
+    tag: 'Inventory',
+    // Not the storekeeper who counted it. An adjustment writes the stock
+    // record to whatever a person says it is, which is the one inventory
+    // operation with no arithmetic behind it.
+    roles: MANAGEMENT,
+    body: AdjustmentSchema,
+  },
+  {
+    method: 'patch',
+    path: '/api/v1/inventory/batches/{id}/block',
+    summary: 'Block or unblock a batch from being allocated',
+    tag: 'Inventory',
+    roles: MANAGEMENT,
+    // No schema: this handler validates `blocked` and `reason` by hand. See
+    // the note on hand-validated bodies in `docs/TESTING.md`.
+  },
+  {
+    method: 'post',
+    path: '/api/v1/inventory/allocations/reserve',
+    summary: 'Reserve stock for an order by FEFO',
+    tag: 'Inventory',
+    roles: MANAGEMENT,
+    body: AllocationSchema,
+  },
+  {
     method: 'get',
     path: '/api/v1/inventory/movements',
     summary: 'Immutable stock movement history',
@@ -281,11 +361,77 @@ export const OPERATIONS: Operation[] = [
   },
   {
     method: 'post',
+    path: '/api/v1/orders/drafts',
+    summary: 'Save a basket server-side so it survives a device change',
+    tag: 'Orders',
+    roles: [...MANAGEMENT, UserRole.SALES, UserRole.SHOP_OWNER],
+    body: SaveOrderDraftSchema,
+  },
+  {
+    method: 'patch',
+    path: '/api/v1/orders/drafts/{id}',
+    summary: 'Amend a saved draft',
+    tag: 'Orders',
+    roles: [...MANAGEMENT, UserRole.SALES, UserRole.SHOP_OWNER],
+    body: SaveOrderDraftSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/orders/drafts/{id}/submit',
+    summary: 'Submit a saved draft as an order',
+    tag: 'Orders',
+    roles: [...MANAGEMENT, UserRole.SALES, UserRole.SHOP_OWNER],
+    body: SubmitOrderSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/orders/{id}/duplicate',
+    summary: 'Start a new draft from a previous order',
+    tag: 'Orders',
+    // Prices are not copied: the draft is rebuilt from today's catalogue, so
+    // repeating last month's order does not repeat last month's price.
+    roles: [...MANAGEMENT, UserRole.SALES, UserRole.SHOP_OWNER],
+  },
+  {
+    method: 'post',
     path: '/api/v1/orders/{id}/cancellation-request',
     summary: 'Ask for an order to be cancelled',
     tag: 'Orders',
     roles: [UserRole.SHOP_OWNER],
     body: CancellationRequestSchema,
+  },
+  {
+    method: 'get',
+    path: '/api/v1/approvals/{id}',
+    summary: 'One order under review, with its credit and licence position',
+    tag: 'Approvals',
+    roles: MANAGEMENT,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/approvals/{id}/start',
+    summary: 'Claim an order for review',
+    tag: 'Approvals',
+    // The body carries the version the reviewer was looking at, so two managers
+    // opening the same order cannot both claim it.
+    roles: MANAGEMENT,
+    body: ReviewVersionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/approvals/{id}/hold',
+    summary: 'Put an order on hold with a reason',
+    tag: 'Approvals',
+    roles: MANAGEMENT,
+    body: HoldOrderSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/approvals/{id}/clarify',
+    summary: 'Ask the customer for something before deciding',
+    tag: 'Approvals',
+    roles: MANAGEMENT,
+    body: HoldOrderSchema,
   },
   {
     method: 'post',
@@ -595,6 +741,65 @@ export const OPERATIONS: Operation[] = [
     query: ['status'],
   },
   {
+    method: 'get',
+    path: '/api/v1/fulfilment/ready',
+    summary: 'Packed orders waiting to be handed to a rider',
+    tag: 'Fulfilment',
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/fulfilment/picking/{id}',
+    summary: 'One picking list, with its lines and current progress',
+    tag: 'Fulfilment',
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER],
+  },
+  {
+    method: 'post',
+    path: '/api/v1/fulfilment/picking/{id}/start',
+    summary: 'Claim a picking list and begin work on it',
+    tag: 'Fulfilment',
+    // Only a storekeeper picks. A manager can read the list and resolve a
+    // discrepancy on it, and cannot claim it — the person holding the list is
+    // the person standing in the aisle.
+    roles: [UserRole.STOREKEEPER],
+    body: PickingActionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/fulfilment/picking/{id}/progress',
+    summary: 'Record what has been picked, by batch',
+    tag: 'Fulfilment',
+    roles: [UserRole.STOREKEEPER],
+    body: PickingProgressSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/fulfilment/picking/{id}/resume',
+    summary: 'Resume a paused picking list',
+    tag: 'Fulfilment',
+    roles: [UserRole.STOREKEEPER],
+    body: PickingActionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/fulfilment/picking/{id}/discrepancies',
+    summary: 'Report a shortfall or a damaged batch against a line',
+    tag: 'Fulfilment',
+    roles: [UserRole.STOREKEEPER],
+    body: DiscrepancySchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/fulfilment/picking/{id}/discrepancies/resolve',
+    summary: 'Decide a reported discrepancy so picking can continue',
+    tag: 'Fulfilment',
+    // The split that makes the discrepancy mechanism worth having: the person
+    // who found the problem cannot also wave it through.
+    roles: MANAGEMENT,
+    body: DiscrepancyResolutionSchema,
+  },
+  {
     method: 'post',
     path: '/api/v1/fulfilment/picking/{id}/pack',
     summary: 'Pack actual quantities and generate the final invoice',
@@ -629,12 +834,122 @@ export const OPERATIONS: Operation[] = [
     query: ['status', 'priority', 'assignedTo', 'q', 'page', 'limit'],
   },
   {
+    method: 'get',
+    path: '/api/v1/deliveries/{id}',
+    summary: 'One delivery, scoped by role',
+    tag: 'Deliveries',
+    roles: ALL_ROLES,
+  },
+  {
+    method: 'get',
+    path: '/api/v1/deliveries/order/{orderId}',
+    summary: 'The delivery attached to an order, if there is one',
+    tag: 'Deliveries',
+    roles: ALL_ROLES,
+  },
+  {
+    method: 'get',
+    path: '/api/v1/deliveries/personnel',
+    summary: 'Riders available to be assigned, with their current load',
+    tag: 'Deliveries',
+    roles: MANAGEMENT,
+  },
+  {
+    method: 'get',
+    path: '/api/v1/deliveries/proof/{fileId}',
+    summary: 'A stored proof-of-delivery photograph or signature',
+    tag: 'Deliveries',
+    roles: ALL_ROLES,
+    produces: 'image/*',
+  },
+  {
     method: 'post',
     path: '/api/v1/deliveries/{id}/assign',
     summary: 'Assign a delivery to a delivery person',
     tag: 'Deliveries',
     roles: MANAGEMENT,
     body: DeliveryAssignmentSchema,
+  },
+  /*
+   * The custody chain, in the order it happens.
+   *
+   * Each step is a separate endpoint with its own role because each is a
+   * different person physically holding the goods: the warehouse hands over,
+   * the rider acknowledges and picks up, drives, arrives, and completes. A
+   * single "status" field a client could set to anything would let a rider mark
+   * a delivery handed over before it left the building.
+   */
+  {
+    method: 'post',
+    path: '/api/v1/deliveries/{id}/handover',
+    summary: 'The warehouse hands the packed goods to the rider',
+    tag: 'Deliveries',
+    roles: [UserRole.STOREKEEPER],
+    body: DeliveryHandoverSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/deliveries/{id}/acknowledge',
+    summary: 'The rider accepts custody',
+    tag: 'Deliveries',
+    roles: [UserRole.DELIVERY_PERSON],
+    body: DeliverySimpleActionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/deliveries/{id}/pickup',
+    summary: 'The rider collects the consignment',
+    tag: 'Deliveries',
+    roles: [UserRole.DELIVERY_PERSON],
+    body: DeliverySimpleActionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/deliveries/{id}/start',
+    summary: 'The rider sets off',
+    tag: 'Deliveries',
+    roles: [UserRole.DELIVERY_PERSON],
+    body: DeliverySimpleActionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/deliveries/{id}/arrived',
+    summary: 'The rider reaches the shop',
+    tag: 'Deliveries',
+    roles: [UserRole.DELIVERY_PERSON],
+    body: DeliverySimpleActionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/deliveries/{id}/send-otp',
+    summary: 'Send the receiver a one-time code to confirm handover',
+    tag: 'Deliveries',
+    roles: [UserRole.DELIVERY_PERSON],
+    body: DeliverySimpleActionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/deliveries/{id}/returning',
+    summary: 'Mark undelivered goods as coming back',
+    tag: 'Deliveries',
+    roles: [...MANAGEMENT, UserRole.DELIVERY_PERSON],
+    body: DeliverySimpleActionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/deliveries/{id}/returned',
+    summary: 'The warehouse receives returning goods back into stock',
+    tag: 'Deliveries',
+    roles: [UserRole.STOREKEEPER],
+    body: DeliverySimpleActionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/deliveries/{id}/cancel',
+    summary: 'Cancel a delivery before it leaves',
+    tag: 'Deliveries',
+    roles: MANAGEMENT,
+    body: DeliverySimpleActionSchema,
   },
   {
     method: 'post',
@@ -670,6 +985,74 @@ export const OPERATIONS: Operation[] = [
     roles: MANAGEMENT,
     body: PaymentPostSchema,
   },
+  /*
+   * Reading payments. `MANAGEMENT` runs the finance desk; a `DELIVERY_PERSON`
+   * is here because they collect cash at the door and must be able to see what
+   * they took; a `SHOP_OWNER` sees what they paid. All three are narrowed by
+   * the handler to their own records — the role list is who may ask, not what
+   * they get back.
+   */
+  {
+    method: 'get',
+    path: '/api/v1/payments',
+    summary: 'Payments, scoped to what the caller may see',
+    tag: 'Payments',
+    roles: [...MANAGEMENT, UserRole.DELIVERY_PERSON, UserRole.SHOP_OWNER],
+    query: ['status', 'method', 'shopId', 'from', 'to', 'page', 'limit'],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/payments/{id}',
+    summary: 'One payment',
+    tag: 'Payments',
+    roles: [...MANAGEMENT, UserRole.DELIVERY_PERSON, UserRole.SHOP_OWNER],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/payments/{id}/receipt',
+    summary: 'The receipt for a posted payment',
+    tag: 'Payments',
+    roles: [...MANAGEMENT, UserRole.DELIVERY_PERSON, UserRole.SHOP_OWNER],
+    query: ['layout'],
+    produces: 'application/pdf',
+  },
+  {
+    method: 'get',
+    path: '/api/v1/payments/{id}/attachment',
+    summary: 'The deposit slip or transfer screenshot supporting a payment',
+    tag: 'Payments',
+    roles: [...MANAGEMENT, UserRole.DELIVERY_PERSON, UserRole.SHOP_OWNER],
+    produces: 'image/*',
+  },
+  {
+    /*
+     * A rider's own collections, and the second endpoint whose path prefix
+     * reads as ownership it does not have — `/payments/my-collections` sits
+     * among the finance desk's endpoints and belongs to one rider, exactly as
+     * `/finance/my/collections` does.
+     */
+    method: 'get',
+    path: '/api/v1/payments/my-collections',
+    summary: 'What the signed-in rider has collected and not yet handed in',
+    tag: 'Payments',
+    roles: [UserRole.DELIVERY_PERSON],
+  },
+  {
+    method: 'post',
+    path: '/api/v1/payments/{id}/fail',
+    summary: 'Record that a pending payment did not clear',
+    tag: 'Payments',
+    roles: MANAGEMENT,
+    body: PaymentFailSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/payments/{id}/handover',
+    summary: 'A rider hands collected cash to the office',
+    tag: 'Payments',
+    roles: [UserRole.DELIVERY_PERSON],
+    body: PaymentHandoverSchema,
+  },
   {
     method: 'post',
     path: '/api/v1/payments/{id}/reverse',
@@ -680,11 +1063,66 @@ export const OPERATIONS: Operation[] = [
   },
   {
     method: 'get',
+    path: '/api/v1/finance/shops/{shopId}/summary',
+    summary: 'What one customer owes, and how overdue it is',
+    tag: 'Finance',
+    roles: MANAGEMENT,
+  },
+  {
+    method: 'get',
+    path: '/api/v1/finance/shops/{shopId}/invoices',
+    summary: 'One customer’s invoices and what remains on each',
+    tag: 'Finance',
+    roles: MANAGEMENT,
+    query: ['status', 'from', 'to', 'page', 'limit'],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/finance/shops/{shopId}/ledger',
+    summary: 'One customer’s ledger entries, newest first',
+    tag: 'Finance',
+    roles: MANAGEMENT,
+    query: ['from', 'to', 'page', 'limit'],
+  },
+  {
+    method: 'get',
     path: '/api/v1/finance/shops/{shopId}/statement',
     summary: 'Customer statement for a period',
     tag: 'Finance',
     roles: MANAGEMENT,
     query: ['from', 'to', 'format'],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/finance/reports/summary',
+    summary: 'Receivables, collections and exposure across all customers',
+    tag: 'Finance',
+    roles: MANAGEMENT,
+    query: ['from', 'to'],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/finance/reports/outstanding',
+    summary: 'Everything invoiced and not yet settled',
+    tag: 'Finance',
+    roles: MANAGEMENT,
+    query: ['from', 'to', 'shopId', 'format'],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/finance/reports/overdue',
+    summary: 'Outstanding balances past their due date, by age',
+    tag: 'Finance',
+    roles: MANAGEMENT,
+    query: ['from', 'to', 'shopId', 'format'],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/finance/reports/collections',
+    summary: 'What was collected in a period, by method and by collector',
+    tag: 'Finance',
+    roles: MANAGEMENT,
+    query: ['from', 'to', 'shopId', 'format'],
   },
   {
     method: 'post',
@@ -693,6 +1131,35 @@ export const OPERATIONS: Operation[] = [
     tag: 'Finance',
     roles: ADMINS,
     body: LedgerAdjustmentSchema,
+  },
+  {
+    /*
+     * The two repair endpoints. Both exist because the ledger is derived and
+     * derivations can go wrong; both are `ADMINS` rather than `MANAGEMENT`,
+     * because a repair rewrites the record the business is audited against.
+     */
+    method: 'get',
+    path: '/api/v1/finance/reconciliation/{shopId}',
+    summary: 'Whether one customer’s ledger balances against its documents',
+    tag: 'Finance',
+    roles: MANAGEMENT,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/finance/reconciliation/{shopId}/repair',
+    summary: 'Rebuild one customer’s derived balances from their documents',
+    tag: 'Finance',
+    roles: ADMINS,
+    // No schema: the handler takes no body. See the note on hand-validated
+    // bodies in `docs/TESTING.md`.
+  },
+  {
+    method: 'post',
+    path: '/api/v1/finance/credit-reservations/backfill',
+    summary: 'Recreate missing credit reservations for orders that predate them',
+    tag: 'Finance',
+    roles: ADMINS,
+    body: CreditReservationBackfillSchema,
   },
 
   // ── Notifications and activity ────────────────────────────────────────────
@@ -703,6 +1170,78 @@ export const OPERATIONS: Operation[] = [
     tag: 'Notifications',
     roles: ALL_ROLES,
     query: ['category', 'unread', 'page', 'limit'],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/notifications/catalogue',
+    summary: 'Every notification type, so preferences can be shown by name',
+    tag: 'Notifications',
+    roles: ALL_ROLES,
+  },
+  {
+    method: 'put',
+    path: '/api/v1/notifications/preferences',
+    summary: 'Choose which notifications reach which channel',
+    tag: 'Notifications',
+    roles: ALL_ROLES,
+    body: NotificationPreferenceUpdateSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/notifications/read',
+    summary: 'Mark named notifications as read',
+    tag: 'Notifications',
+    roles: ALL_ROLES,
+    body: NotificationIdsSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/notifications/read-all',
+    summary: 'Mark everything the caller had already seen as read',
+    tag: 'Notifications',
+    roles: ALL_ROLES,
+    body: NotificationMarkAllReadSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/notifications/archive',
+    summary: 'Archive named notifications out of the inbox',
+    tag: 'Notifications',
+    roles: ALL_ROLES,
+    body: NotificationIdsSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/notifications/devices',
+    summary: 'Register a device for push',
+    tag: 'Notifications',
+    roles: ALL_ROLES,
+    body: PushDeviceRegisterSchema,
+  },
+  {
+    method: 'delete',
+    path: '/api/v1/notifications/devices',
+    summary: 'Forget a device, so a signed-out handset stops receiving push',
+    tag: 'Notifications',
+    roles: ALL_ROLES,
+    body: PushDeviceUnregisterSchema,
+  },
+  {
+    method: 'get',
+    path: '/api/v1/notifications/{id}/deliveries',
+    summary: 'Per-channel delivery attempts for one notification',
+    tag: 'Notifications',
+    // Administrators only: this is the diagnostic view of whether an SMS
+    // actually left, and it names recipients and providers.
+    roles: ADMINS,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/notifications/test',
+    summary: 'Send a test notification through a chosen channel',
+    tag: 'Notifications',
+    roles: ADMINS,
+    body: NotificationTestSendSchema,
   },
   {
     method: 'get',
@@ -761,12 +1300,105 @@ export const OPERATIONS: Operation[] = [
     body: AdminPasswordResetSchema,
   },
   {
+    method: 'post',
+    path: '/api/v1/settings/{group}/reset',
+    summary: 'Discard a group’s saved values and fall back to the code defaults',
+    tag: 'Settings',
+    roles: ADMINS,
+    body: SettingsResetSchema,
+  },
+  {
+    method: 'get',
+    path: '/api/v1/admin/users/{id}',
+    summary: 'One user, with their sessions and recent activity',
+    tag: 'Administration',
+    // Readable by `MANAGER`, changeable only by an administrator: a manager
+    // needs to know who a delivery person is without being able to make one.
+    roles: MANAGEMENT,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/admin/users/{id}/revoke-sessions',
+    summary: 'Sign a user out of every device',
+    tag: 'Administration',
+    roles: ADMINS,
+    body: AdminSessionRevokeSchema,
+  },
+  {
     method: 'get',
     path: '/api/v1/admin/audit',
     summary: 'Read-only audit log',
     tag: 'Administration',
     roles: ADMINS,
     query: ['action', 'entityType', 'from', 'to', 'page', 'limit'],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/admin/audit/actions',
+    summary: 'The action names present in the audit log, for its filter',
+    tag: 'Administration',
+    roles: ADMINS,
+  },
+  {
+    method: 'get',
+    path: '/api/v1/users/me',
+    summary: 'The signed-in user’s own profile',
+    tag: 'Authentication',
+    // No role guard: this is "who am I", and every authenticated caller has an
+    // answer. Authentication is still required — it is applied router-wide.
+    roles: ALL_ROLES,
+  },
+  {
+    method: 'patch',
+    path: '/api/v1/shops/{id}',
+    summary: 'Amend a customer’s details or price list',
+    tag: 'Shops',
+    roles: ADMINS,
+    body: UpdateShopSchema,
+  },
+  {
+    method: 'patch',
+    path: '/api/v1/shops/{id}/status',
+    summary: 'Suspend or reinstate a customer',
+    tag: 'Shops',
+    // `MANAGER` as well as an administrator: suspending a customer who has
+    // stopped paying is a credit decision, and it is reversible.
+    roles: MANAGEMENT,
+    // No schema: this handler reads `status` and `reason` off the body by hand.
+  },
+  {
+    method: 'post',
+    path: '/api/v1/shops/{id}/assign-owner',
+    summary: 'Attach a shop-owner account to a customer',
+    tag: 'Shops',
+    roles: ADMINS,
+    // No schema: this handler reads `userId` off the body by hand.
+  },
+  {
+    method: 'post',
+    path: '/api/v1/shops/{id}/assign-manager',
+    summary: 'Name the internal manager responsible for a customer',
+    tag: 'Shops',
+    roles: ADMINS,
+    // No schema: this handler reads `userId` off the body by hand.
+  },
+  {
+    /*
+     * The API describes itself. Both are deliberately unauthenticated — a
+     * specification a caller must already hold a token to read is no use for
+     * writing the client that gets the token. Neither returns any data.
+     */
+    method: 'get',
+    path: '/api/v1/docs',
+    summary: 'Human-readable API reference',
+    tag: 'Documentation',
+    produces: 'text/html',
+  },
+  {
+    method: 'get',
+    path: '/api/v1/docs/openapi.json',
+    summary: 'This document, served by the running API',
+    tag: 'Documentation',
   },
 
   // ── Returns ───────────────────────────────────────────────────────────────
@@ -787,12 +1419,53 @@ export const OPERATIONS: Operation[] = [
     body: CreateReturnSchema,
   },
   {
+    method: 'get',
+    path: '/api/v1/returns/credit-notes/{id}',
+    summary: 'An issued credit note',
+    tag: 'Returns',
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER, UserRole.SHOP_OWNER, UserRole.DELIVERY_PERSON],
+  },
+  {
+    method: 'post',
+    path: '/api/v1/returns/{id}/review',
+    summary: 'Claim a return for review',
+    tag: 'Returns',
+    roles: MANAGEMENT,
+    body: ReturnReviewStartSchema,
+  },
+  {
     method: 'post',
     path: '/api/v1/returns/{id}/decision',
     summary: 'Approve, partially approve or reject requested lines',
     tag: 'Returns',
     roles: MANAGEMENT,
     body: ReturnDecisionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/returns/{id}/reject',
+    summary: 'Refuse a return outright, with a reason the customer sees',
+    tag: 'Returns',
+    roles: MANAGEMENT,
+    body: ReturnRejectionSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/returns/{id}/cancel',
+    summary: 'Withdraw a return before it has been collected',
+    tag: 'Returns',
+    // The customer who raised it may withdraw it; a rep may not, which is the
+    // same boundary that keeps `SALES` out of the workflow entirely.
+    roles: [...MANAGEMENT, UserRole.SHOP_OWNER],
+    body: ReturnCancelSchema,
+  },
+  {
+    method: 'post',
+    path: '/api/v1/returns/{id}/collect',
+    summary: 'A rider collects approved goods from the shop',
+    tag: 'Returns',
+    roles: [...MANAGEMENT, UserRole.DELIVERY_PERSON],
+    body: ReturnCollectionSchema,
   },
   {
     method: 'post',
@@ -851,6 +1524,14 @@ export const OPERATIONS: Operation[] = [
     tag: 'Reports',
     roles: [...MANAGEMENT, UserRole.STOREKEEPER],
     query: ['asOf', 'format'],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/reports/stock-movements',
+    summary: 'Stock movements over a period, by medicine and by reason',
+    tag: 'Reports',
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER],
+    query: ['from', 'to', 'medicineId', 'format'],
   },
   {
     method: 'get',

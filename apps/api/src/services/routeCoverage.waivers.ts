@@ -16,7 +16,8 @@
  *
  * The counts below are stated as figures rather than as prose because they are
  * the burn-down, and a burn-down nobody can read the number off is a mood. At
- * the time of writing: **187 routes, 112 covered by an integration test.**
+ * the time of writing: **187 routes, 187 documented, 156 covered by an
+ * integration test.**
  * (The earlier "150 routes" in this comment was itself stale by 37 — the same
  * drift that left `docs/openapi.json` describing 72 operations against 110.)
  */
@@ -24,140 +25,61 @@
 /**
  * Served, but absent from the OpenAPI document.
  *
- * **77 of 187.** The document was hand-declared alongside the routers rather
- * than reflected off them, so it drifted; the reconciliation test now makes any
- * further drift fail the build.
+ * **Empty. 187 of 187 documented.**
+ *
+ * It began at 91, and the last 77 went in one pass because the roles assertion
+ * had made the exercise worth doing: every `roles` list written here is checked
+ * against the mounted router, so documenting an endpoint means stating who may
+ * call it and being told immediately if that is wrong.
+ *
+ * Keeping it empty is now the gate's job — a new route with no `OPERATIONS`
+ * entry fails the build rather than joining a list.
+ *
+ * Writing them out surfaced one thing worth acting on: **four write endpoints
+ * validate their request body by hand rather than through a Zod schema**, so
+ * they are the four operations in the document with no request shape. They are
+ * `PATCH /inventory/batches/{id}/block`, `PATCH /shops/{id}/status`,
+ * `POST /shops/{id}/assign-owner` and `POST /shops/{id}/assign-manager`. Each
+ * is marked in `openapi.ts` where it is declared.
  */
-export const UNDOCUMENTED_ROUTES: readonly string[] = [
-  'delete /api/v1/notifications/devices',
-  'get /api/v1/admin/audit/actions',
-  'get /api/v1/admin/users/:id',
-  'get /api/v1/approvals/:id',
-  'get /api/v1/deliveries/:id',
-  'get /api/v1/deliveries/order/:orderId',
-  'get /api/v1/deliveries/personnel',
-  'get /api/v1/deliveries/proof/:fileId',
-  'get /api/v1/docs',
-  'get /api/v1/docs/openapi.json',
-  'get /api/v1/finance/reconciliation/:shopId',
-  'get /api/v1/finance/reports/collections',
-  'get /api/v1/finance/reports/outstanding',
-  'get /api/v1/finance/reports/overdue',
-  'get /api/v1/finance/reports/summary',
-  'get /api/v1/finance/shops/:shopId/invoices',
-  'get /api/v1/finance/shops/:shopId/ledger',
-  'get /api/v1/finance/shops/:shopId/summary',
-  'get /api/v1/fulfilment/picking/:id',
-  'get /api/v1/fulfilment/ready',
-  'get /api/v1/inventory/batches/:id',
-  'get /api/v1/notifications/:id/deliveries',
-  'get /api/v1/notifications/catalogue',
-  'get /api/v1/payments',
-  'get /api/v1/payments/:id',
-  'get /api/v1/payments/:id/attachment',
-  'get /api/v1/payments/:id/receipt',
-  'get /api/v1/payments/my-collections',
-  'get /api/v1/reports/stock-movements',
-  'get /api/v1/returns/credit-notes/:id',
-  'get /api/v1/users/me',
-  'patch /api/v1/inventory/batches/:id/block',
-  'patch /api/v1/inventory/medicines/:id',
-  'patch /api/v1/orders/drafts/:id',
-  'patch /api/v1/shops/:id',
-  'patch /api/v1/shops/:id/status',
-  'post /api/v1/admin/users/:id/revoke-sessions',
-  'post /api/v1/approvals/:id/clarify',
-  'post /api/v1/approvals/:id/hold',
-  'post /api/v1/approvals/:id/start',
-  'post /api/v1/deliveries/:id/acknowledge',
-  'post /api/v1/deliveries/:id/arrived',
-  'post /api/v1/deliveries/:id/cancel',
-  'post /api/v1/deliveries/:id/handover',
-  'post /api/v1/deliveries/:id/pickup',
-  'post /api/v1/deliveries/:id/returned',
-  'post /api/v1/deliveries/:id/returning',
-  'post /api/v1/deliveries/:id/send-otp',
-  'post /api/v1/deliveries/:id/start',
-  'post /api/v1/finance/credit-reservations/backfill',
-  'post /api/v1/finance/reconciliation/:shopId/repair',
-  'post /api/v1/fulfilment/picking/:id/discrepancies',
-  'post /api/v1/fulfilment/picking/:id/discrepancies/resolve',
-  'post /api/v1/fulfilment/picking/:id/progress',
-  'post /api/v1/fulfilment/picking/:id/resume',
-  'post /api/v1/fulfilment/picking/:id/start',
-  'post /api/v1/inventory/allocations/reserve',
-  'post /api/v1/inventory/batches/:id/adjust',
-  'post /api/v1/inventory/batches/:id/operations',
-  'post /api/v1/notifications/archive',
-  'post /api/v1/notifications/devices',
-  'post /api/v1/notifications/read',
-  'post /api/v1/notifications/read-all',
-  'post /api/v1/notifications/test',
-  'post /api/v1/orders/:id/duplicate',
-  'post /api/v1/orders/drafts',
-  'post /api/v1/orders/drafts/:id/submit',
-  'post /api/v1/payments/:id/fail',
-  'post /api/v1/payments/:id/handover',
-  'post /api/v1/returns/:id/cancel',
-  'post /api/v1/returns/:id/collect',
-  'post /api/v1/returns/:id/reject',
-  'post /api/v1/returns/:id/review',
-  'post /api/v1/settings/:group/reset',
-  'post /api/v1/shops/:id/assign-manager',
-  'post /api/v1/shops/:id/assign-owner',
-  'put /api/v1/notifications/preferences',
-];
+export const UNDOCUMENTED_ROUTES: readonly string[] = [];
 
 /**
  * Served, but no integration test reaches them.
  *
- * **75 of 187.** Recorded live by `routeCoverageRecorder()` rather than inferred
- * from test source, so a test that merely mentions a path in a string does not
- * count as covering it.
+ * **31 of 187**, from 81. Recorded live by `routeCoverageRecorder()` rather than
+ * inferred from test source, so a test that merely mentions a path in a string
+ * does not count as covering it.
+ *
+ * Four of the thirty-one are the health probes and `/metrics`, which the
+ * recorder structurally cannot see; their reason is written beside them below.
+ * So **twenty-seven** are genuinely untested, in four tranches that remain:
+ * orders and drafts, approvals, returns, and deliveries with their reports.
+ * `docs/TESTING.md` carries the table, because "81 → 31" without saying which
+ * is the same dishonesty as a percentage.
+ *
+ * Four tranches went in: **finance** (18 — the money first, deliberately),
+ * **administration** (10, including `POST /users` itself, whose original role
+ * bug is now planted and caught rather than only cited), **warehouse** (10),
+ * and **the inbox** (6).
  */
 export const UNTESTED_ROUTES: readonly string[] = [
   'delete /api/v1/orders/drafts/:id',
-  'get /api/v1/activity',
-  'get /api/v1/admin/users/:id',
   'get /api/v1/approvals/:id',
   'get /api/v1/approvals/queue',
   'get /api/v1/deliveries',
   'get /api/v1/deliveries/:id',
   'get /api/v1/deliveries/personnel',
   'get /api/v1/deliveries/proof/:fileId',
-  'get /api/v1/finance/my/collections',
-  'get /api/v1/finance/my/invoices',
-  'get /api/v1/finance/my/statement',
-  'get /api/v1/finance/my/summary',
-  'get /api/v1/finance/reconciliation/:shopId',
-  'get /api/v1/finance/reports/collections',
-  'get /api/v1/finance/reports/outstanding',
-  'get /api/v1/finance/reports/overdue',
-  'get /api/v1/finance/reports/summary',
-  'get /api/v1/finance/shops/:shopId/invoices',
-  'get /api/v1/finance/shops/:shopId/ledger',
   'get /api/v1/fulfilment/picking/:id',
   'get /api/v1/fulfilment/queue',
-  'get /api/v1/inventory/batches',
-  'get /api/v1/inventory/batches/:id',
-  'get /api/v1/inventory/medicines/:id',
-  'get /api/v1/inventory/movements',
-  'get /api/v1/notifications/:id/deliveries',
-  'get /api/v1/notifications/catalogue',
-  'get /api/v1/notifications/preferences',
   'get /api/v1/orders/:id',
-  'get /api/v1/payments',
-  'get /api/v1/payments/:id',
-  'get /api/v1/payments/:id/attachment',
-  'get /api/v1/payments/my-collections',
   'get /api/v1/reports/deliveries',
   'get /api/v1/reports/orders',
   'get /api/v1/reports/returns',
   'get /api/v1/reports/sales/breakdown',
-  'get /api/v1/reports/stock-movements',
   'get /api/v1/returns/:id',
   'get /api/v1/returns/credit-notes/:id',
-  'get /api/v1/shops/:id',
   /*
    * These four are mounted directly on the application, ahead of the coverage
    * recorder, so that a degraded process can still answer a probe and a scraper
@@ -171,33 +93,15 @@ export const UNTESTED_ROUTES: readonly string[] = [
   'get /health/ready',
   'get /health/version',
   'get /metrics',
-  'patch /api/v1/inventory/batches/:id/block',
   'patch /api/v1/orders/drafts/:id',
-  'patch /api/v1/shops/:id/status',
-  'post /api/v1/admin/users/:id/revoke-sessions',
   'post /api/v1/approvals/:id/clarify',
   'post /api/v1/approvals/:id/hold',
   'post /api/v1/approvals/:id/reject',
-  'post /api/v1/auth/logout',
-  'post /api/v1/auth/logout-all',
   'post /api/v1/deliveries/:id/cancel',
-  'post /api/v1/finance/adjustments',
-  'post /api/v1/finance/reconciliation/:shopId/repair',
-  'post /api/v1/inventory/allocations/reserve',
-  'post /api/v1/inventory/batches/:id/adjust',
-  'post /api/v1/inventory/batches/:id/operations',
-  'post /api/v1/inventory/batches/receive',
-  'post /api/v1/notifications/archive',
-  'post /api/v1/notifications/read-all',
   'post /api/v1/orders/:id/duplicate',
   'post /api/v1/orders/drafts',
   'post /api/v1/orders/drafts/:id/submit',
-  'post /api/v1/payments/:id/fail',
   'post /api/v1/returns/:id/collect',
   'post /api/v1/returns/:id/reject',
   'post /api/v1/returns/:id/review',
-  'post /api/v1/shops',
-  'post /api/v1/shops/:id/assign-manager',
-  'post /api/v1/shops/:id/assign-owner',
-  'post /api/v1/users',
 ];
