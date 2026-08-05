@@ -1291,3 +1291,54 @@ None. Linking `Warehouse` to `MedicineBatch.warehouseLocation` is the one piece
 of unfinished business, and it is a data change rather than a screen. Go-live
 items remain as listed in Phase 24: SMS provider procurement, an
 `ERROR_REPORTING_DSN` adapter, and a scheduled backup.
+
+## Phase 28: The Blank Page, and the Front Door Behind It
+
+**Status:** COMPLETED
+
+### Scope and completed work
+
+Reported as "the system is showing a white blank page". The cause was a dev
+server holding a stale transform of `packages/i18n/en.ts`: the module no longer
+provided the export the catalogue is read through, evaluation stopped there,
+`#root` was never touched, and the browser painted white with the reason in the
+console. Restarting the server cleared it. The three things that did not clear
+were fixed.
+
+- **A blank page is now impossible.** `index.html` carries its own boot screen
+  and a classic script that turns a failed or hung load into a sentence, the
+  browser's own report of what went wrong, and a Try again button. It is
+  outside `#root`, untranslated, and dismissed by the last statement of
+  `main.tsx` — see `ASSUMPTIONS.md` for why each of those is deliberate.
+- **`/` is a route.** It had never been one. All fifty-one manifest paths are
+  sub-paths, so the origin fell through to the catch-all and told the visitor
+  the page did not exist. It now sends a signed-in person to their own home
+  screen and everybody else to the sign-in form.
+- **The not-found screen no longer tells signed-out visitors they are signed
+  in.** The sentence was unconditional, above a button that took them to the
+  sign-in form.
+
+### Testing
+
+Web 279 (three for the front door), browser 124 (four new assertions, each run
+against both the dev server and the built bundle), API 170 unit / 194
+integration / 5 route coverage, mobile 93. Each new gate was proved by planting
+the defect it claims to catch: the guard script deleted, the boot node left in
+place, and the `/` route removed.
+
+### Known limitations
+
+- **The boot screen cannot rescue a partially-evaluated application.** It
+  speaks only while it is still on the page, which means only before React
+  mounts. Anything that fails afterwards belongs to `ErrorBoundary`, which is
+  the right division but does mean a module that throws during a lazy route's
+  evaluation is reported by the boundary, not here.
+- **Nothing gates the arrangement structurally.** The browser tests prove the
+  behaviour; there is no rule stopping somebody moving the fallback back inside
+  `#root`, which would quietly disarm `expectPageRendered`. The comment in
+  `index.html` says so, which is weaker than a test.
+
+### Next phase dependencies
+
+None. The Phase 27 item stands: linking `Warehouse` to
+`MedicineBatch.warehouseLocation` is a data change rather than a screen.

@@ -2,6 +2,7 @@ import { Suspense, useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { Login } from './pages/Login';
+import { FrontDoor } from './app/FrontDoor';
 import { Unauthorized } from './pages/Unauthorized';
 import { NotFound } from './pages/NotFound';
 import { AppShell } from './components/AppShell';
@@ -46,6 +47,13 @@ function App() {
           <BrowserRouter>
             <SessionGate>
               <Routes>
+                {/*
+                  The origin itself. Not in the manifest, because the manifest
+                  describes screens a role may open and this is neither a
+                  screen nor role-dependent — it is the front door, and it
+                  belongs to everybody who arrives without typing a path.
+                */}
+                <Route path="/" element={<FrontDoor />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/unauthorized" element={<Unauthorized />} />
 

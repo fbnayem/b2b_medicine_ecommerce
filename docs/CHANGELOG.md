@@ -1,5 +1,53 @@
 # Changelog
 
+## Phase 28 — the white blank page, and the front door behind it
+
+Reported as "the system is showing a white blank page". It was, and the cause was
+a dev server holding a stale transform of `packages/i18n/en.ts`: the module
+evaluated, did not provide the export the catalogue is read through, and the
+whole application stopped at that line. `#root` was never touched, so the browser
+painted white and put the reason in a console nobody has open. A restart cleared
+it. Two other things found on the way did not clear.
+
+### A blank page is now impossible
+
+Everything this application shows arrives through the module graph rooted at
+`main.tsx` — the stylesheet and both language catalogues included. So the one
+moment you most need it to say something is the moment it has nothing to say it
+with. `index.html` now carries its own boot screen in plain CSS, and a classic
+script that turns a failed load into a sentence, a copy of what the browser
+reported, and a Try again button.
+
+Three details are deliberate. It is **outside `#root`**, because
+`expectPageRendered` fails a page whose `#root` has no text in it and putting the
+fallback in there would have handed that gate its own words to read. It is
+**dismissed by the last statement of `main.tsx`** rather than by a stylesheet or
+a timer, so the removal is the thing that proves the application started. And it
+is **not translated**, because the catalogue is part of the graph it exists to
+cover for — which is exactly what failed this time.
+
+This is the second time the same shape of defect has been reported. The first was
+the shared packages resolving to their CommonJS build, where every page died on
+`does not provide an export named 'UserRole'`.
+
+### The address of the application was a 404
+
+There was no route for `/`. All fifty-one paths in the manifest are sub-paths, so
+the origin itself — what a browser autocompletes to, what a bookmark of the site
+is, what a deployment serves at its root — fell through to the catch-all and said
+the page did not exist.
+
+It survived because every one of the 116 browser assertions types the path it
+wants: `signIn` goes to `/login`, the screens sweep walks the manifest. Nobody
+had ever knocked on the front door. `/` now sends a signed-in person to their own
+home screen and everybody else to the sign-in form.
+
+### "You are still signed in" was said to people who were not
+
+The not-found screen ended its explanation with that sentence unconditionally,
+directly above a button that took the reader to the sign-in form. Both halves now
+depend on which is true.
+
 ## Phase 27 — a catalogue you can actually run
 
 Four things were asked for. Three turned out to be holes rather than polish.

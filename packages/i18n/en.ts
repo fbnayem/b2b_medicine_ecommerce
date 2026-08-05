@@ -152,8 +152,14 @@ export const en = {
 
   errorPages: {
     notFoundTitle: 'That page does not exist',
-    notFoundBody:
-      'The address may have been mistyped, or the page may have moved. You are still signed in.',
+    /*
+     * Split in two, because the single sentence ended "You are still signed
+     * in." and was shown to everybody — including a visitor who was not signed
+     * in, standing in front of a button that took them to the sign-in form.
+     */
+    notFoundBody: 'The address may have been mistyped, or the page may have moved.',
+    notFoundSignedIn: 'You are still signed in.',
+    notFoundSignedOut: 'Sign in and we will take you to your own home screen.',
     forbiddenTitle: 'You cannot open this page',
     forbiddenBody: 'Your account does not have access to it. Ask an administrator if you need it.',
     backToDashboard: 'Back to your home screen',

@@ -43,7 +43,7 @@ reconciles every `e2e/*.spec.ts` against the `testMatch` patterns in
 | Tier                     | Files                                                    | Contract                                                                                                                                                                                    |
 | ------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1 — domain workflows     | `journey.spec.ts`                                        | **Must survive the redesign untouched.** Navigates by URL and asserts on text a person reads, never on a class name.                                                                        |
-| 2 — page-level state     | `smoke.spec.ts`                                          | Signs in as each role and asserts the page mounted. Stable across restyling.                                                                                                                |
+| 2 — page-level state     | `smoke.spec.ts`                                          | Signs in as each role and asserts the page mounted; also the front door (`/`) and the boot fallback, which is why it runs against both web targets. Stable across restyling.                |
 | 3 — navigation and shell | `navigation.spec.ts`                                     | The sidebar, search, account menu, breadcrumbs and dark mode. Rewritten when the shell landed, as budgeted.                                                                                 |
 | 4 — every screen         | `screens.spec.ts`                                        | Opens **every** `NAV_ITEMS` destination as a role permitted to open it: no error card, no refused request, no broken image.                                                                 |
 | — accessibility          | `accessibility.spec.ts`                                  | Axe at strict zero across seventeen screens.                                                                                                                                                |
@@ -68,6 +68,26 @@ So tier 4 asserts the two things a person notices and nothing else did: no
 `error-state`, and no response in the 4xx/5xx range for a request the page made.
 It walks `NAV_ITEMS` rather than a list somebody maintains, so a screen added
 next month is covered on the day it is added.
+
+### The boot fallback, and why it is outside `#root`
+
+`index.html` carries a fallback that speaks when the module graph fails to load
+at all — the blank white page, twice reported. It is deliberately **outside
+`#root`**, and that is a testing constraint rather than a layout one:
+`expectPageRendered` fails a page whose `#root` has no text in it, so a fallback
+placed inside it would supply the very words that gate reads and switch it off
+without anything going red.
+
+Two assertions hold the arrangement up, and they only mean something together:
+
+- blocking every script request must produce a readable failure, not a white
+  screen;
+- a normal load must leave **no** `#app-boot` on the page, or the first
+  assertion would pass against a fallback that sits on top of a working
+  application forever.
+
+Both run against the dev server and the built bundle, because the two blank-page
+defects this project has had appeared in one target and not the other.
 
 **It waits before it asserts, and that is load-bearing.** The first version went
 straight to `toHaveCount(0)` and _passed with a 404 planted_, because an
@@ -151,16 +171,19 @@ A harness that has not been shown to fail on the bug it was built for is not yet
 evidence of anything. Each of these was reintroduced on purpose and the suite
 went red:
 
-| Defect reintroduced                                                | Caught by                                |
-| ------------------------------------------------------------------ | ---------------------------------------- |
-| `SHOP_OWNER` landing on `/shop`, a route that does not exist       | `smoke.spec.ts` — Shop owner signs in    |
-| A route added with no integration test                             | `routeCoverage.test.ts`                  |
-| A route added and left out of the OpenAPI document                 | `routeCoverage.test.ts`                  |
-| `COMPLETE` reachable from `ASSIGNED` in the delivery state machine | `deliveryRules.test.ts`                  |
-| An implicit `any` in the web app                                   | `pnpm --filter @medsupply/web typecheck` |
-| A duplicate OpenAPI operation                                      | `securityRules.test.ts`                  |
-| A package with a script CI does not run                            | `pipelineWiring.test.ts`                 |
-| A test file registered with no script                              | `testWiring.test.ts`                     |
+| Defect reintroduced                                                | Caught by                                             |
+| ------------------------------------------------------------------ | ----------------------------------------------------- |
+| `SHOP_OWNER` landing on `/shop`, a route that does not exist       | `smoke.spec.ts` — Shop owner signs in                 |
+| A route added with no integration test                             | `routeCoverage.test.ts`                               |
+| A route added and left out of the OpenAPI document                 | `routeCoverage.test.ts`                               |
+| `COMPLETE` reachable from `ASSIGNED` in the delivery state machine | `deliveryRules.test.ts`                               |
+| An implicit `any` in the web app                                   | `pnpm --filter @medsupply/web typecheck`              |
+| A duplicate OpenAPI operation                                      | `securityRules.test.ts`                               |
+| A package with a script CI does not run                            | `pipelineWiring.test.ts`                              |
+| A test file registered with no script                              | `testWiring.test.ts`                                  |
+| The boot guard script deleted from `index.html`                    | `smoke.spec.ts` — an application that cannot load     |
+| The boot screen left in place after React mounts                   | `smoke.spec.ts` — the boot screen gets out of the way |
+| The `/` route removed again                                        | `smoke.spec.ts` — the bare address of the application |
 
 ### What it found on its first run
 

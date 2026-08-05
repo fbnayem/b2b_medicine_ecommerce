@@ -542,3 +542,33 @@ reads a decision rather than guesses at an intention.
   optional so leaving costs less than it does on a round with stops already
   chosen. What had to change was the silence: it read one page of twenty-five
   with nothing on screen saying there were more.
+
+## Phase 28 — the blank page, and the front door
+
+- **The boot fallback lives in `index.html`, in plain CSS, untranslated.**
+  Everything else the application shows — the stylesheet, the design tokens,
+  both language catalogues — arrives through the module graph rooted at
+  `main.tsx`. A fallback that imports any of it is not a fallback for the case
+  where that graph fails, which is the only case it exists for. The duplication
+  of a few colours is the price.
+- **It sits outside `#root`, not inside it.** `expectPageRendered` fails a page
+  whose `#root` has no text in it, and that assertion is what catches the blank
+  page in the first place. A fallback inside `#root` would have given that gate
+  its own words to read and switched it off silently.
+- **It is dismissed by the last statement of `main.tsx`.** Not by a CSS rule and
+  not by a timer: if any module above that line throws, the line is never
+  reached and the message stays on screen. The removal has to be the thing that
+  proves the application started.
+- **Twenty seconds before it says the load is slow**, and the wording is a delay
+  rather than a failure. A cold Vite dev server on Windows can take longer than
+  a warehouse connection does, so a false positive is expected occasionally and
+  must not accuse the network of something it did not do.
+- **`FrontDoor` is not in the navigation manifest.** The manifest describes
+  screens a role may open; `/` is neither a screen nor role-dependent. It also
+  lives in `app/` rather than `pages/`, because the design-system gate requires
+  everything in `pages/` to carry a `PageHeader` and take its words from the
+  catalogue — correct for a screen, meaningless for a redirect that renders
+  nothing.
+- **The file is `FrontDoor.tsx`, not `Landing.tsx`.** `app/landing.ts` sits
+  beside it, and Windows resolves `./Landing` to `./landing` — an import that
+  works on CI and hands back `undefined` on a developer's machine.
