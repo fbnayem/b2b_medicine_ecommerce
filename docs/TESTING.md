@@ -116,7 +116,12 @@ rather than summarised as a percentage — the endpoint that mattered was
 and a percentage would have read "88%" and named nothing. A waiver that goes
 stale fails the build, so the lists can only shrink.
 
-**As of 05 August 2026: 165 routes, 78 undocumented, 75 untested.**
+**As of 05 August 2026: 187 routes, 77 undocumented, 75 untested.**
+
+(The route count in this line previously read 165, and the header comments in
+`routeCoverage.waivers.ts` read 150. Both were stale — the same drift that left
+`docs/openapi.json` describing 72 operations against a source declaring 110.
+Counted from `routeTable()` rather than from memory this time.)
 
 Tranches are ordered by what a real user's journey touches rather than by what
 is easy, so a shrinking number means the riskiest endpoints went first. Done so
@@ -151,15 +156,56 @@ opened with a search box that answered 403 for the only role they were built
 for. The other sixteen were corrected in the document, because the router is
 what runs.
 
-Two things it deliberately does **not** claim. A route with no role guard may be
+One thing it deliberately does **not** claim: a route with no role guard may be
 documented as `ALL_ROLES` or as public, since the difference is router-level
 authentication that this reflection does not read; it only fails when the
 document names a _narrower_ set than the server enforces, which is a promise of
-a refusal that will not happen. And it reconciles the document against the
-router, not the router against the navigation package — where those two
-disagree (a storekeeper is offered an Orders tab the API refuses, for instance)
-that is a real gap, and a separate decision about who should read what rather
-than a drift to be silently closed.
+a refusal that will not happen.
+
+#### The specification is gated as a file, not only as an object
+
+`docs/openapi.json` is a generated artefact committed on purpose — a
+specification change is a contract change and reviewing it as a diff is the
+point, which only works if the committed file is the file the code produces. It
+was not: **72 operations committed against 110 declared.** Every assertion about
+the specification had been made against `buildOpenApiDocument()`, the live
+object, which is never stale by construction.
+
+Two separate gates, because they fail for different reasons and the difference
+is the diagnosis. One compares the file byte for byte and tells you to run
+`pnpm --filter @medsupply/api openapi`. The other builds the document twice and
+compares — which is how the real cause surfaced: `z.toJSONSchema` evaluates a
+Zod default to produce its JSON Schema counterpart, so two request bodies
+defaulting a timestamp to `new Date()` were publishing the moment of the build
+as a contract default and making every regeneration produce a diff that meant
+nothing. Both proved by planting.
+
+### Navigation reconciliation
+
+`navigationRules.test.ts` is the fifth reconciliation, and the first that looks
+at a client: **a screen the navigation offers must be a screen the API will
+serve.** `SCREEN_READS` names, per screen, the request it cannot function
+without; the roles offered that screen are compared against the roles
+`requireRole` admits on that route.
+
+It is deliberately "cannot function without" and not "ever calls" — a screen
+that hides an administrator's panel from everybody else is working correctly, so
+`security` names the session list a person came to see rather than
+`GET /admin/runtime`. Screens with no opening read at all (create forms, the
+cart) are listed in `SCREENS_WITHOUT_READS` with the reason, and the test fails
+if a screen appears in both lists, in neither, or names an id the navigation no
+longer has.
+
+`MOBILE_TABS` is checked separately: a tab bar is a stronger promise than a menu,
+a role gets exactly five, and one that leads nowhere is a fifth of the
+application gone.
+
+This defect class had already been found by hand three times — a rider who could
+not open the delivery board, a rep whose customer picker returned 403, and four
+more from sampling twelve of sixty entries. The gate found five conflicts, and
+they resolved in both directions: two menus narrowed because the API was right
+about what the role should see, and one route widened (with territory scoping)
+because the menu was.
 
 The API integration command uses `mongodb-memory-server` as a one-node replica set by default. If `MONGODB_TEST_URI` is supplied, it uses that dedicated external replica-set database instead. The suite drops only the selected integration database before and after execution.
 

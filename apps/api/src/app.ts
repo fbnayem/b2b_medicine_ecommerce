@@ -6,7 +6,13 @@ import { env } from './env';
 import { errorHandler, notFoundHandler } from './middlewares/error';
 import { securityHeaders } from './middlewares/securityHeaders';
 import { requestContext, sanitiseRequest } from './middlewares/requestContext';
-import { globalRateLimit, reportRateLimit, writeMethodRateLimit } from './middlewares/rateLimit';
+import {
+  globalRateLimit,
+  mediaRateLimit,
+  reportRateLimit,
+  writeMethodRateLimit,
+} from './middlewares/rateLimit';
+import { MEDIA_PREFIX, mediaFiles } from './middlewares/media';
 import { parseQuery } from './services/requestSanitiser';
 import { live, metrics, ready, version } from './controllers/healthController';
 import { metricsMiddleware } from './services/metrics';
@@ -84,6 +90,16 @@ app.get('/health', live);
 app.get('/health/ready', ready);
 app.get('/health/version', version);
 app.get('/metrics', metrics);
+
+/**
+ * Product photography, on its own budget and ahead of the global one.
+ *
+ * A catalogue page asks for one list and a hundred pictures. Charging both to
+ * the same counter means the pictures exhaust it and the API starts refusing
+ * the screen that requested them — so the files get a tier sized for how they
+ * actually arrive, and the global backstop keeps protecting everything else.
+ */
+app.use(MEDIA_PREFIX, mediaRateLimit(), ...mediaFiles());
 
 app.use(globalRateLimit());
 

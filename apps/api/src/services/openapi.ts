@@ -190,6 +190,17 @@ export const OPERATIONS: Operation[] = [
     query: ['status', 'territory', 'search', 'page', 'limit'],
   },
   {
+    method: 'get',
+    path: '/api/v1/shops/{id}',
+    summary: 'One customer, if the caller may act for them',
+    tag: 'Shops',
+    // A rep opens a customer from the list above, which is already narrowed to
+    // their territories; the handler applies the same rule, so the detail is
+    // scoped exactly as tightly as the list that leads to it. A shop owner
+    // reaches only their own record.
+    roles: [...MANAGEMENT, UserRole.SALES, UserRole.SHOP_OWNER],
+  },
+  {
     method: 'post',
     path: '/api/v1/shops',
     summary: 'Register a shop',
@@ -973,6 +984,38 @@ export const OPERATIONS: Operation[] = [
   },
 ];
 
+/** An instant, as `new Date().toISOString()` writes one. */
+const GENERATED_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+
+/**
+ * Replaces a defaulted timestamp with a sentence saying what it means.
+ *
+ * `z.toJSONSchema` evaluates a Zod default to produce its JSON Schema
+ * counterpart, which is right for `.default(30)` and wrong for
+ * `.default(() => new Date())`: the second is not a value, it is the server's
+ * clock, and freezing it produces a published contract telling every client the
+ * field defaults to one particular instant in August 2026.
+ *
+ * `POST /payments`'s `collectedAt` and `POST /finance/adjustments`'s
+ * `occurredAt` are the two. Between them they also made the document
+ * unreproducible — two regenerations minutes apart differ — which is why the
+ * committed copy could not be gated against the source until now.
+ */
+function withoutGeneratedInstants(node: unknown): void {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) {
+    for (const entry of node) withoutGeneratedInstants(entry);
+    return;
+  }
+  const record = node as Record<string, unknown>;
+  if (typeof record.default === 'string' && GENERATED_INSTANT.test(record.default)) {
+    delete record.default;
+    const existing = typeof record.description === 'string' ? `${record.description} ` : '';
+    record.description = `${existing}Defaults to the moment the server receives the request.`;
+  }
+  for (const value of Object.values(record)) withoutGeneratedInstants(value);
+}
+
 /** JSON Schema for a Zod schema, expressed for a request body. */
 function bodySchema(schema: z.ZodType): Record<string, unknown> {
   const generated = z.toJSONSchema(schema, { io: 'input', unrepresentable: 'any' }) as Record<
@@ -981,6 +1024,7 @@ function bodySchema(schema: z.ZodType): Record<string, unknown> {
   >;
   // The dialect marker belongs on the document, not on every operation.
   delete generated.$schema;
+  withoutGeneratedInstants(generated);
   return generated;
 }
 

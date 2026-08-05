@@ -311,3 +311,43 @@ reads a decision rather than guesses at an intention.
   some artwork, and the descriptions are their marketing and monograph text.
   `--no-images` and `--no-descriptions` turn each off. `meta_title` and
   `meta_description` name Arogga outright and are never imported.
+
+## Serving product photography (phase 24)
+
+- **`/media` is unauthenticated.** Both clients render these through an ordinary
+  image loader — a browser's and React Native's `<Image>` — and neither can
+  attach a bearer token to one. Signed URLs and streaming every file through an
+  authenticated handler are both real designs that buy nothing here: a
+  photograph of a box tells a stranger what the box looks like, while prices,
+  stock and customers stay behind the API. It has its own rate-limit tier
+  (`RATE_LIMIT_MEDIA_MAX`, default 1200) because a catalogue page asks for one
+  list and a hundred pictures, and charging both to the global budget lets a
+  page throttle the screen that requested it.
+- **Only raster images are served, checked on the decoded path.** `.svg` is
+  excluded deliberately: it is a document that can carry script, and a browser
+  navigated to one directly will execute it. The check decodes first because
+  `req.path` does not, so a check written against the raw string reads `%2e%2e`
+  as an ordinary segment.
+- **The media directory's absence is a missing photograph, never a failed
+  boot.** A deployment that mounts nothing at `MEDIA_ROOT` simply has no
+  pictures.
+- **Pictures are copied into the media root, keyed by source product id.** Two
+  products in the export share a filename often enough that flattening would
+  silently give one of them the other's photograph; the id is the one thing
+  guaranteed unique.
+
+## Importing at full scale (phase 24)
+
+- **A description is capped at 2,000 characters as it arrives, not afterwards.**
+  That cap is also the memory bound on the import: 49,000 monographs held in
+  full while the products are written is the difference between a batch job and
+  an out-of-memory crash.
+- **`descriptions.csv` is streamed, because at scale it cannot be read.** ~4.1M
+  rows; `readFileSync` on the synthesised equivalent throws
+  `Cannot create a string longer than 0x1fffffe8 characters` rather than running
+  slowly. Verified against a synthetic full-scale bundle — 57,015 products,
+  4.1M description rows, 812 MB — completing in 62 seconds inside a 1 GB heap.
+  **The real 57k export has not been run**; the sample is 15 products.
+- **A tag with no closing `>` is stripped wherever text is cut.** One row of the
+  real sample ends `...</p>\n55:Tcad,<h` inside its quoted field — the exporter
+  truncated it mid-write — and capping a description can produce the same shape.

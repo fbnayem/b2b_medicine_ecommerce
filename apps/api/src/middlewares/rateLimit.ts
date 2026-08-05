@@ -123,6 +123,13 @@ export const writeRateLimit = () => rateLimit({ tier: 'write', max: env.RATE_LIM
 export const reportRateLimit = () => rateLimit({ tier: 'report', max: env.RATE_LIMIT_REPORT_MAX });
 
 /**
+ * Catalogue photographs. Generous, because they arrive a hundred to a page and
+ * cost a disk read each — and mostly do not arrive at all, since they are served
+ * immutable and a browser asks for a given picture once.
+ */
+export const mediaRateLimit = () => rateLimit({ tier: 'media', max: env.RATE_LIMIT_MEDIA_MAX });
+
+/**
  * Backstop applied to everything. Read endpoints are exempt from the narrower
  * tiers, so this is what keeps a runaway client from saturating the process.
  */

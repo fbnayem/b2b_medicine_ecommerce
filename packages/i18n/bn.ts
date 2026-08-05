@@ -229,6 +229,7 @@ export const bn: Catalogue = {
     listedInactive: 'এখন পাওয়া যাচ্ছে না',
     back: 'ওষুধের তালিকায় ফিরে যান',
     about: 'এই ওষুধ সম্পর্কে',
+    productType: 'পণ্যের ধরন',
     manufacturer: 'প্রস্তুতকারক',
     category: 'ধরন',
     classification: 'শ্রেণি',

@@ -14,13 +14,17 @@
  *     test fails on the stale waiver until it is struck off. The list can
  *     therefore only shrink, which is the whole point.
  *
- * At the time of writing: 150 routes, 69 covered by an integration test.
+ * The counts below are stated as figures rather than as prose because they are
+ * the burn-down, and a burn-down nobody can read the number off is a mood. At
+ * the time of writing: **187 routes, 112 covered by an integration test.**
+ * (The earlier "150 routes" in this comment was itself stale by 37 — the same
+ * drift that left `docs/openapi.json` describing 72 operations against 110.)
  */
 
 /**
  * Served, but absent from the OpenAPI document.
  *
- * 91 of 150. The document was hand-declared alongside the routers rather
+ * **77 of 187.** The document was hand-declared alongside the routers rather
  * than reflected off them, so it drifted; the reconciliation test now makes any
  * further drift fail the build.
  */
@@ -55,7 +59,6 @@ export const UNDOCUMENTED_ROUTES: readonly string[] = [
   'get /api/v1/payments/my-collections',
   'get /api/v1/reports/stock-movements',
   'get /api/v1/returns/credit-notes/:id',
-  'get /api/v1/shops/:id',
   'get /api/v1/users/me',
   'patch /api/v1/inventory/batches/:id/block',
   'patch /api/v1/inventory/medicines/:id',
@@ -108,7 +111,7 @@ export const UNDOCUMENTED_ROUTES: readonly string[] = [
 /**
  * Served, but no integration test reaches them.
  *
- * 81 of 150. Recorded live by `routeCoverageRecorder()` rather than inferred
+ * **75 of 187.** Recorded live by `routeCoverageRecorder()` rather than inferred
  * from test source, so a test that merely mentions a path in a string does not
  * count as covering it.
  */

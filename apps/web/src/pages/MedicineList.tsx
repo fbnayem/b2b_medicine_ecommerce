@@ -18,6 +18,17 @@ import {
 import { useApiCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
+import { mediaUrl } from '../api/config';
+
+/**
+ * The line under the name, built from whichever parts exist.
+ *
+ * It used to be `{genericName} · {dosageForm}` written out literally, which was
+ * right while the catalogue held nothing but drugs. A shampoo has neither, and
+ * that expression renders as a lone separator floating under the name — so the
+ * separator is now a consequence of there being two things to separate.
+ */
+const describe = (parts: (string | undefined)[]) => parts.filter(Boolean).join(' · ');
 
 /**
  * The catalogue, browsed as cards rather than rows because what a shop owner is
@@ -94,6 +105,7 @@ export function MedicineList() {
           <ul className="grid list-none grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-4 p-0">
             {page.items.map((medicine) => {
               const inStock = (medicine.totalAvailable ?? 0) > 0;
+              const picture = mediaUrl(medicine.productImageUrl);
               return (
                 <li key={medicine._id}>
                   <Card
@@ -108,16 +120,32 @@ export function MedicineList() {
                           : t('catalogue.listedInactive')}
                       </Badge>
                     </div>
+                    {picture && (
+                      /*
+                       * Decorative, so the alt text is empty: the brand name is
+                       * the next element and a screen reader announcing the
+                       * picture would read it twice. `contain` because these are
+                       * photographs of packaging at whatever aspect ratio the
+                       * supplier shot them, and cropping a box loses the part a
+                       * person recognises it by.
+                       */
+                      <img
+                        src={picture}
+                        alt=""
+                        loading="lazy"
+                        className="h-32 w-full rounded-md bg-surface-sunken object-contain"
+                      />
+                    )}
                     <h2 className="text-lg font-semibold text-text">
                       <Link className="text-brand underline" to={`/medicines/${medicine._id}`}>
-                        {medicine.brandName} {medicine.strength}
+                        {[medicine.brandName, medicine.strength].filter(Boolean).join(' ')}
                       </Link>
                     </h2>
                     <p className="text-text-muted">
-                      {medicine.genericName} · {medicine.dosageForm}
+                      {describe([medicine.genericName, medicine.dosageForm])}
                     </p>
                     <p className="text-sm text-text-muted">
-                      {medicine.manufacturer} · {medicine.packSize}
+                      {describe([medicine.manufacturer, medicine.packSize])}
                     </p>
                     <div className="mt-auto flex items-center justify-between gap-2 pt-2">
                       <strong className="tabular-nums text-text">

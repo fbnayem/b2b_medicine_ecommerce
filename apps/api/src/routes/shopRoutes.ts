@@ -36,7 +36,21 @@ router.post('/', requireRole(adminRoles as UserRole[]), createShop);
 // the shop-owner clients ask for.
 router.get('/my', requireRole([UserRole.SHOP_OWNER]), listShops);
 
-router.get('/:id', requireRole([...managementRoles, UserRole.SHOP_OWNER] as UserRole[]), getShop);
+/*
+ * And may open one of them.
+ *
+ * The list above was opened to `SALES` without this, so a rep saw their
+ * customers and could not tap one — the navigation offered the screen, the
+ * route refused it, and the person met an error with no way to tell whether the
+ * system was broken or they were not allowed. `getShop` applies the same
+ * territory rule the list does, so the detail is scoped exactly as tightly as
+ * the list that leads to it.
+ */
+router.get(
+  '/:id',
+  requireRole([...managementRoles, UserRole.SALES, UserRole.SHOP_OWNER] as UserRole[]),
+  getShop,
+);
 router.patch('/:id', requireRole(adminRoles as UserRole[]), updateShop);
 router.post('/:id/assign-owner', requireRole(adminRoles as UserRole[]), assignOwner);
 router.post('/:id/assign-manager', requireRole(adminRoles as UserRole[]), assignManager);

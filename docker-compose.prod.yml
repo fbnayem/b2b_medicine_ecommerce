@@ -108,6 +108,13 @@ services:
       APP_VERSION: ${APP_VERSION:-1.0.0}
       GIT_COMMIT: ${GIT_COMMIT:-unknown}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      MEDIA_ROOT: /app/var/media
+    volumes:
+      # Catalogue photography. A named volume rather than part of the image
+      # because the pictures outlive any one build and are refilled by the
+      # importer, not by a deploy — rebuilding the image must not empty the
+      # catalogue.
+      - media_data:/app/var/media
     depends_on:
       mongodb:
         condition: service_healthy
@@ -137,3 +144,4 @@ services:
 volumes:
   mongodb_data:
   redis_data:
+  media_data:

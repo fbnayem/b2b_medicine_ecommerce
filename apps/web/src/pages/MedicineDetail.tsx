@@ -15,6 +15,18 @@ import {
 import { useApiCollection, useApiResource } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
+import { mediaUrl } from '../api/config';
+
+/**
+ * Joins whichever parts of a description exist.
+ *
+ * The header used to interpolate `${genericName} · ${dosageForm} · ${packSize}`
+ * directly, which was correct while every row was a drug. Those two fields are
+ * now optional — a box of nappies has neither — and a template literal renders
+ * a missing one as the word "undefined" on the page.
+ */
+const describe = (parts: (string | undefined)[], separator = ' · ') =>
+  parts.filter(Boolean).join(separator);
 
 /** A label and its value, so the detail lists on every page line up the same way. */
 function Detail({ label, children }: { label: string; children: ReactNode }) {
@@ -78,17 +90,32 @@ export function MedicineDetail() {
           <>
             <PageHeader
               routeId="medicine-detail"
-              title={`${item.brandName} ${item.strength}`}
-              description={`${item.genericName} · ${item.dosageForm} · ${item.packSize}`}
+              title={describe([item.brandName, item.strength], ' ')}
+              description={describe([item.genericName, item.dosageForm, item.packSize])}
               actions={<LinkButton to="/medicines">{t('catalogue.back')}</LinkButton>}
             />
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
                 <h2 className="mb-2 text-lg font-semibold text-text">{t('catalogue.about')}</h2>
+                {mediaUrl(item.productImageUrl) && (
+                  // Empty alt: the packaging is here to be recognised, and every
+                  // word a screen reader could get from it is already in the
+                  // heading above and the list below.
+                  <img
+                    src={mediaUrl(item.productImageUrl)}
+                    alt=""
+                    className="mb-3 h-48 w-full rounded-md bg-surface-sunken object-contain"
+                  />
+                )}
                 <dl className="m-0">
                   <Detail label={t('common.reference')}>
                     {item.reference} · {item.sku}
                   </Detail>
+                  {item.productType && (
+                    <Detail label={t('catalogue.productType')}>
+                      {t(`productType.${item.productType}`)}
+                    </Detail>
+                  )}
                   <Detail label={t('catalogue.manufacturer')}>{item.manufacturer}</Detail>
                   <Detail label={t('catalogue.category')}>{item.category}</Detail>
                   <Detail label={t('catalogue.classification')}>{item.classification}</Detail>

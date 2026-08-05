@@ -59,6 +59,28 @@ const envSchema = z
     RATE_LIMIT_AUTH_MAX: positiveInt(10),
     RATE_LIMIT_WRITE_MAX: positiveInt(120),
     RATE_LIMIT_REPORT_MAX: positiveInt(60),
+    /**
+     * Catalogue photographs, which arrive in bulk: one page of the catalogue is
+     * a hundred of them against a handful of API calls. Its own tier because
+     * charging them to the global budget would let a catalogue page throttle
+     * the very screen that requested it.
+     */
+    RATE_LIMIT_MEDIA_MAX: positiveInt(1200),
+
+    /**
+     * Directory the catalogue's product photographs are read from, resolved
+     * against the process working directory when relative.
+     *
+     * Product artwork is a file, not a document: it is too large for Mongo to
+     * hold comfortably and too static to be worth a request through the
+     * application at all. The importer copies each picture in here and records
+     * the public path on the medicine, so the two halves — the bytes and the
+     * reference to them — are written by the same step and cannot disagree.
+     *
+     * A deployment that mounts nothing here simply has no pictures: the
+     * directory's absence is a missing photograph, never a failure to boot.
+     */
+    MEDIA_ROOT: z.string().trim().default('var/media'),
 
     /** Longest a report aggregation may occupy a database server thread. */
     DB_QUERY_TIMEOUT_MS: positiveInt(20_000, 300_000),

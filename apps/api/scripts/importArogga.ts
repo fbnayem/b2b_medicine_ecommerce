@@ -1,11 +1,12 @@
 import 'dotenv/config';
-import { resolve, join, sep, dirname } from 'node:path';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { resolve, join, dirname, basename } from 'node:path';
+import { copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import mongoose from 'mongoose';
 import { MedicineClassification, ProductType, UserRole } from '@medsupply/shared-types';
 import { CreateMedicineSchema } from '@medsupply/validation';
 import { env } from '../src/env';
+import { MEDIA_PREFIX, mediaRoot } from '../src/middlewares/media';
 import { Medicine } from '../src/models/Medicine';
 import { User } from '../src/models/User';
 import { nextReference } from '../src/models/Counter';
@@ -224,60 +225,165 @@ function mapProduct(product: SourceProduct, variant: SourceVariant): Mapped {
   };
 }
 
+// ─── Pictures ────────────────────────────────────────────────────────────────
+
+/**
+ * Copies a picture out of the bundle and into the media root, and returns the
+ * path a client should ask for.
+ *
+ * The bundle is not part of the deployment — it is gitignored, it arrives with
+ * the zip's own nesting intact, and it is several hundred megabytes at full
+ * scale. So the bytes are copied to somewhere the API actually serves from, and
+ * the medicine records where they landed. Recording a bundle-relative path
+ * instead is what the first version of this did, and it produced a catalogue
+ * full of `productImageUrl`s pointing at files no client could fetch.
+ *
+ * The destination keeps the source product id in the path. Two products in this
+ * export share a filename often enough that flattening would silently give one
+ * of them the other's photograph, and the id is the one thing guaranteed unique.
+ */
+function placeImage(
+  dataDirectory: string,
+  localPath: string,
+  productId: number,
+  apply: boolean,
+): string | undefined {
+  const source = join(dataDirectory, localPath);
+  if (!existsSync(source)) return undefined;
+
+  const file = basename(localPath);
+  const relative = `catalogue/arogga/${productId}/${file}`;
+  if (apply) {
+    const destination = join(mediaRoot, 'catalogue', 'arogga', String(productId), file);
+    mkdirSync(dirname(destination), { recursive: true });
+    copyFileSync(source, destination);
+  }
+  return `${MEDIA_PREFIX}/${relative}`;
+}
+
 // ─── Descriptions ────────────────────────────────────────────────────────────
 
 /**
- * RFC 4180, because the descriptions are HTML and HTML is full of commas.
+ * RFC 4180, a chunk at a time.
  *
- * `split(',')` would tear a description apart at the first comma inside a
- * quoted field, and a `<p>` tag spanning a newline would be read as a new row —
- * so the file has to be parsed properly rather than approximately. Quoted
- * fields, doubled quotes as an escape, embedded newlines, and `\r\n` folded.
+ * Two separate reasons this is not `split(',')` and not `readFileSync`.
+ *
+ * The descriptions are HTML, and HTML is full of commas and newlines — a naive
+ * split tears a monograph apart at the first comma inside a quoted field, and
+ * reads a `<p>` spanning a line as the start of a new row. So: quoted fields,
+ * doubled quotes as an escape, embedded newlines, `\r\n` folded.
+ *
+ * And at full scale the file is **~4.1 million rows**, which the first version
+ * of this read into a single string and then into a `string[][]` of every field
+ * in it. Both of those are hard failures rather than slow ones: the string
+ * exceeds V8's maximum length, and the array is tens of millions of objects.
+ * The reader is therefore fed chunks and hands each row straight to a callback,
+ * so nothing accumulates that the caller has not chosen to keep.
+ *
+ * The one subtlety is a `"` arriving as the last character of a chunk. Whether
+ * it closed the field or escaped a second quote depends on the character after
+ * it, which has not been read yet — so that decision is deferred rather than
+ * guessed.
  */
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
+function csvFeeder(onRow: (row: string[]) => void) {
   let row: string[] = [];
   let field = '';
   let quoted = false;
+  let pendingQuote = false;
 
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text[index]!;
-    if (quoted) {
-      if (character === '"') {
-        if (text[index + 1] === '"') {
+  const endField = () => {
+    row.push(field);
+    field = '';
+  };
+  const endRow = () => {
+    endField();
+    onRow(row);
+    row = [];
+  };
+
+  return {
+    push(text: string) {
+      let index = 0;
+      if (pendingQuote) {
+        pendingQuote = false;
+        if (text[0] === '"') {
           field += '"';
-          index += 1;
+          index = 1;
         } else {
           quoted = false;
         }
-      } else {
-        field += character;
       }
-      continue;
-    }
-    if (character === '"') quoted = true;
-    else if (character === ',') {
-      row.push(field);
-      field = '';
-    } else if (character === '\n') {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = '';
-    } else if (character !== '\r') field += character;
-  }
-  if (field || row.length) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows;
+      for (; index < text.length; index += 1) {
+        const character = text[index]!;
+        if (quoted) {
+          if (character !== '"') {
+            field += character;
+            continue;
+          }
+          if (index + 1 >= text.length) {
+            pendingQuote = true;
+            break;
+          }
+          if (text[index + 1] === '"') {
+            field += '"';
+            index += 1;
+          } else quoted = false;
+          continue;
+        }
+        if (character === '"') quoted = true;
+        else if (character === ',') endField();
+        else if (character === '\n') endRow();
+        else if (character !== '\r') field += character;
+      }
+    },
+    end() {
+      // A trailing quote with nothing after it closed its field.
+      pendingQuote = false;
+      quoted = false;
+      if (field || row.length) endRow();
+    },
+  };
 }
 
 /** The order the handoff gives for rebuilding a monograph. */
 const SECTION_ORDER = ['body', 'brief_description', 'overview', 'quick_tips', 'safety_advice'];
 
 /**
- * Long-form copy, read from the CSV rather than from the database.
+ * How much of a description the catalogue keeps.
+ *
+ * Also the memory bound on the import. A monograph is long, there are 49,000 of
+ * them, and holding all of them in full while the products are written is the
+ * difference between a batch job and an out-of-memory crash — so each one is
+ * stripped to text and capped as it arrives rather than after the file is read.
+ */
+const DESCRIPTION_LIMIT = 2000;
+
+/**
+ * A tag that never closes, which is what is left when text is cut mid-markup.
+ *
+ * One row of the sample export ends `...</p>\n55:Tcad,<h` inside its quoted
+ * field — the exporter truncated it mid-write — and `/<[^>]+>/` cannot strip a
+ * tag with no `>` to match. Capping a description can produce the same shape,
+ * so it is removed wherever text is cut rather than only where it was found.
+ */
+const DANGLING_TAG = /<[^>]*$/;
+
+/** Markup out, whitespace collapsed, the source's own name placeholder filled. */
+function readable(html: string, productName: string): string {
+  return (
+    html
+      // The source templates the product name out as `__NAME__`, which reads as
+      // a rendering bug if it reaches a screen.
+      .replaceAll('__NAME__', productName)
+      .replace(/<[^>]+>/g, ' ')
+      .replace(DANGLING_TAG, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
+/**
+ * Long-form copy, streamed from the CSV rather than read from the database.
  *
  * The handoff says to prefer `arogga.sqlite` because "it has the same data" —
  * it does not. The database's `seo_sections` table carries only `heading` and
@@ -285,41 +391,70 @@ const SECTION_ORDER = ['body', 'brief_description', 'overview', 'quick_tips', 's
  * instruction to filter to English cannot be followed from it: English and
  * Bengali arrive interleaved in one field. `descriptions.csv` has the shape the
  * handoff documents, so that is the file this reads.
+ *
+ * Only the products being imported are kept, so `--limit` bounds this too.
  */
-function loadDescriptions(dataDirectory: string, names: Map<number, string>): Map<number, string> {
+async function loadDescriptions(
+  dataDirectory: string,
+  names: Map<number, string>,
+): Promise<Map<number, string>> {
   const file = join(dataDirectory, 'descriptions.csv');
-  const byProduct = new Map<number, { section: string; title: string; content: string }[]>();
   if (!existsSync(file)) return new Map();
 
-  const rows = parseCsv(readFileSync(file, 'utf8'));
-  const header = rows.shift() ?? [];
-  const at = (name: string) => header.indexOf(name);
+  /**
+   * One slot per known section, plus a trailing slot for anything the handoff
+   * does not name. Slotting is what puts a monograph back in order without
+   * holding the sections to sort them afterwards; the extra slot is why an
+   * unrecognised section lands at the end rather than, as it used to, at the
+   * front on the strength of `indexOf` returning -1.
+   */
+  const slots = new Map<number, string[]>();
+  let header: string[] | null = null;
+  let column: Record<string, number> = {};
 
-  for (const row of rows) {
-    if (row.length < header.length) continue;
-    if (row[at('lang')] !== 'en') continue;
-    const productId = Number(row[at('product_id')]);
-    if (!productId) continue;
-    const list = byProduct.get(productId) ?? [];
-    list.push({
-      section: row[at('section')] ?? '',
-      title: row[at('title')] ?? '',
-      content: row[at('content')] ?? '',
-    });
-    byProduct.set(productId, list);
+  const feeder = csvFeeder((row) => {
+    if (!header) {
+      header = row;
+      column = Object.fromEntries(row.map((name, index) => [name, index]));
+      return;
+    }
+    if (row.length < header.length) return;
+    if (row[column.lang!] !== 'en') return;
+
+    const productId = Number(row[column.product_id!]);
+    const name = names.get(productId);
+    // Not in this run — either not a product, or excluded by `--limit`.
+    if (!productId || name === undefined) return;
+
+    const parts = slots.get(productId) ?? new Array<string>(SECTION_ORDER.length + 1).fill('');
+    const held = parts.reduce((total, part) => total + part.length, 0);
+    if (held >= DESCRIPTION_LIMIT) return;
+
+    const title = readable(row[column.title!] ?? '', name);
+    const content = readable(row[column.content!] ?? '', name);
+    const text = title ? `${title}: ${content}` : content;
+    if (!text) return;
+
+    const section = row[column.section!] ?? '';
+    const at = SECTION_ORDER.indexOf(section);
+    const slot = at < 0 ? SECTION_ORDER.length : at;
+    const room = text.slice(0, DESCRIPTION_LIMIT - held).replace(DANGLING_TAG, '');
+    parts[slot] = (parts[slot] ? `${parts[slot]}\n\n` : '') + room;
+    slots.set(productId, parts);
+  });
+
+  for await (const chunk of createReadStream(file, { encoding: 'utf8' })) {
+    feeder.push(chunk as string);
   }
+  feeder.end();
 
   const assembled = new Map<number, string>();
-  for (const [productId, sections] of byProduct) {
-    sections.sort((a, b) => SECTION_ORDER.indexOf(a.section) - SECTION_ORDER.indexOf(b.section));
-    const text = sections
-      .map((entry) => (entry.title ? `${entry.title}: ${entry.content}` : entry.content))
+  for (const [productId, parts] of slots) {
+    const text = parts
+      .filter(Boolean)
       .join('\n\n')
-      // The source templates the product name out as `__NAME__`, which reads as
-      // a rendering bug if it reaches a screen.
-      .replaceAll('__NAME__', names.get(productId) ?? '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
+      .slice(0, DESCRIPTION_LIMIT)
+      .replace(DANGLING_TAG, '')
       .trim();
     if (text) assembled.set(productId, text);
   }
@@ -419,9 +554,12 @@ async function main() {
     imagesByProduct.set(row.product_id, list);
   }
 
+  /** Everything the bundle references is relative to the database's own folder. */
+  const dataDirectory = dirname(SOURCE);
+
   const descriptions = WITH_DESCRIPTIONS
-    ? loadDescriptions(
-        dirname(SOURCE),
+    ? await loadDescriptions(
+        dataDirectory,
         new Map(products.map((product) => [product.product_id, product.name])),
       )
     : new Map<number, string>();
@@ -449,6 +587,8 @@ async function main() {
   const created: string[] = [];
   const updated: string[] = [];
   const needsReview: string[] = [];
+  const imagesMissing: string[] = [];
+  let imagesPlaced = 0;
   let noCostPrice = 0;
 
   for (const product of products) {
@@ -468,12 +608,20 @@ async function main() {
 
     const mapped = mapProduct(product, variant);
     if (WITH_DESCRIPTIONS && descriptions.has(product.product_id)) {
-      mapped.fields.description = descriptions.get(product.product_id)!.slice(0, 2000);
+      mapped.fields.description = descriptions.get(product.product_id)!;
     }
     if (WITH_IMAGES && primary?.local_path) {
-      // Bundle-relative, forward-slashed. Serving it is a separate step; this
-      // records which file belongs to which medicine so that step has an input.
-      mapped.fields.productImageUrl = primary.local_path.split(sep).join('/');
+      const served = placeImage(dataDirectory, primary.local_path, product.product_id, APPLY);
+      if (served) {
+        mapped.fields.productImageUrl = served;
+        imagesPlaced += 1;
+      } else {
+        // The database names a file the bundle does not contain. Counted rather
+        // than fatal — the row is still a product, it just has no photograph —
+        // but reported, because a bundle that has lost its images is worth
+        // knowing about before somebody blames the catalogue screen.
+        imagesMissing.push(`${product.product_id} ${primary.local_path}`);
+      }
     }
 
     // Assets go through the same schema as everything else. Bolting them on
@@ -548,9 +696,20 @@ async function main() {
     `    cost price is absent from the export; ${noCostPrice} rows take the trade price,`,
   );
   console.log(`    so margin reads as zero until a goods receipt supplies the real figure.`);
-  console.log(
-    `    images       : ${WITH_IMAGES ? 'attached from the bundle' : 'skipped (--no-images)'}`,
-  );
+  if (WITH_IMAGES) {
+    console.log(
+      `    images       : ${imagesPlaced} ${APPLY ? 'copied to' : 'would be copied to'} ${mediaRoot}`,
+    );
+    console.log(`                   served at ${MEDIA_PREFIX}/catalogue/arogga/<product>/<file>`);
+    if (imagesMissing.length) {
+      console.log(
+        `                   ${imagesMissing.length} named by the database but not present:`,
+      );
+      for (const line of imagesMissing) console.log(`                     ? ${line}`);
+    }
+  } else {
+    console.log(`    images       : skipped (--no-images)`);
+  }
   console.log(
     `    descriptions : ${WITH_DESCRIPTIONS ? "imported, lang='en'" : 'skipped (--no-descriptions)'}`,
   );

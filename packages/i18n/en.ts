@@ -257,6 +257,7 @@ export const en = {
     listedInactive: 'Not available',
     back: 'Back to the catalogue',
     about: 'About this medicine',
+    productType: 'Product type',
     manufacturer: 'Manufacturer',
     category: 'Category',
     classification: 'Classification',

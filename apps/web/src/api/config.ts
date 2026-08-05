@@ -19,3 +19,22 @@ export const apiBaseUrl = import.meta.env.VITE_API_URL ?? '/api/v1';
  * page's own origin, which is what a relative API base implies.
  */
 export const realtimeOrigin = /^https?:\/\//.test(apiBaseUrl) ? new URL(apiBaseUrl).origin : '';
+
+/**
+ * Where a product photograph actually lives.
+ *
+ * The catalogue stores `/media/catalogue/...` — a path, not a URL, because the
+ * API has no idea what origin it is reached on. In production that path is
+ * same-origin and needs nothing done to it; in development the web application
+ * is on 5173 and the API on 5000, so it needs the API's origin in front. The
+ * same value that already resolves the realtime channel resolves this, so a
+ * build cannot have the two disagree.
+ *
+ * A row whose picture is already an absolute URL — a hosted one, rather than
+ * one the importer placed — is left alone.
+ */
+export function mediaUrl(path: string | undefined): string | undefined {
+  if (!path) return undefined;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${realtimeOrigin}${path.startsWith('/') ? path : `/${path}`}`;
+}

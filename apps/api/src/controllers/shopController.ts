@@ -6,6 +6,7 @@ import { ShopStatus, UserRole } from '@medsupply/shared-types';
 import { User } from '../models/User';
 import { assertPriceListAssignable } from '../services/priceListService';
 import { containsFilter, escapeRegex } from '../services/requestSanitiser';
+import { territoryPermits } from '../services/onBehalfRules';
 
 /**
  * Turns the form's price-list field into what the document stores.
@@ -74,6 +75,27 @@ export const getShop = async (req: AuthRequest, res: Response, next: NextFunctio
       if (!isOwner) {
         return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Access denied' } });
       }
+    }
+
+    /*
+     * A rep may open the customers they may act for, and no others.
+     *
+     * The list is already filtered by exactly this rule, so without it here a
+     * rep could read any shop in the country by pasting its id — the list would
+     * be scoped and the detail behind it would not, which is the shape of
+     * scoping that only looks like scoping.
+     *
+     * `territoryPermits` rather than a second copy of the filter, for the same
+     * reason `listShops` mirrors it: the list, the detail and
+     * `decideOnBehalf`'s refusal must agree about which customers are theirs.
+     */
+    if (
+      req.user!.role === UserRole.SALES &&
+      !territoryPermits(req.user!.territories, shop.territory)
+    ) {
+      return res.status(403).json({
+        error: { code: 'SHOP_OUTSIDE_TERRITORY', message: 'That customer is not in your area' },
+      });
     }
 
     res.json({ data: shop });

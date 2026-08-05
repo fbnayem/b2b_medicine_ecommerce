@@ -1,11 +1,25 @@
 # Permissions Matrix
 
+> **This page is a summary, not the authority.** Who may call what is decided by
+> `requireRole` on the mounted routers, published in `docs/openapi.json`, and
+> reconciled against both the specification and the navigation package by
+> `routeCoverage.test.ts` and `navigationRules.test.ts`. Where this page and
+> those disagree, those are right — this one is hand-maintained and has been
+> wrong before. The tables below the role summary still describe six roles and
+> predate `SALES`.
+
 - **SUPER_ADMIN**: Full system access, settings, destructive actions (if any).
 - **ADMIN**: Access to shops, customers, inventory, orders, deliveries. Cannot change global system settings.
 - **MANAGER**: Review and approve orders, assign deliveries, manage credit limits, view reports.
-- **STOREKEEPER**: View approved orders, pick batches, pack orders, report discrepancies.
+- **STOREKEEPER**: Pick batches, pack orders, report discrepancies, count stock.
+  **Not the order book** — a pick list carries the lines to pick, and the order
+  behind it carries the customer's prices, credit terms and discounts.
 - **DELIVERY_PERSON**: View assigned deliveries, update delivery status, collect payments, capture POD.
-- **SHOP_OWNER**: View own shop, own orders, own invoices, create new order drafts, submit orders, view own ledger.
+- **SALES**: Take an order on behalf of a customer in their own territories, read
+  the customer list and one customer's record, read price lists and schemes to
+  quote from. No step in the return workflow, and no access to a customer's
+  ledger.
+- **SHOP_OWNER**: View own shop, own orders, own invoices, create new order drafts, submit orders, view own ledger, raise and track returns.
 
 ## Phase 3 catalogue and inventory
 

@@ -82,11 +82,20 @@ export const NAV_ITEMS: readonly NavItem[] = [
 
   // ── Work ──────────────────────────────────────────────────────────────────
   {
+    /*
+     * A rep works out of the order book; the list is scoped server-side.
+     *
+     * **Not `STOREKEEPER`.** They were offered this and `GET /api/v1/orders`
+     * has never admitted them, so the menu item opened onto a 403. The API is
+     * right and the menu was wrong: a storekeeper works from a pick list, and
+     * the order behind it carries the customer's prices, credit terms and
+     * discounts — commercial information that is not part of picking a box.
+     * `fulfilment` already gives them the lines.
+     */
     id: 'orders',
     label: 'Orders',
     path: '/orders',
-    // A rep works out of the order book; the list is scoped server-side.
-    roles: [...WAREHOUSE, UserRole.SALES, UserRole.SHOP_OWNER],
+    roles: [...MANAGEMENT, UserRole.SALES, UserRole.SHOP_OWNER],
     group: 'work',
     icon: 'orders',
   },
@@ -110,7 +119,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     id: 'order-detail',
     label: 'Order',
     path: '/orders/:id',
-    roles: [...WAREHOUSE, UserRole.SALES, UserRole.SHOP_OWNER],
+    // Follows `orders` above, for the same reason.
+    roles: [...MANAGEMENT, UserRole.SALES, UserRole.SHOP_OWNER],
     group: 'work',
     icon: 'orders',
     hidden: true,
@@ -214,10 +224,23 @@ export const NAV_ITEMS: readonly NavItem[] = [
     parent: 'trips',
   },
   {
+    /*
+     * Everybody with a step in the return workflow, which is everybody except
+     * a rep.
+     *
+     * This said `EVERYONE`, and `GET /api/v1/returns` admits six of the seven
+     * roles: a shop owner raises a return, management reviews and decides it, a
+     * rider collects it, the warehouse receives it. `SALES` has no step — they
+     * cannot even raise one on a customer's behalf, which is the thing a rep
+     * would most plausibly want to do — so offering them a menu item that 403s
+     * is the worst of both. Taking returns on behalf of a customer, the way
+     * orders already work, is a feature to decide on rather than a role to
+     * widen quietly.
+     */
     id: 'returns',
     label: 'Returns',
     path: '/returns',
-    roles: EVERYONE,
+    roles: [...WAREHOUSE, UserRole.DELIVERY_PERSON, UserRole.SHOP_OWNER],
     group: 'work',
     icon: 'returns',
   },
@@ -225,7 +248,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     id: 'return-detail',
     label: 'Return',
     path: '/returns/:id',
-    roles: EVERYONE,
+    // Follows `returns` above, for the same reason.
+    roles: [...WAREHOUSE, UserRole.DELIVERY_PERSON, UserRole.SHOP_OWNER],
     group: 'work',
     icon: 'returns',
     hidden: true,

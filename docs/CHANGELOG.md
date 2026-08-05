@@ -1,5 +1,151 @@
 # Changelog
 
+## Phase 24 — the pictures, the specification, and the menu
+
+Three things this project believed were true and were not, each found by
+building the gate rather than by reading the code again.
+
+### The catalogue import recorded pictures nobody could fetch
+
+The Arogga import wrote a `productImageUrl` on all fifteen products. The bytes
+stayed in the supplier bundle — gitignored, outside the deployment — and the API
+served no files at all, so every one of those paths pointed at nothing.
+
+`MEDIA_ROOT` is now a configured directory the importer copies into and the API
+serves at `/media`, unauthenticated: both clients render these through an
+ordinary image loader, and neither a browser's nor React Native's can attach a
+bearer token. What is not relaxed is _what_ may be served — a raster-extension
+allow-list checked on the decoded path, so an HTML file dropped into the media
+directory cannot become a page executing on the API's origin. Proved by putting
+one there next to a picture that is served.
+
+Two traps in that, both silent. `securityHeaders()` sets `no-store` on every
+response before any route sees it and `send` will not replace a Cache-Control
+that is already present, so `express.static`'s `maxAge` is accepted and ignored;
+and setting the header any earlier caches a **404** for a year. Both are
+asserted.
+
+### The importer could not have run at full scale
+
+`descriptions.csv` was read whole into one string. That file is ~4.1 million
+rows at the documented scale, and `readFileSync` on 812 MB does not run slowly —
+it throws `Cannot create a string longer than 0x1fffffe8 characters`. The reader
+is now fed chunks and hands each row straight to a callback, with the per-product
+text stripped and capped as it arrives rather than after the file is read.
+
+Measured against a synthesised full-scale bundle — 57,015 products, 4.1M
+description rows, 812 MB — the whole import completes in **62 seconds inside a
+1 GB heap**. One row of the real sample also ends `...</p>\n55:Tcad,<h` inside
+its quoted field: the exporter truncated it mid-write, and `/<[^>]+>/` cannot
+strip a tag with no `>` to close it.
+
+### `docs/openapi.json` described 72 operations; the source declared 110
+
+Thirty-seven endpoints — including every one added across the last four phases —
+existed in the API and nowhere in the document anybody integrating against it
+would read. Nothing noticed because every assertion about the specification was
+made against `buildOpenApiDocument()`, the live object, which is never stale.
+
+Gating it turned up why it had gone stale twice: **the document was not
+reproducible.** `z.toJSONSchema` evaluates a Zod default to produce a JSON Schema
+one, which is right for `.default(30)` and wrong for `.default(() => new Date())`
+— two request bodies were publishing the moment of the build as a contract
+default, so every regeneration produced a diff that meant nothing. Both gates are
+proved by planting: drift, and non-determinism.
+
+### A fifth reconciliation: the menu against the router
+
+Three separate hand discoveries of one defect class — a rider who could not open
+the delivery board that is their entire job, a rep whose order-entry picker
+returned 403, and four more found by sampling twelve of sixty navigation entries
+— is the argument for a gate. `navigationRules.test.ts` reconciles what each
+screen offers against what `requireRole` admits, screen by screen and mobile tab
+by mobile tab. It found five conflicts, and they did not all resolve the same
+way:
+
+- **`STOREKEEPER` → Orders and Order detail.** The API was right. A storekeeper
+  works from a pick list; the order behind it carries the customer's prices,
+  credit terms and discounts. The menu was narrowed.
+- **`SALES` → Returns.** The API was right, and for a reason worth stating: a rep
+  has no step in the return workflow and cannot even raise one on a customer's
+  behalf. Offering the menu item was the worst of both. Taking returns on behalf,
+  the way orders already work, is a feature to decide on — not a role to widen
+  quietly.
+- **`SALES` → Shop detail.** The menu was right. `GET /shops` was opened to reps
+  last week, so a rep could see their customers and not tap one. `GET /shops/{id}`
+  now admits them, scoped by `territoryPermits` exactly as the list is — a list
+  that is scoped behind a detail that is not is scoping that only looks like
+  scoping.
+
+Undocumented waivers 78 → 77; the header counts in that file were themselves
+stale by 37 and now state 187 routes, 112 covered.
+
+## Phase 23 — the journeys people actually take
+
+The features existed; the screens did not, or existed somewhere nobody stands.
+
+- **Order entry**, and a patch that stopped deleting fields it was not asked
+  about. `SALES` and order-on-behalf had been on the server since phase 8 with no
+  client able to use them.
+- **A rep can see their own customers.** `GET /shops` was management-only, so the
+  role added specifically to take orders for somebody else could not list a
+  single shop. The list is territory-scoped by the same rule the submission
+  enforces, so a picker cannot offer a choice the server will reject.
+- **A rep can take an order on the phone they carry** — the mobile order-entry
+  screen, deliberately not a port of the keyboard-driven web one, with the
+  customer asked for first and remembered, and offline refused out loud rather
+  than queued unpriced.
+- **Picking by scan**, and a queue that remembers where you were working.
+- **Roles reconciled between the specification and the router.** Seventeen
+  endpoints disagreed. Sixteen were the document; the seventeenth was
+  `GET /inventory/medicines` excluding `SALES`, which broke both order-entry
+  screens at the first thing a rep does.
+- **The shop owner's own journey documented** — twelve endpoints a customer uses
+  end to end, none of which appeared in the published specification.
+- **A catalogue that can describe something other than a tablet.** Generic name,
+  strength and dosage form are conditional on `classification` rather than
+  required on every row, so a distributor can stock a box of nappies without
+  inventing clinical data for it.
+
+## Phases 8–13 — the commercial model and the operations around it
+
+- **Phase 8: MRP, price lists, and somebody who can take a phone order.** The
+  volume that actually arrives in this trade comes by phone; every order route
+  was `SHOP_OWNER`-only and there was no sales role.
+- **Bonus schemes.** "10+1" is the standard promotional instrument here and the
+  model could not express it at all.
+- **The commercial model, reachable by somebody other than curl.** Three of the
+  gaps were not "no screen yet" but genuinely unreachable code — `mrpMinor` was
+  on the model, in the shared types and read by `marginBasisPoints`, and absent
+  from the validation schema, so it could never be set.
+- **Phase 10: purchasing, recall and the controlled register made reachable.**
+  All built in phase 6, all integration-tested, and in none of the 51 navigation
+  items — including the two screens that exist because the operation is
+  DGDA-inspected.
+- **Phase 11: warehouses, blind stocktakes, and delivery rounds** — a count is
+  one event over many batches approved and posted once, not a series of
+  single-batch adjustments; and the day's work was the thing missing from
+  delivery, which is why riders planned rounds on paper.
+- **The rider's round on the phone, in sequence.**
+- **Phase 13: an issued document says what it said.** `currencyCode` and
+  `currencySymbol` were administrable, and every document rendered through them —
+  so changing either restated every invoice ever issued, including ones a
+  customer is holding on paper.
+
+## Design system and localisation — one visual language, then a gate
+
+Phases 3 to 5 built UI primitives, a token package and a translation catalogue,
+and then almost nothing used them: no page used the table primitive, none called
+`toast()`, none called the translation function, and 34 mobile files carried raw
+hex including both brand greens the token package exists to collapse. Every web
+page and every mobile screen moved onto the system, and skipping it now fails the
+build.
+
+The localisation settings were in the same state — `currencyCode` and
+`dateFormat` persisted, validated, returned by `/settings/branding`, rendered in
+the settings screen, and read by no formatter at all. Choosing `YYYY-MM-DD`
+changed nothing anywhere.
+
 ## Road to production, phase 7 — documents and the operational floor
 
 The audit that opened this phase was run from a customer's chair rather than an

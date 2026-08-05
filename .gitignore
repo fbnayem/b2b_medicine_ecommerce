@@ -17,6 +17,11 @@ yarn.lock
 # Route-coverage recording, written by the integration suites.
 apps/api/.route-coverage.log
 
+# Product photography, copied out of a supplier bundle by the catalogue import
+# and served from `/media`. Content, not source: a deployment mounts a volume
+# here, and the importer refills it.
+apps/api/var/
+
 # Playwright
 test-results/
 playwright-report/

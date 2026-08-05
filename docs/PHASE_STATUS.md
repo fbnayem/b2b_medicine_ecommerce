@@ -940,3 +940,64 @@ strip ObjectIds from route labels.
 
 The CSV byte-order-mark finding was wrong: `toCsv` already emits `U+FEFF` and
 `csvMinor` already uses integer arithmetic.
+
+## Phase 23 — The journeys people actually take
+
+**Status:** COMPLETED
+
+The features existed and the screens did not, or existed somewhere nobody
+stands. Order entry on the web, then on the phone a rep actually carries.
+`GET /shops` opened to `SALES` — the role added specifically to take orders for
+somebody else could not list a single shop — territory-scoped by the same rule
+`decideOnBehalf` enforces, so the picker cannot offer a customer the submission
+will refuse. Picking by scan, and a queue that remembers where you were working.
+The roles in the specification reconciled against the roles the router enforces,
+which found seventeen disagreements, one of which was a live defect:
+`GET /inventory/medicines` excluded `SALES`, so both order-entry screens opened
+with a search box that answered 403 for the only role they were built for.
+
+The catalogue learned to describe something other than a tablet: generic name,
+strength and dosage form are conditional on `classification` rather than
+required on every row, and a supplier export of fifteen products — six medicines,
+seven personal care, one baby care, one herbal — imported end to end.
+
+## Phase 24 — Pictures, the specification, and the menu
+
+**Status:** COMPLETED
+
+Three things believed true and not, each found by building the gate rather than
+by reading the code again.
+
+- **Product photography is served.** `MEDIA_ROOT` is a configured directory the
+  catalogue import copies into and the API serves at `/media` — unauthenticated,
+  raster-only, on its own rate-limit tier, cached immutably for a year. Before
+  this, every `productImageUrl` the import wrote pointed at a file no client
+  could fetch.
+- **The importer survives the full export.** `descriptions.csv` was read whole
+  into one string, which at the documented ~4.1M rows throws rather than running
+  slowly. Streamed now, and measured against a synthesised full-scale bundle:
+  57,015 products, 812 MB, 62 seconds inside a 1 GB heap.
+- **`docs/openapi.json` is gated.** It described 72 operations while the source
+  declared 110. Gating it exposed why: the document was not reproducible, because
+  two request bodies published the moment of the build as a contract default.
+- **The menu is reconciled against the router.** A fifth reconciliation, and the
+  first that looks at a client. Five conflicts, resolved in both directions.
+
+### Verified
+
+API 169 unit, 133 integration, 5 reconciliation; web 199; mobile 93 logic and 33
+render. `pnpm -r typecheck` clean; lint clean apart from seven pre-existing
+fast-refresh warnings in files this phase did not touch. Every new gate proved by
+planting the defect it claims to catch.
+
+### Known limitations
+
+- The real 57,000-product export has not been run. The scale figures above come
+  from a synthesised bundle of the documented shape; the sample is 15 products.
+- `productImageUrl` is rendered on the web catalogue list and detail. The mobile
+  order-entry search rows still show text only.
+- Cost price is absent from the supplier export, so imported rows report a zero
+  margin until a goods receipt supplies the real figure.
+- Still open from the go-live list: SMS provider procurement, an
+  `ERROR_REPORTING_DSN` adapter, and a scheduled backup — `backup.ts` exists and
+  nothing runs it on a timer.

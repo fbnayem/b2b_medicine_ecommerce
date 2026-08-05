@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import bcrypt from 'bcrypt';
 import {
   containsFilter,
@@ -217,6 +219,65 @@ test('the OpenAPI document describes every declared operation and its permission
       assert.ok(responses[status], `status ${status} is documented`);
     }
   }
+});
+
+/**
+ * The workspace root, found by walking up for the pnpm workspace file. This
+ * test runs from `dist/`, so a path relative to the file points at build output.
+ */
+function workspaceRoot(from: string): string {
+  let directory = from;
+  while (!existsSync(resolve(directory, 'pnpm-workspace.yaml'))) {
+    const parent = dirname(directory);
+    if (parent === directory) throw new Error(`Could not find the workspace root from ${from}`);
+    directory = parent;
+  }
+  return directory;
+}
+
+test('the specification is reproducible, so a diff of it means something', () => {
+  /*
+   * Two builds of the same source must be byte-identical. They were not:
+   * `z.toJSONSchema` evaluates a Zod default to produce a JSON Schema one, and
+   * two request bodies default a timestamp to `new Date()` — so the document
+   * carried the moment it was generated, every regeneration produced a diff
+   * that meant nothing, and the gate below could never have been green.
+   *
+   * Asserted separately from the file comparison because the two fail for
+   * different reasons and the difference is the whole diagnosis: this one red
+   * means the generator is non-deterministic, that one means somebody forgot to
+   * run it.
+   */
+  assert.equal(JSON.stringify(buildOpenApiDocument()), JSON.stringify(buildOpenApiDocument()));
+});
+
+test('the committed specification is the one this build would produce', () => {
+  /*
+   * `docs/openapi.json` is a generated artefact that is committed on purpose —
+   * a specification change is a contract change, and reviewing it as a diff is
+   * the point. Which only works if the file in the repository is the file the
+   * code produces.
+   *
+   * It was not. The committed document described **72** operations while the
+   * source declared **109**: thirty-seven endpoints, including every one added
+   * across the last four phases, existed in the API and not in the document
+   * anybody integrating against it would read. Nothing noticed, because until
+   * now every assertion about the specification was made against
+   * `buildOpenApiDocument()` — the live object, which is never stale by
+   * construction — and none against the file.
+   *
+   * `ROAD_TO_PRODUCTION.md` records this same file going stale once before,
+   * which is the argument for a gate rather than another regeneration.
+   */
+  const path = resolve(workspaceRoot(__dirname), 'docs/openapi.json');
+  const expected = `${JSON.stringify(buildOpenApiDocument(), null, 2)}\n`;
+
+  assert.ok(existsSync(path), `${path} is missing; run \`pnpm --filter @medsupply/api openapi\``);
+  assert.equal(
+    readFileSync(path, 'utf8'),
+    expected,
+    'docs/openapi.json is out of date — run `pnpm --filter @medsupply/api openapi` and commit the result',
+  );
 });
 
 test('the specification carries the request schemas the server actually enforces', () => {

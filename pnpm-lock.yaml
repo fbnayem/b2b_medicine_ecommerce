@@ -35,6 +35,9 @@ importers:
       '@medsupply/jurisdictions':
         specifier: workspace:^
         version: link:../../packages/jurisdictions
+      '@medsupply/navigation':
+        specifier: workspace:^
+        version: link:../../packages/navigation
       '@medsupply/shared-types':
         specifier: workspace:^
         version: link:../../packages/shared-types
