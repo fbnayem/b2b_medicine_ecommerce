@@ -364,6 +364,22 @@ export const AdjustmentSchema = z.object({
   idempotencyKey: z.string().trim().min(8).max(120),
 });
 
+/**
+ * Taking a batch out of circulation, or putting it back.
+ *
+ * One of four writes this API validated by hand, and it is the one that ships
+ * its first caller this phase. The hand-written version checked
+ * `typeof reason === 'string'` and a length of three — the same rule as every
+ * other reason field, restated — and answered a generic sentence for either
+ * mistake. A schema says which field was wrong and, more usefully, is the thing
+ * `docs/openapi.json` is generated from, so the endpoint stops being documented
+ * as taking no body at all.
+ */
+export const BatchBlockSchema = z.object({
+  blocked: z.boolean(),
+  reason: z.string().trim().min(3).max(500),
+});
+
 export const AllocationSchema = z.object({
   medicineId: z.string().min(1),
   quantity: positiveQuantity,

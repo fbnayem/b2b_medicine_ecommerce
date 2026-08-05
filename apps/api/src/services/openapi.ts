@@ -45,6 +45,7 @@ import {
   SettingsUpdateSchema,
   SubmitOrderSchema,
   AdjustmentSchema,
+  BatchBlockSchema,
   AdminSessionRevokeSchema,
   AllocationSchema,
   CreditReservationBackfillSchema,
@@ -319,8 +320,9 @@ export const OPERATIONS: Operation[] = [
     summary: 'Block or unblock a batch from being allocated',
     tag: 'Inventory',
     roles: MANAGEMENT,
-    // No schema: this handler validates `blocked` and `reason` by hand. See
-    // the note on hand-validated bodies in `docs/TESTING.md`.
+    // Was hand-validated, and is documented from its schema now — this phase
+    // ships the endpoint's first caller anywhere.
+    body: BatchBlockSchema,
   },
   {
     method: 'post',

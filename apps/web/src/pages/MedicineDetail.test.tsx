@@ -90,6 +90,24 @@ function serve(url: string) {
         ],
       },
     };
+  if (url.startsWith('/pricing/schemes'))
+    return {
+      data: {
+        data: [
+          {
+            _id: 'scheme-1',
+            reference: 'SCH-2026-000001',
+            name: 'Napa 10+1',
+            medicineId: 'med-1',
+            buyQuantity: 10,
+            freeQuantity: 1,
+            shopIds: [],
+            isActive: true,
+            version: 1,
+          },
+        ],
+      },
+    };
   // Two lists, only one of which names this medicine.
   return {
     data: {

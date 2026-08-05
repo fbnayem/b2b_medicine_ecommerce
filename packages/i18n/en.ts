@@ -336,6 +336,8 @@ export const en = {
     aboveMrp: 'The price cannot be above the price printed on the pack.',
     onPriceLists: 'Price lists carrying this',
     noPriceLists: 'No price list names this medicine, so every shop pays the price above.',
+    offers: 'Free-goods offers',
+    noOffers: 'No offer is running on this medicine.',
     history: 'Stock history',
     receiveInto: 'This stock goes against {{brand}}.',
     correctCount: 'Correct the count',

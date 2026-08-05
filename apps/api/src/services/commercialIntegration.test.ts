@@ -833,3 +833,64 @@ test('an MRP can be set, and a trade price above it is refused', async () => {
   );
   assert.equal((await Medicine.findById(medicine._id))?.defaultSellingPriceMinor, 700);
 });
+
+test('offers can be asked for one medicine at a time', async () => {
+  /*
+   * The filter a medicine's own page needs.
+   *
+   * Two-sided deliberately: the filtered page must **hold** this medicine's
+   * offer and **not hold** the other medicine's. Asserting only the first would
+   * pass for a filter that quietly ignores its argument and returns everything.
+   *
+   * Last in the file, and phrased against membership rather than counts,
+   * because the scheme tests above leave offers behind and a count would then
+   * be a statement about the order these run in.
+   */
+  await api('POST', '/api/v1/pricing/schemes', manager._id, {
+    name: 'Ace 5+1 filter fixture',
+    medicineId: String(listedMedicineId),
+    buyQuantity: 5,
+    freeQuantity: 1,
+  });
+  await api('POST', '/api/v1/pricing/schemes', manager._id, {
+    name: 'Napa 10+1 filter fixture',
+    medicineId: String(medicineId),
+    buyQuantity: 10,
+    freeQuantity: 1,
+  });
+
+  type Page = { items: Array<{ name: string; medicineId: string }> };
+  const names = (page: Page) => page.items.map((row) => row.name);
+
+  const everything = payload<Page>(
+    await api('GET', '/api/v1/pricing/schemes?limit=100', manager._id),
+  );
+  assert.ok(names(everything).includes('Ace 5+1 filter fixture'));
+  assert.ok(names(everything).includes('Napa 10+1 filter fixture'));
+
+  const forAce = payload<Page>(
+    await api(
+      'GET',
+      `/api/v1/pricing/schemes?limit=100&medicineId=${listedMedicineId}`,
+      manager._id,
+    ),
+  );
+  assert.ok(names(forAce).includes('Ace 5+1 filter fixture'));
+  assert.equal(
+    names(forAce).includes('Napa 10+1 filter fixture'),
+    false,
+    'the filter returned an offer for a different medicine, so it is not filtering',
+  );
+  for (const row of forAce.items) {
+    assert.equal(row.medicineId, String(listedMedicineId));
+  }
+
+  /*
+   * A malformed id is a client mistake, and an empty page is the right answer
+   * to one. Handing it straight to Mongoose throws a cast error, which reaches
+   * the reader as a 500 on a page that merely asked what offers were running.
+   */
+  const nonsense = await api('GET', '/api/v1/pricing/schemes?medicineId=not-an-id', manager._id);
+  assert.equal(nonsense.status, 200);
+  assert.equal(payload<Page>(nonsense).items.length, 0);
+});

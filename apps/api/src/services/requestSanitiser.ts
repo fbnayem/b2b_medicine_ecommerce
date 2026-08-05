@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 /**
  * Protection against NoSQL injection and prototype pollution.
  *
@@ -111,3 +112,16 @@ export function escapeRegex(input: string, maxLength = 80): string {
 export function containsFilter(input: string) {
   return { $regex: escapeRegex(input), $options: 'i' };
 }
+
+/**
+ * A query value that is only usable as a Mongo id, or nothing.
+ *
+ * This lived in `inventoryController` and is now needed by pricing as well.
+ * Copying it would have been the smaller diff and the worse one: the whole
+ * point is that an id-shaped filter is validated identically everywhere, and
+ * two copies is how one of them ends up missing the `isValid` check and
+ * throwing a cast error on `?medicineId=nonsense` instead of answering with an
+ * empty page.
+ */
+export const objectIdParam = (value: unknown): string | undefined =>
+  typeof value === 'string' && Types.ObjectId.isValid(value) ? value : undefined;

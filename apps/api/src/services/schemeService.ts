@@ -232,13 +232,29 @@ export interface ListSchemesOptions {
   page?: number;
   limit?: number;
   activeOnly?: boolean;
+  /**
+   * Every offer running on one medicine.
+   *
+   * A scheme is already scoped to exactly one — `Scheme.medicineId` is required
+   * and singular — so the only thing missing was a way to ask. Without it, a
+   * medicine's own page would have to read every offer in the tenant and filter
+   * in the browser, which is a page that gets slower as the business grows and
+   * wrong the moment the first page of offers fills up.
+   */
+  medicineId?: string;
 }
 
 /** Every offer, each naming the medicine it runs on rather than its id. */
 export async function listSchemes(options: ListSchemesOptions = {}) {
   const page = Math.max(1, options.page ?? 1);
   const limit = Math.min(100, Math.max(1, options.limit ?? 25));
-  const filter = options.activeOnly ? { isActive: true } : {};
+  const filter: Record<string, unknown> = options.activeOnly ? { isActive: true } : {};
+  /*
+   * Validated as an id before it reaches Mongoose. An unparseable value yields
+   * an empty page rather than a cast error — `?medicineId=nonsense` is a client
+   * mistake, and a 500 is the wrong answer to one.
+   */
+  if (options.medicineId) filter.medicineId = options.medicineId;
 
   const [items, total] = await Promise.all([
     Scheme.find(filter)

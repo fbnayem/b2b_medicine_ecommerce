@@ -8,6 +8,7 @@ import {
 } from '@medsupply/shared-types';
 import {
   AdjustmentSchema,
+  BatchBlockSchema,
   AllocationSchema,
   CreateMedicineSchema,
   ReceiveStockSchema,
@@ -30,7 +31,7 @@ import {
 } from '../services/inventoryService';
 import { inventorySettings } from '../services/settingsService';
 import { correlationId } from '../services/logger';
-import { escapeRegex } from '../services/requestSanitiser';
+import { escapeRegex, objectIdParam } from '../services/requestSanitiser';
 import { emitEntityUpdate } from '../services/realtime';
 
 const COST_ROLES = new Set<UserRole>([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER]);
@@ -81,9 +82,6 @@ const actor = (req: AuthRequest) => ({
  * a filter built from one either matches by equality or is left out, and can
  * never become an operator object or a value Mongoose will refuse to cast.
  */
-const objectIdParam = (value: unknown): string | undefined =>
-  typeof value === 'string' && Types.ObjectId.isValid(value) ? value : undefined;
-
 /** A query value that is only ever compared as a string. */
 const stringParam = (value: unknown): string | undefined =>
   typeof value === 'string' && value.length > 0 && value.length <= 120 ? value : undefined;
@@ -337,28 +335,21 @@ export async function adjust(req: AuthRequest, res: Response, next: NextFunction
 
 export async function setBatchBlock(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (
-      typeof req.body.blocked !== 'boolean' ||
-      typeof req.body.reason !== 'string' ||
-      req.body.reason.trim().length < 3
-    )
-      return res.status(400).json({
-        error: { code: 'VALIDATION_FAILED', message: 'Blocked flag and reason are required' },
-      });
+    const data = BatchBlockSchema.parse(req.body);
     const batch = await MedicineBatch.findByIdAndUpdate(
       req.params.id,
-      { isBlocked: req.body.blocked, notes: req.body.reason },
+      { isBlocked: data.blocked, notes: data.reason },
       { new: true },
     );
     if (!batch)
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Batch not found' } });
     await audit(
       req,
-      req.body.blocked ? 'BATCH_BLOCKED' : 'BATCH_UNBLOCKED',
+      data.blocked ? 'BATCH_BLOCKED' : 'BATCH_UNBLOCKED',
       'MedicineBatch',
       batch._id,
       undefined,
-      { isBlocked: batch.isBlocked, reason: req.body.reason },
+      { isBlocked: batch.isBlocked, reason: data.reason },
     );
     // Blocking removes the batch from what can be sold, so the availability
     // every other screen shows is wrong until they hear about it.

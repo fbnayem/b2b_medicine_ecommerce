@@ -6,6 +6,7 @@ import {
   type Medicine,
   type MedicineBatch,
   type PriceListRecord,
+  type SchemeRecord,
 } from '@medsupply/shared-types';
 import { parseMoney, toMoneyInputValue } from '@medsupply/utilities';
 import { apiClient, errorMessage } from '../api/client';
@@ -210,6 +211,20 @@ export function MedicineDetail() {
   const priceLists = useApiCollection<PriceListRecord>(
     keys.priceLists.list({ forMedicine: true }),
     '/pricing/price-lists?limit=50',
+    { enabled: showCommercial },
+  );
+  /*
+   * The offers running on this line.
+   *
+   * A scheme has always been scoped to exactly one medicine — `medicineId` is
+   * required and singular — and the only thing missing was a way to ask for
+   * them by it. Without the filter this page would have to read every offer in
+   * the tenant and sift them in the browser: slower as the business grows, and
+   * simply wrong once the first page of offers fills up.
+   */
+  const schemes = useApiCollection<SchemeRecord>(
+    keys.schemes.list({ medicineId: id }),
+    `/pricing/schemes?medicineId=${id}&limit=25`,
     { enabled: showCommercial },
   );
 
@@ -709,6 +724,55 @@ export function MedicineDetail() {
                       })}
                     </ul>
                   )}
+                </Section>
+              )}
+
+              {showCommercial && (
+                <Section
+                  id="offers"
+                  title={t('medicinePage.offers')}
+                  actions={
+                    mayEdit && (
+                      <LinkButton size="sm" to="/pricing/schemes/new">
+                        {t('schemes.add')}
+                      </LinkButton>
+                    )
+                  }
+                >
+                  <Resource
+                    query={schemes}
+                    loadingLabel={t('medicinePage.offers')}
+                    errorMessageFallback={t('lists.couldNotLoad')}
+                    empty={<EmptyState title={t('medicinePage.noOffers')} />}
+                  >
+                    {(page) => (
+                      <ul className="m-0 list-none p-0">
+                        {page.items.map((scheme) => (
+                          <li
+                            key={scheme._id}
+                            className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border py-2 last:border-b-0"
+                          >
+                            <div>
+                              <p className="font-medium text-text">{scheme.name}</p>
+                              <p className="text-sm text-text-muted">
+                                {t('schemes.buyGet', {
+                                  buy: scheme.buyQuantity,
+                                  free: scheme.freeQuantity,
+                                })}
+                                {' · '}
+                                {scheme.shopIds.length === 0
+                                  ? t('schemes.everyCustomer')
+                                  : t('schemes.namedCustomers', { count: scheme.shopIds.length })}
+                              </p>
+                            </div>
+                            <Badge tone={scheme.isActive ? 'success' : 'neutral'}>
+                              {scheme.isActive ? t('common.active') : t('common.inactive')}
+                            </Badge>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Resource>
                 </Section>
               )}
 

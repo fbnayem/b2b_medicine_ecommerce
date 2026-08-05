@@ -15,6 +15,7 @@ import {
   updatePriceList,
 } from '../services/priceListService';
 import { createScheme, getScheme, listSchemes, updateScheme } from '../services/schemeService';
+import { objectIdParam } from '../services/requestSanitiser';
 
 /**
  * The commercial terms a distributor sets: what customers pay, and what they
@@ -79,7 +80,36 @@ export async function patchPriceList(req: AuthRequest, res: Response, next: Next
 
 export async function getSchemes(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    res.json({ data: await listSchemes(pagination(req)) });
+    /*
+     * The medicine filter belongs here and not in `pagination`, which price
+     * lists also use: a price list carries many medicines, so `?medicineId=` on
+     * that endpoint would either be ignored or mean something different. One
+     * shared helper answering two different questions is how a filter comes to
+     * be silently dropped.
+     */
+    const options = pagination(req);
+    const asked = req.query.medicineId;
+    if (asked === undefined) {
+      res.json({ data: await listSchemes(options) });
+      return;
+    }
+
+    const medicineId = objectIdParam(asked);
+    /*
+     * Asked for, and unusable.
+     *
+     * Dropping the filter here would answer a question about one medicine with
+     * every offer in the tenant — the most misleading of the three possible
+     * replies, and worse than the cast error that handing it straight to
+     * Mongoose would raise. Nothing matches an id that cannot exist, so nothing
+     * is what comes back.
+     */
+    if (!medicineId) {
+      res.json({ data: { items: [], total: 0, page: options.page, limit: options.limit } });
+      return;
+    }
+
+    res.json({ data: await listSchemes({ ...options, medicineId }) });
   } catch (error) {
     next(error);
   }
