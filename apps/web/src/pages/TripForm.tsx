@@ -9,12 +9,15 @@ import {
   EmptyState,
   ErrorState,
   Field,
+  FormNotice,
   Input,
   LinkButton,
   PageHeader,
+  Resource,
   Select,
   Textarea,
   toast,
+  type FormProblem,
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
@@ -27,12 +30,31 @@ interface Rider {
   activeDeliveries?: number;
 }
 
+/** Stable ids, so the validation notice can carry the reader to the control. */
+const RIDER_FIELD = 'trip-rider';
+const DAY_FIELD = 'trip-day';
+const STOPS_PANEL = 'trip-available';
+
 /**
  * Planning a round.
  *
  * Two lists rather than a multi-select: **the order matters**, and a
  * multi-select cannot express it. What is chosen appears in the sequence it
  * will be driven in, which is the whole point of the screen.
+ *
+ * Two things this screen got wrong, both about telling the truth.
+ *
+ * It answered its own validation with the red "Something went wrong" card, so a
+ * round with no stops on it yet was reported as a malfunction — and in one
+ * sentence covering three separate requirements, which does not tell somebody
+ * who has already chosen a rider and a day which of the three they are missing.
+ * That is `FormNotice` now, one problem at a time, each offering to take you to
+ * the thing it is about.
+ *
+ * And it rendered "Nothing is waiting to go on a round" for **three different
+ * facts**: the list is loading, the list failed to load, and the list is
+ * genuinely empty. A failed request reading as "there is nothing here" is the
+ * worst of the three, because the reader has no reason to doubt it.
  */
 export function TripForm() {
   const navigate = useNavigate();
@@ -45,6 +67,12 @@ export function TripForm() {
   const [notes, setNotes] = useState('');
   const [chosen, setChosen] = useState<PlannableDelivery[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  /*
+   * Which submit attempt this is, rather than the problems themselves. The list
+   * is derived below so it shrinks as the form is filled in; this is what moves
+   * the cursor, and it changes only when somebody presses the button.
+   */
+  const [attempt, setAttempt] = useState(0);
   const [failure, setFailure] = useState<{ message: string; reference?: string }>();
 
   const available = useApiResource<PlannableDelivery[]>(
@@ -54,6 +82,21 @@ export function TripForm() {
 
   const chosenIds = new Set(chosen.map((delivery) => delivery._id));
   const offered = (available.data ?? []).filter((delivery) => !chosenIds.has(delivery._id));
+
+  const chosenRider = (riders.data ?? []).find((rider) => rider._id === deliveryPersonId);
+  /*
+   * Nothing to plan **with**, as distinct from nothing chosen yet. The whole
+   * screen is a dead end in that case: no sequence of actions on it produces a
+   * round, so saying it once at the top beats letting somebody pick a vehicle
+   * and type notes before finding out.
+   */
+  const nothingToPlan =
+    available.isSuccess && !deliveryPersonId && (available.data ?? []).length === 0;
+
+  const problems: FormProblem[] = [];
+  if (!deliveryPersonId) problems.push({ message: t('trips.needRider'), focus: RIDER_FIELD });
+  if (!tripDate) problems.push({ message: t('trips.needDay'), focus: DAY_FIELD });
+  if (chosen.length === 0) problems.push({ message: t('trips.needStops'), focus: STOPS_PANEL });
 
   function move(index: number, by: number) {
     const next = [...chosen];
@@ -66,10 +109,9 @@ export function TripForm() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     setFailure(undefined);
-    if (!deliveryPersonId || !tripDate || chosen.length === 0) {
-      setFailure({ message: t('trips.needRiderAndStops') });
-      return;
-    }
+
+    setAttempt((count) => count + 1);
+    if (problems.length > 0) return;
 
     setSubmitting(true);
     try {
@@ -105,9 +147,27 @@ export function TripForm() {
       <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
         {failure && <ErrorState message={failure.message} reference={failure.reference} />}
 
+        {/*
+          Said before anything is filled in, not after. With no delivery
+          assigned to anybody there is no round to be planned, and letting
+          somebody pick a vehicle and type notes before telling them that is a
+          waste of their afternoon.
+        */}
+        {nothingToPlan && (
+          <EmptyState
+            title={t('trips.nothingToPlanTitle')}
+            description={t('trips.nothingToPlanBody')}
+            action={<LinkButton to="/deliveries">{t('trips.goToDeliveries')}</LinkButton>}
+          />
+        )}
+
+        {riders.isError && <ErrorState message={t('trips.ridersFailed')} />}
+
+        {attempt > 0 && <FormNotice problems={problems} focusKey={attempt} />}
+
         <Card>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label={t('trips.rider')} required>
+            <Field label={t('trips.rider')} required id={RIDER_FIELD}>
               <Select
                 required
                 value={deliveryPersonId}
@@ -126,7 +186,7 @@ export function TripForm() {
                 ))}
               </Select>
             </Field>
-            <Field label={t('trips.day')} required>
+            <Field label={t('trips.day')} required id={DAY_FIELD}>
               <Input
                 type="date"
                 required
@@ -147,40 +207,66 @@ export function TripForm() {
         </Card>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
+          {/*
+            `tabIndex={-1}` so the validation notice can bring the reader here.
+            A panel is the honest target for "add at least one stop": the thing
+            to act on is the list inside it, not any one control.
+          */}
+          <Card id={STOPS_PANEL} tabIndex={-1}>
             <h2 className="mb-2 text-lg font-semibold text-text">{t('trips.available')}</h2>
-            {offered.length === 0 ? (
-              <EmptyState
-                title={t('trips.availableNone')}
-                description={t('trips.availableNoneBody')}
-              />
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {offered.map((delivery) => (
-                  <li
-                    key={delivery._id}
-                    className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2"
-                  >
-                    <div>
-                      <p className="font-medium text-text">{delivery.reference}</p>
-                      <p className="text-sm text-text-muted">
-                        {entityReference(delivery.shopId)} · {delivery.addressSnapshot?.line1},{' '}
-                        {delivery.addressSnapshot?.city}
-                        {delivery.expectedDeliveryDate
-                          ? ` · ${formatFinanceDate(delivery.expectedDeliveryDate)}`
-                          : ''}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={() => setChosen((current) => [...current, delivery])}
-                    >
-                      {t('trips.addStop')}
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <Resource
+              query={available}
+              loadingLabel={t('trips.availableLoading')}
+              errorMessageFallback={t('trips.availableFailed')}
+              // The panel decides emptiness from `offered`, which excludes what
+              // is already on the round; `Resource` would only see the payload.
+              isEmpty={() => false}
+            >
+              {() =>
+                offered.length === 0 ? (
+                  <EmptyState
+                    title={
+                      chosenRider
+                        ? t('trips.availableNoneForRider', {
+                            rider: `${chosenRider.firstName} ${chosenRider.lastName}`,
+                          })
+                        : t('trips.availableNone')
+                    }
+                    description={
+                      chosenRider
+                        ? t('trips.availableNoneForRiderBody')
+                        : t('trips.availableNoneBody')
+                    }
+                  />
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {offered.map((delivery) => (
+                      <li
+                        key={delivery._id}
+                        className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2"
+                      >
+                        <div>
+                          <p className="font-medium text-text">{delivery.reference}</p>
+                          <p className="text-sm text-text-muted">
+                            {entityReference(delivery.shopId)} · {delivery.addressSnapshot?.line1},{' '}
+                            {delivery.addressSnapshot?.city}
+                            {delivery.expectedDeliveryDate
+                              ? ` · ${formatFinanceDate(delivery.expectedDeliveryDate)}`
+                              : ''}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => setChosen((current) => [...current, delivery])}
+                        >
+                          {t('trips.addStop')}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              }
+            </Resource>
           </Card>
 
           <Card>

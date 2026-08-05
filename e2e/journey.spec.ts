@@ -109,3 +109,41 @@ test.describe('money is rendered the same way everywhere', () => {
     });
   }
 });
+
+test.describe('a form that is not finished is not a malfunction', () => {
+  /*
+   * The screenshot this was written from: a rider chosen, a day chosen, notes
+   * typed, and a red "Something went wrong" card. Nothing had gone wrong — the
+   * round simply had no stops on it yet, and the form reported that in the same
+   * words, colour and tone it uses for an unreachable database.
+   *
+   * The assertion is deliberately about which of the two states appears, not
+   * about the wording. `error-state` is what the screen sweep reads as "this
+   * page is broken", so a form waiting to be filled in must never raise it.
+   */
+  test('planning a round with no stops asks, rather than alarms', async ({ page }) => {
+    await signIn(page, 'manager');
+    await page.goto('/deliveries/trips/new');
+    await expectPageRendered(page);
+
+    // Nothing has been submitted, so neither state belongs on screen yet.
+    await expect(page.getByTestId('form-notice')).toHaveCount(0);
+
+    /*
+     * A rider first, because the select carries the native `required` attribute
+     * and the browser refuses to submit without it — so the application's own
+     * validation is never reached. This is the state the screenshot was taken
+     * in: rider chosen, day prefilled, no stops.
+     */
+    await page.getByLabel(/which rider/i).selectOption({ index: 1 });
+    await page.getByRole('button', { name: /plan this round/i }).click();
+
+    await expect(page.getByTestId('form-notice')).toBeVisible();
+    await expect(page.getByTestId('error-state')).toHaveCount(0);
+    await expect(page.locator('#root')).not.toContainText(/something went wrong/i);
+
+    // Each requirement named separately, so somebody who has already chosen a
+    // rider can see which of them is the one they have not met.
+    await expect(page.getByTestId('form-notice').getByRole('listitem')).not.toHaveCount(0);
+  });
+});

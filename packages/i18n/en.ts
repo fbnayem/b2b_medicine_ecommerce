@@ -222,6 +222,18 @@ export const en = {
     outstanding: 'Outstanding',
   },
 
+  /**
+   * A form that is not finished being filled in.
+   *
+   * Separate from `errors` on purpose. Nothing here describes a malfunction —
+   * it describes a form that still needs something, which is an ordinary part
+   * of filling one in and should not be worded as a fault.
+   */
+  forms: {
+    notReady: 'This is not ready to be saved yet',
+    takeMeThere: 'Take me there',
+  },
+
   /** Lists, tables and the things said around them. */
   lists: {
     searchPlaceholder: 'Search…',
@@ -1374,13 +1386,30 @@ export const en = {
     remaining: 'Still to do',
     settled: 'Done',
     available: 'Waiting to be delivered',
+    availableLoading: 'Loading what is waiting',
+    availableFailed: 'What is waiting to be delivered could not be loaded.',
     availableNone: 'Nothing is waiting to go on a round.',
     availableNoneBody: 'Deliveries appear here once a package has been assigned to a rider.',
+    /*
+     * The list is filtered by the chosen rider, and the old wording did not say
+     * so — a screen that shows nothing while another rider has six stops is
+     * telling the truth about the query and a lie about the business.
+     */
+    availableNoneForRider: 'Nothing is waiting for {{rider}}.',
+    availableNoneForRiderBody:
+      'This shows only deliveries already assigned to the rider you chose. Another rider may have some.',
+    ridersFailed: 'The riders could not be loaded, so a round cannot be planned right now.',
+    nothingToPlanTitle: 'There is nothing to plan a round with yet',
+    nothingToPlanBody:
+      'A round groups deliveries that have already been assigned to a rider. Assign one on the Deliveries screen and it will appear here.',
+    goToDeliveries: 'Go to Deliveries',
     addStop: 'Add to the round',
     removeStop: 'Take off the round',
     chosen: 'On this round',
     chosenNone: 'No stops yet. Add them from the list on the left.',
-    needRiderAndStops: 'Choose a rider, a day, and at least one stop.',
+    needRider: 'Choose which rider is making this round.',
+    needDay: 'Choose which day this round is for.',
+    needStops: 'Add at least one stop from the list of deliveries waiting.',
     planned: 'Round {{reference}} planned.',
     planFailed: 'That round could not be planned.',
     savePlan: 'Plan this round',
@@ -1722,7 +1751,8 @@ export const en = {
     removeLine: 'Remove this line',
     chooseMedicine: 'Which medicine',
     quantity: 'How many',
-    needSupplierAndLine: 'Choose a supplier and at least one medicine with a quantity.',
+    needSupplier: 'Choose which supplier this order goes to.',
+    needLine: 'Add at least one medicine with a quantity.',
     orderRaised: 'Purchase order {{reference}} raised.',
     orderFailed: 'That purchase order could not be raised.',
     newOrderTitle: 'Raise a purchase order',

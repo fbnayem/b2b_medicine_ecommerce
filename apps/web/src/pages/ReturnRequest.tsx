@@ -9,16 +9,21 @@ import {
   EmptyState,
   ErrorState,
   Field,
+  FormNotice,
   LinkButton,
   PageHeader,
   Resource,
   Select,
   Textarea,
   type Column,
+  type FormProblem,
 } from '../components/ui';
 import { useApiCollection, useApiResource } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { createActionKey, formatFinanceDate, formatMinor } from '../lib/finance';
+
+/** Stable id, so the validation notice can carry the reader to the lines. */
+const LINES_PANEL = 'return-lines';
 
 interface InvoiceOption {
   _id: string;
@@ -53,6 +58,8 @@ export function ReturnRequest() {
   const [shopNotes, setShopNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [failure, setFailure] = useState<{ message: string; reference?: string }>();
+  /** Which submit attempt this is; see `FormNotice`. */
+  const [attempt, setAttempt] = useState(0);
 
   const invoices = useApiCollection<InvoiceOption>(
     ['my-invoices', 'returnable'],
@@ -99,22 +106,28 @@ export function ReturnRequest() {
     0,
   );
 
+  /*
+   * Not filled in yet is not the same fact as the request being refused, and
+   * this form used to report both with the red "Something went wrong" card.
+   */
+  const overLimit = selected.find(({ line, entry }) => Number(entry.quantity) > line.quantity);
+  const problems: FormProblem[] = [];
+  if (!selected.length) problems.push({ message: t('returns.needQuantity'), focus: LINES_PANEL });
+  if (overLimit) {
+    problems.push({
+      message: t('returns.tooMany', {
+        maximum: overLimit.line.quantity,
+        brand: overLimit.line.medicineSnapshot.brandName,
+      }),
+      focus: LINES_PANEL,
+    });
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!selected.length) {
-      setFailure({ message: t('returns.needQuantity') });
-      return;
-    }
-    const overLimit = selected.find(({ line, entry }) => Number(entry.quantity) > line.quantity);
-    if (overLimit) {
-      setFailure({
-        message: t('returns.tooMany', {
-          maximum: overLimit.line.quantity,
-          brand: overLimit.line.medicineSnapshot.brandName,
-        }),
-      });
-      return;
-    }
+    setAttempt((count) => count + 1);
+    if (problems.length > 0) return;
+
     setSubmitting(true);
     setFailure(undefined);
     try {
@@ -247,6 +260,7 @@ export function ReturnRequest() {
           <Card>
             <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
               {failure && <ErrorState message={failure.message} reference={failure.reference} />}
+              {attempt > 0 && <FormNotice problems={problems} focusKey={attempt} />}
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label={t('returns.invoice')} required>
@@ -279,23 +293,25 @@ export function ReturnRequest() {
               </div>
 
               {invoiceId && (
-                <Resource
-                  query={invoice}
-                  loadingLabel={t('returns.loadingLines')}
-                  errorMessageFallback={t('returns.couldNotLoadLines')}
-                  isEmpty={(data) => (data.items ?? []).length === 0}
-                  empty={<EmptyState title={t('returns.noLines')} />}
-                >
-                  {() => (
-                    <DataTable
-                      caption={t('returns.requestTitle')}
-                      columns={columns}
-                      rows={lines}
-                      rowKey={lineId}
-                      rowTest={(line) => line.batchNumber}
-                    />
-                  )}
-                </Resource>
+                <div id={LINES_PANEL} tabIndex={-1}>
+                  <Resource
+                    query={invoice}
+                    loadingLabel={t('returns.loadingLines')}
+                    errorMessageFallback={t('returns.couldNotLoadLines')}
+                    isEmpty={(data) => (data.items ?? []).length === 0}
+                    empty={<EmptyState title={t('returns.noLines')} />}
+                  >
+                    {() => (
+                      <DataTable
+                        caption={t('returns.requestTitle')}
+                        columns={columns}
+                        rows={lines}
+                        rowKey={lineId}
+                        rowTest={(line) => line.batchNumber}
+                      />
+                    )}
+                  </Resource>
+                </div>
               )}
 
               <Field label={t('returns.notesForSupplier')}>

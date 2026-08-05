@@ -1,5 +1,62 @@
 # Changelog
 
+## Phase 26 — a form that is not finished is not a malfunction
+
+One screenshot: the round-planning form with a rider chosen, a day chosen, notes
+typed, and a red **"Something went wrong — Choose a rider, a day, and at least
+one stop."** Nothing had gone wrong. The round had no stops on it yet, and the
+form said so in the words, the colour and the tone it uses for an unreachable
+database.
+
+### Validation stopped wearing the failure card
+
+Four hand-rolled forms did this — planning a round, raising a purchase order,
+requesting a return, adding a shop. They now use `FormNotice`: warning-toned
+rather than danger-toned, with each requirement listed separately instead of
+concatenated into one sentence, and each able to carry the reader to the control
+it is about. "Choose a rider, a day, and at least one stop" does not tell
+somebody who has already chosen two of the three which one is missing.
+
+The list is derived from form state rather than captured at submit, so it shrinks
+as the form is filled in. Focus follows a submit counter, not the list, so
+correcting one problem does not yank the cursor away from the field being typed
+in. `role="alert"` **and** focus, following the GOV.UK error summary.
+
+The rest of the round form was fixed at the same time. Its availability list
+rendered "Nothing is waiting to go on a round" for **three different facts** —
+loading, failed, and genuinely empty — and the failed case is the worst, because
+the reader has no reason to doubt it. It reads through `Resource` now. The list
+is filtered by the chosen rider and never said so, so a screen showing nothing
+while another rider had six stops was telling the truth about the query and a lie
+about the business. And when no delivery is assigned to anybody there is no round
+to be planned at all: the screen says that at the top, with a link to where the
+work actually starts, rather than after somebody has picked a vehicle and typed
+notes.
+
+### Every error card in the browser was English
+
+`ErrorState` defaulted its title to the literal `'Something went wrong'`, its
+button to `'Try again'` and its support line to `'Quote this reference if you
+contact support'`. `LoadingState` said `'Loading'`. `Resource` and `DataTable`
+said `'Nothing to show yet'`.
+
+All six sentences have existed in Bangla in `packages/i18n` since the localisation
+phase, and `apps/mobile/src/components/Feedback.tsx` has always read them — the
+same component, in the same product, translated on a phone and not in a browser.
+Nothing caught it: `catalogueKeys.test.ts` checks that every key a component
+_asks for_ exists, which says nothing about a component that never asks. No
+missing key, no type error, no lint warning — just a language toggle with no
+effect on the one surface a confused user stops to read.
+
+`apps/web/src/testing/uiStrings.test.ts` is the gate, proved by restoring
+`title = 'Something went wrong'` and watching it name both the string and the
+file. `e2e/journey.spec.ts` freezes the screenshot's own scenario: submitting the
+round form with no stops must raise `form-notice` and must not raise
+`error-state`, proved by planting the old `ErrorState` and watching it go red.
+
+**Tests:** web 235 (28 files), browser 100, API 169 unit / 192 integration / 5
+reconciliation, mobile 93. Typecheck, lint and build clean.
+
 ## Phase 25 — what the screenshots actually were
 
 Four screens were reported broken. The real number was fourteen, the cause was

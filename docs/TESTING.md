@@ -71,12 +71,30 @@ an address the server has never served, and swallowing the 404 — so the
 administrative password field always used the floor of eight rather than the
 configured minimum.
 
-### The other two gates added with it
+### The other gates added alongside it
 
 | Gate                                         | Catches                                                                                                       | Proved by                                          |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | `apps/web/src/testing/orphanClasses.test.ts` | A class name no stylesheet declares and Tailwind cannot generate — across `pages/`, `components/` and `app/`. | Restoring `className="bell-panel"`.                |
 | `apps/web/src/testing/apiPaths.test.ts`      | A path the web app requests that `docs/openapi.json` does not serve.                                          | Renaming `/trips` to `/delivery-rounds` in a page. |
+| `apps/web/src/testing/uiStrings.test.ts`     | An English sentence written as a literal in `components/ui`, where the reader's language should decide it.    | Restoring `title = 'Something went wrong'`.        |
+
+`uiStrings` was added in phase 26 for a defect nothing else could see. `ErrorState`
+defaulted its title to the literal `'Something went wrong'`, its button to `'Try
+again'` and its support line to `'Quote this reference if you contact support'`;
+`LoadingState` said `'Loading'`; `Resource` and `DataTable` said `'Nothing to show
+yet'`. Every one of those sentences had a Bangla translation sitting unused in
+`packages/i18n`, and `apps/mobile/src/components/Feedback.tsx` was already reading
+it — so the same component was translated on a phone and not in a browser.
+`catalogueKeys.test.ts` checks that every key a component _asks for_ exists, which
+says nothing about a component that never asks: there was no missing key, no type
+error and no lint warning, only a language toggle that had no effect on the one
+surface a confused user stops to read.
+
+The rule is narrow deliberately — `components/ui` only, and only prose of two or
+more words where a reader would see it. A broader "no English anywhere" sweep
+would drown in `data-test` values, ARIA tokens and class names, and a gate that
+mostly cries wolf is a gate somebody deletes.
 
 `orphanClasses` is the one that matters most, because it is the gate the
 existing `uiDiscipline.test.ts` should have been: that file globs `../pages/*.tsx`

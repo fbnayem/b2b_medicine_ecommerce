@@ -8,12 +8,14 @@ import {
   Card,
   ErrorState,
   Field,
+  FormNotice,
   Input,
   LinkButton,
   PageHeader,
   Select,
   Textarea,
   toast,
+  type FormProblem,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
@@ -35,6 +37,10 @@ const units = (value: string) => {
   return digits ? Number(digits) : 0;
 };
 
+/** Stable ids, so the validation notice can carry the reader to the control. */
+const SUPPLIER_FIELD = 'purchase-order-supplier';
+const LINES_PANEL = 'purchase-order-lines';
+
 export function PurchaseOrderForm() {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
@@ -52,6 +58,8 @@ export function PurchaseOrderForm() {
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [submitting, setSubmitting] = useState(false);
   const [failure, setFailure] = useState<{ message: string; reference?: string }>();
+  /** Which submit attempt this is; see `FormNotice`. */
+  const [attempt, setAttempt] = useState(0);
 
   /** Money is the typed string until submit, then integer minor units. */
   const minor = (value: string) => {
@@ -64,19 +72,24 @@ export function PurchaseOrderForm() {
   const patch = (key: number, next: Partial<Line>) =>
     setLines((current) => current.map((line) => (line.key === key ? { ...line, ...next } : line)));
 
+  const filled = lines.filter((line) => line.medicineId && units(line.quantity) > 0);
+
+  /*
+   * Derived rather than captured at submit, so the notice shrinks as the form
+   * is filled in instead of going on naming a problem that has been fixed.
+   */
+  const problems: FormProblem[] = [];
+  if (!supplierId) problems.push({ message: t('purchasing.needSupplier'), focus: SUPPLIER_FIELD });
+  if (filled.length === 0) problems.push({ message: t('purchasing.needLine'), focus: LINES_PANEL });
+  if (filled.some((line) => line.unitCost && !parseMoney(line.unitCost).ok)) {
+    problems.push({ message: t('purchasing.badAmount'), focus: LINES_PANEL });
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     setFailure(undefined);
-
-    const filled = lines.filter((line) => line.medicineId && units(line.quantity) > 0);
-    if (!supplierId || filled.length === 0) {
-      setFailure({ message: t('purchasing.needSupplierAndLine') });
-      return;
-    }
-    if (filled.some((line) => line.unitCost && !parseMoney(line.unitCost).ok)) {
-      setFailure({ message: t('purchasing.badAmount') });
-      return;
-    }
+    setAttempt((count) => count + 1);
+    if (problems.length > 0) return;
 
     setSubmitting(true);
     try {
@@ -116,9 +129,10 @@ export function PurchaseOrderForm() {
       <Card className="max-w-4xl">
         <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
           {failure && <ErrorState message={failure.message} reference={failure.reference} />}
+          {attempt > 0 && <FormNotice problems={problems} focusKey={attempt} />}
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t('purchasing.supplier')} required>
+            <Field label={t('purchasing.supplier')} required id={SUPPLIER_FIELD}>
               <Select
                 required
                 value={supplierId}
@@ -151,7 +165,7 @@ export function PurchaseOrderForm() {
             </Field>
           </div>
 
-          <div className="flex flex-col gap-3">
+          <div id={LINES_PANEL} tabIndex={-1} className="flex flex-col gap-3">
             {lines.map((line) => (
               <div key={line.key} className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr_auto]">
                 <Field label={t('purchasing.chooseMedicine')}>

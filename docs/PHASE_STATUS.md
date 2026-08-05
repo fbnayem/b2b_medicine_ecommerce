@@ -1106,3 +1106,78 @@ seven pre-existing fast-refresh warnings in files not touched here.
 The three gates hold the ground this phase recovered. Go-live items remain as
 listed in Phase 24: SMS provider procurement, an `ERROR_REPORTING_DSN` adapter,
 and a scheduled backup.
+
+## Phase 26 — A form that is not finished is not a malfunction
+
+### Status
+
+Complete.
+
+### Scope
+
+One screenshot: the round-planning form answering its own validation with the
+red "Something went wrong" card. The investigation found the same pattern on
+four forms, and — while reading the primitive they all reach for — that the whole
+web application's error, loading and empty wording was English regardless of the
+chosen language.
+
+### Files created
+
+- `apps/web/src/components/ui/Feedback.test.tsx` — 7 tests over `FormNotice`,
+  `ErrorState` and `LoadingState`.
+- `apps/web/src/testing/uiStrings.test.ts` — the gate for an English sentence
+  written as a literal in `components/ui`.
+
+### Files modified
+
+- `apps/web/src/components/ui/Feedback.tsx` — `FormNotice` added; `ErrorState`
+  and `LoadingState` read their defaults from the catalogue.
+- `apps/web/src/components/ui/Resource.tsx`, `DataTable.tsx` — likewise.
+- `apps/web/src/components/ui/Field.tsx` — an optional stable `id`, so a
+  validation summary can name the control it is talking about.
+- `apps/web/src/pages/TripForm.tsx` — validation, the three states of the
+  availability list, the rider-scoped empty wording, and the nothing-to-plan
+  case.
+- `apps/web/src/pages/PurchaseOrderForm.tsx`, `ReturnRequest.tsx`,
+  `ShopForm.tsx` — validation moved off the failure card.
+- `packages/i18n/en.ts`, `bn.ts` — a `forms` section; the round and purchase-order
+  catch-all sentences split into one message per requirement.
+- `apps/web/src/testing/uiWaivers.ts` — `UNTRANSLATED_PRIMITIVES`, empty.
+- `e2e/journey.spec.ts` — the screenshot's own scenario, frozen.
+- `docs/TESTING.md`, `docs/ASSUMPTIONS.md`, `docs/CHANGELOG.md`.
+
+### Tests added
+
+`Feedback.test.tsx` (7), `uiStrings.test.ts` (4), `journey.spec.ts` (1).
+
+### Gates proved by planting the defect
+
+- `uiStrings.test.ts` — restoring `title = 'Something went wrong'` and the
+  literal `Try again`; it named both strings and the file.
+- `journey.spec.ts` — restoring `ErrorState` as the round form's validation
+  surface; it went red on `form-notice` not being visible.
+
+### Test results
+
+Web 235 (28 files). Browser 100. API 169 unit, 192 integration, 5
+reconciliation. Mobile 93. Typecheck, lint and build clean apart from the seven
+pre-existing fast-refresh warnings in files not touched here.
+
+### Known limitations
+
+- `uiStrings.test.ts` covers `components/ui` only, and only prose of two or more
+  words. A single-word literal — `'Loading'` was one — is not distinguishable
+  from an identifier by regex, so it is caught by the primitive's own test
+  rather than by the sweep.
+- Roughly ten forms still report a submit guard through `toast.error`. Those are
+  mostly inside dialogs, where a toast is defensible, and they were left alone
+  rather than converted speculatively; the four that used the red failure card
+  were the defect.
+- The round form's `needRider` problem is unreachable through the submit button,
+  because the select carries the native `required` attribute and the browser
+  refuses first. It is kept as the second line, not removed.
+
+### Next phase dependencies
+
+None. Go-live items remain as listed in Phase 24: SMS provider procurement, an
+`ERROR_REPORTING_DSN` adapter, and a scheduled backup.

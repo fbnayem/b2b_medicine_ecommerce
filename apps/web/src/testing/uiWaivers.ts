@@ -94,3 +94,20 @@ export const UNTRANSLATED: readonly string[] = [];
  * shipped.
  */
 export const ORPHAN_CLASSES: readonly string[] = [];
+
+/**
+ * Shared primitives still writing an English sentence a reader would see.
+ *
+ * Empty, and it starts empty, for the same reason `ORPHAN_CLASSES` does: the
+ * six sentences this gate was written for — "Something went wrong", "Try
+ * again", "Quote this reference if you contact support", "Loading", "Nothing to
+ * show yet", "This could not be loaded." — were all fixed in the change that
+ * added the rule. Every one of them had a Bangla translation sitting unused in
+ * `packages/i18n`, and `apps/mobile` was already reading it.
+ *
+ * The list exists so the seventh fails the build. Nothing else can see this
+ * defect: a component that never asks the catalogue for a word produces no
+ * missing key, no type error and no lint warning — only a language toggle that
+ * quietly does not apply to the sentence a confused user has stopped to read.
+ */
+export const UNTRANSLATED_PRIMITIVES: readonly string[] = [];

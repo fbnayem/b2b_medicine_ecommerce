@@ -32,7 +32,10 @@ export interface ResourceProps<T> {
   children: (data: T) => ReactNode;
   /** What is being waited for, in the user's words rather than the route's. */
   loadingLabel?: string;
-  /** Sentence shown when the request fails, before the server's own message. */
+  /**
+   * Sentence shown when the request fails, before the server's own message.
+   * Defaults to the catalogue's "This could not be loaded."
+   */
   errorMessageFallback?: string;
   /** Rendered instead of `children` when the payload has nothing in it. */
   empty?: ReactNode;
@@ -53,14 +56,14 @@ export function Resource<T>({
   query,
   children,
   loadingLabel,
-  errorMessageFallback = 'This could not be loaded.',
+  errorMessageFallback,
   empty,
   isEmpty = looksEmpty,
 }: ResourceProps<T>) {
   // The resolved language, so a failure is explained in the language the user
   // is reading. `errorMessage` consults the catalogue before the server's own
   // wording, because the server writes for a developer.
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   // `isPending` rather than `isFetching`: the second is true during a
   // background revalidation, and using it here is what makes a screen blink.
@@ -69,7 +72,11 @@ export function Resource<T>({
   if (query.isError) {
     return (
       <ErrorState
-        message={errorMessage(query.error, language, errorMessageFallback)}
+        message={errorMessage(
+          query.error,
+          language,
+          errorMessageFallback ?? t('lists.couldNotLoad'),
+        )}
         reference={failureReference(query.error)}
         onRetry={() => void query.refetch()}
       />
@@ -77,7 +84,7 @@ export function Resource<T>({
   }
 
   if (isEmpty(query.data)) {
-    return <>{empty ?? <EmptyState title="Nothing to show yet" />}</>;
+    return <>{empty ?? <EmptyState title={t('common.nothingHere')} />}</>;
   }
 
   return <>{children(query.data)}</>;

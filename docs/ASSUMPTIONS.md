@@ -401,3 +401,53 @@ reads a decision rather than guesses at an intention.
   Nine list screens fetched the server's default page — twenty rows for orders —
   and displayed exactly that with no indication anything followed. The reader
   has no reason to doubt it, which makes it worse than an error.
+
+## Not finished filling in a form is not a malfunction (phase 26)
+
+- **"Something went wrong" was the answer to a blank field.** Four hand-rolled
+  forms — planning a round, raising a purchase order, requesting a return,
+  adding a shop — answered their own validation with `ErrorState`, so leaving a
+  field empty was reported in the same words, the same red and the same tone as
+  an unreachable database. The screenshot that prompted this shows it exactly: a
+  rider chosen, a day chosen, notes typed, and a red alert. Nothing had gone
+  wrong; the round had no stops on it yet.
+- **`FormNotice` is warning-toned and lists problems separately.** "Choose a
+  rider, a day, and at least one stop" is one sentence covering three
+  requirements, and it does not tell somebody who has already met two of them
+  which one they are missing. Each problem now stands alone and can carry the
+  reader to the control it is about — on a form two panels deep, that is the
+  difference between being told and being helped.
+- **The notice is derived from state, not captured at submit.** So it shrinks as
+  the form is filled in rather than going on naming a problem already fixed.
+  Focus is driven by a separate submit counter, because moving the cursor every
+  time the list changes would yank it out of the field being corrected.
+- **`role="alert"` _and_ focus, following the GOV.UK error summary.** Focus alone
+  conveys the heading but not reliably the list; the alert alone is missed by
+  anybody who has scrolled past.
+- **Native `required` still guards the fields that carry it.** On the round form
+  the browser refuses to submit without a rider, so the application's own
+  `needRider` problem is effectively unreachable through the button. It is kept
+  as the second line rather than removed: the two mechanisms disagree about
+  nothing, and the notice is what a keyboard or screen-reader user meets if the
+  native bubble is dismissed.
+- **The shared feedback primitives were English-only, and nothing could see it.**
+  `ErrorState`, `LoadingState`, `Resource` and `DataTable` wrote their defaults
+  as literals while `packages/i18n` held Bangla for every one of them and
+  `apps/mobile` was already reading it. A component that never asks the
+  catalogue produces no missing key, no type error and no lint warning — so the
+  language toggle worked everywhere except on a failure, which is the one
+  surface a confused user stops to read. `uiStrings.test.ts` is the gate.
+- **One empty list was three different facts.** The round form rendered "Nothing
+  is waiting to go on a round" while the request was in flight, when the request
+  had failed, and when the list was genuinely empty. The failed case is the
+  worst of the three: the reader has no reason to doubt it. It reads through
+  `Resource` now, which has always distinguished them.
+- **An empty list scoped to a filter must say so.** `/trips/plannable` is
+  filtered by the chosen rider, and the wording did not mention the rider — so a
+  screen showing nothing while another rider had six stops was telling the truth
+  about the query and a lie about the business.
+- **A screen with no possible successful outcome says so before it is filled
+  in.** With no delivery assigned to any rider there is no round to plan, and
+  the form used to let somebody pick a vehicle and type notes before telling
+  them. That state is now named at the top with a link to where the work
+  actually starts.

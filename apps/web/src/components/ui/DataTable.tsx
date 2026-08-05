@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
+import { useLanguage } from '../../lib/useLanguage';
 import { EmptyState } from './Feedback';
 
 /**
@@ -84,8 +85,9 @@ export function DataTable<Row>({
   empty,
   className,
 }: DataTableProps<Row>) {
+  const { t } = useLanguage();
   if (rows.length === 0) {
-    return <>{empty ?? <EmptyState title="Nothing to show yet" />}</>;
+    return <>{empty ?? <EmptyState title={t('common.nothingHere')} />}</>;
   }
 
   return (

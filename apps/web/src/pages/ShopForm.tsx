@@ -8,6 +8,7 @@ import {
   Card,
   ErrorState,
   Field,
+  FormNotice,
   Input,
   LinkButton,
   PageHeader,
@@ -51,6 +52,8 @@ export function ShopForm() {
   const [priceListId, setPriceListId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [failure, setFailure] = useState<{ message: string; reference?: string }>();
+  /** Which submit attempt this is; see `FormNotice`. */
+  const [attempt, setAttempt] = useState(0);
 
   /*
    * Only lists that are in force. Assigning an inactive one is a price that
@@ -62,20 +65,26 @@ export function ShopForm() {
     '/pricing/price-lists?activeOnly=true',
   );
 
+  /*
+   * `parseMoney`, not `Math.round(Number(input) * 100)`. The old line was
+   * float arithmetic on a credit limit — the figure that decides whether a
+   * customer's order is refused — which `AGENTS.md` forbids outright.
+   */
+  const credit = form.creditLimit ? parseMoney(form.creditLimit) : { ok: true, minor: 0 };
+  /*
+   * A number typed the wrong way round is not a malfunction, and this form used
+   * to answer it with the red "Something went wrong" card. It is now said twice
+   * where it belongs: beside the field, and in the summary at the top.
+   */
+  const creditProblem = credit.ok ? undefined : t('shops.badAmount');
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     setFailure(undefined);
-
-    /*
-     * `parseMoney`, not `Math.round(Number(input) * 100)`. The old line was
-     * float arithmetic on a credit limit — the figure that decides whether a
-     * customer's order is refused — which `AGENTS.md` forbids outright.
-     */
-    const credit = form.creditLimit ? parseMoney(form.creditLimit) : { ok: true, minor: 0 };
-    if (!credit.ok) {
-      setFailure({ message: t('shops.badAmount') });
-      return;
-    }
+    setAttempt((count) => count + 1);
+    // On `credit.ok` rather than on `creditProblem`, so the narrowing survives
+    // into `credit.minor` below.
+    if (!credit.ok) return;
 
     setSubmitting(true);
     try {
@@ -109,13 +118,21 @@ export function ShopForm() {
       <Card className="max-w-2xl">
         <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
           {failure && <ErrorState message={failure.message} reference={failure.reference} />}
+          {attempt > 0 && creditProblem && (
+            <FormNotice
+              problems={[{ message: creditProblem, focus: 'shop-creditLimit' }]}
+              focusKey={attempt}
+            />
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             {TEXT_FIELDS.map(([name, key, type, required]) => (
               <Field
                 key={name}
+                id={`shop-${name}`}
                 label={t(`shops.${key}`)}
                 required={required}
+                error={name === 'creditLimit' && attempt > 0 ? creditProblem : undefined}
                 hint={
                   name === 'primaryPhone'
                     ? t('shops.primaryPhoneHint')

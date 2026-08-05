@@ -44,13 +44,22 @@ export interface FieldProps {
   /** Shown instead of the hint, and announced. */
   error?: ReactNode;
   required?: boolean;
+  /**
+   * A stable id for the control, instead of the generated one.
+   *
+   * `useId()` produces something like `:r7:`, which is correct for wiring a
+   * label but useless to anything outside this component — and a validation
+   * summary that offers to take you to the field it is talking about has to be
+   * able to name it. Only forms that do that need to pass one.
+   */
+  id?: string;
   children: ReactNode;
   className?: string;
 }
 
-export function Field({ label, hint, error, required, children, className }: FieldProps) {
+export function Field({ label, hint, error, required, id, children, className }: FieldProps) {
   const base = useId();
-  const controlId = `${base}-control`;
+  const controlId = id ?? `${base}-control`;
   const hintId = hint ? `${base}-hint` : undefined;
   const errorId = error ? `${base}-error` : undefined;
   const describedBy = [errorId, hintId].filter(Boolean).join(' ') || undefined;

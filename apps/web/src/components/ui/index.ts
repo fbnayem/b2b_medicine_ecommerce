@@ -19,10 +19,13 @@ export { Field, Input, Select, Textarea, type FieldProps } from './Field';
 export {
   EmptyState,
   ErrorState,
+  FormNotice,
   LoadingState,
   Skeleton,
   type EmptyStateProps,
   type ErrorStateProps,
+  type FormNoticeProps,
+  type FormProblem,
 } from './Feedback';
 export { ConfirmDialog, Dialog, type ConfirmDialogProps, type DialogProps } from './Dialog';
 export {
