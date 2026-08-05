@@ -1677,10 +1677,103 @@ export const en = {
     classification: 'Classification',
     coldChain: 'Must be kept cold',
     description: 'Description',
+    productImageUrl: 'Product photograph',
     save: 'Save this medicine',
     saving: 'Saving…',
     saveFailed: 'This medicine could not be saved.',
     badAmount: 'Enter an amount like 12.50.',
+  },
+
+  /**
+   * An example of the value, shown inside the empty box.
+   *
+   * A placeholder is never load-bearing — it disappears the moment somebody
+   * types, and a screen reader may not announce it at all. So it carries only
+   * the *shape* of a good answer, for the fields where the shape is not
+   * obvious: a code, an amount, a way of describing a pack. Anything a person
+   * must know before typing is a hint, and anything about how the field works
+   * is a `HelpTip`.
+   */
+  medicinePlaceholder: {
+    sku: 'NAP-500-10T',
+    barcode: '8901234567890',
+    brandName: 'Napa',
+    genericName: 'Paracetamol',
+    manufacturer: 'Beximco Pharmaceuticals',
+    strength: '500 mg',
+    dosageForm: 'Tablet',
+    packSize: '10 x 10 tablets',
+    unit: 'Box',
+    category: 'Painkillers',
+    costPrice: '82.50',
+    sellingPrice: '95.00',
+    mrp: '120.00',
+    minimumOrderQuantity: '1',
+    maximumOrderQuantity: '100',
+    description: 'Anything a shop should read before ordering.',
+    productImageUrl: 'https://…/napa-500.webp',
+  },
+
+  /**
+   * The always-visible rule, for the four fields where getting it wrong is
+   * either an outright refusal or expensive.
+   *
+   * Deliberately short and deliberately few. A hint on every field is a form
+   * nobody reads; these are the ones where the answer cannot be guessed from
+   * the label.
+   */
+  medicineHint: {
+    barcode: 'Optional. The number under the bars on the pack.',
+    unit: 'What one of the number in an order means.',
+    costPrice: 'In taka.',
+    sellingPrice: 'In taka. Cannot be above the MRP.',
+    mrp: 'Optional. In taka.',
+    maximumOrderQuantity: 'Optional.',
+    productImageUrl: 'A web address, or a file we already hold.',
+  },
+
+  /**
+   * How each field works, and what it changes elsewhere.
+   *
+   * This is the layer that was missing entirely: the form said "Sold as" and
+   * nothing anywhere explained that putting *Tablet* there means a shop
+   * ordering five gets five tablets rather than five boxes. Written as
+   * sentences a storekeeper would say, per the plain-language rule at the top
+   * of this file — no "FEFO", no "basis points", no "idempotency".
+   */
+  medicineHelp: {
+    about: 'About {{field}}',
+    sku: 'Your own code for this product. It must be different from every other one, and it is what a stock count or an import matches on. Changing it does not change past orders.',
+    barcode:
+      'Scanning this in the warehouse finds this product. Leave it blank if the pack has none.',
+    brandName: 'The name printed largest on the pack. This is what people search for.',
+    genericName:
+      'The active ingredient. Required for anything sold on prescription, so a pharmacist can check what they are dispensing.',
+    manufacturer: 'Who made it. Used to trace a batch back after a recall.',
+    strength:
+      'How much active ingredient is in one unit. The same brand at two strengths is two products here.',
+    dosageForm: 'The form it takes — tablet, syrup, injection, cream.',
+    packSize:
+      'What is inside one pack you sell. Write it the way the shop reads it off the carton.',
+    unit: 'An order for 5 means 5 of this. If you sell by the box, put Box — not Tablet — or a shop ordering 5 gets 5 tablets.',
+    category: 'Groups this with similar products so it can be filtered and reported on.',
+    costPrice: 'What this costs you. Only managers see it; it never appears to a shop.',
+    sellingPrice:
+      'The ordinary trade price. Every order uses this unless the customer has a price list or their own discount, which both take priority.',
+    mrp: 'The price printed on the pack. A pharmacy may not sell above it, so this is what the shop’s own profit is measured against. Leave it blank if the pack shows none.',
+    minimumOrderQuantity:
+      'The smallest number a shop may order at once. Set 1 if there is no minimum.',
+    maximumOrderQuantity:
+      'A cap per order — useful for something scarce. Leave it blank for no cap.',
+    productType:
+      'Which shelf this sits on. It changes nothing about pricing or stock; it is for browsing and reporting.',
+    classification:
+      'Whether this is dispensed against a prescription. Choosing Prescription makes generic name, strength and form required, because a pharmacist cannot dispense without them.',
+    coldChain:
+      'Ticked means it must stay refrigerated. It is recorded on the product and shown to whoever handles the box; it does not yet change how the system picks or packs.',
+    description: 'Shown to shops on the product page. Not for internal notes.',
+    productImageUrl:
+      'The picture shops see in the catalogue. Leave it blank and a placeholder is shown.',
   },
 
   /**

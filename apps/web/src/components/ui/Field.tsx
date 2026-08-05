@@ -53,11 +53,19 @@ export interface FieldProps {
    * able to name it. Only forms that do that need to pass one.
    */
   id?: string;
+  /**
+   * A `HelpTip` beside the label — how the field works and what it affects.
+   *
+   * A sibling of the `<label>`, never inside it: a `<button>` within a
+   * `<label htmlFor>` means pressing the icon also focuses the control, and on
+   * some browsers activates the label outright.
+   */
+  help?: ReactNode;
   children: ReactNode;
   className?: string;
 }
 
-export function Field({ label, hint, error, required, id, children, className }: FieldProps) {
+export function Field({ label, hint, error, required, id, help, children, className }: FieldProps) {
   const base = useId();
   const controlId = id ?? `${base}-control`;
   const hintId = hint ? `${base}-hint` : undefined;
@@ -67,14 +75,17 @@ export function Field({ label, hint, error, required, id, children, className }:
   return (
     <FieldContext.Provider value={{ controlId, describedBy, invalid: Boolean(error) }}>
       <div className={clsx('flex flex-col gap-1', className)}>
-        <label htmlFor={controlId} className="text-sm font-medium text-text">
-          {label}
-          {required && (
-            <span className="text-danger ms-1" aria-hidden="true">
-              *
-            </span>
-          )}
-        </label>
+        <div className="flex items-center gap-1">
+          <label htmlFor={controlId} className="text-sm font-medium text-text">
+            {label}
+            {required && (
+              <span className="text-danger ms-1" aria-hidden="true">
+                *
+              </span>
+            )}
+          </label>
+          {help}
+        </div>
         {children}
         {/*
           Both, not one or the other.

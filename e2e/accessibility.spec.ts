@@ -77,3 +77,49 @@ test.describe('the screens people spend their day on', () => {
     });
   }
 });
+
+/**
+ * The catalogue, which nothing scanned until now.
+ *
+ * `/medicines/:id` and `/medicines/new` are the most control-dense screens in
+ * the product and neither had ever been looked at: the detail page carries a
+ * batch table and — from this phase — stock and pricing actions, and the form
+ * carries nineteen fields each with a popover beside its label. A popover is
+ * exactly the shape axe is good at judging: an icon-only trigger needs a name,
+ * its glyph must be hidden from the tree, and content that is not in the
+ * document must not be pointed at by `aria-describedby`.
+ *
+ * The detail page is reached by clicking through from the list rather than by a
+ * hard-coded id, so the spec also proves the link the catalogue draws.
+ */
+test.describe('the catalogue', () => {
+  test('the medicine form, with an explanation on every field', async ({ page }) => {
+    await signIn(page, 'manager');
+    await page.goto('/medicines/new');
+    await expect(page.locator('#root')).not.toBeEmpty();
+    await scan(page, '/medicines/new as manager');
+
+    // Opened, too. A popover's content is only in the document while it is
+    // showing, so a closed one is not the thing that needs judging.
+    await page
+      .getByRole('button', { name: /^About / })
+      .first()
+      .click();
+    await scan(page, '/medicines/new with an explanation open');
+  });
+
+  for (const as of ['manager', 'owner'] as RoleKey[]) {
+    test(`a medicine as ${as}`, async ({ page }) => {
+      await signIn(page, as);
+      await page.goto('/medicines');
+      // The product's own heading link. A bare `a[href^="/medicines/"]` picks
+      // up "Add a medicine" first for anybody who may create one.
+      await page.locator('h2 a[href^="/medicines/"]').first().click();
+      await expect(page).toHaveURL(/\/medicines\/[a-f0-9]{24}/);
+      await expect(page.locator('#root')).not.toBeEmpty();
+      // A manager sees the most controls; a shop owner sees a structurally
+      // different, read-only page. Both DOMs need judging.
+      await scan(page, `a medicine as ${as}`);
+    });
+  }
+});

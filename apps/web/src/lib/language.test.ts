@@ -59,6 +59,27 @@ describe('the Bangla catalogue', () => {
       // A paper size and a file format. Neither is a word in either language,
       // and a storekeeper looking for the A4 button is looking for "A4".
       'picking.a4Pdf',
+      /*
+       * Worked examples of things printed on the carton in Latin script and
+       * typed back exactly as printed: a stock code, two proper nouns, a
+       * manufacturer, a strength and a web address. A Bangla rendering of
+       * "Beximco Pharmaceuticals" would be an example of something nobody will
+       * ever type.
+       *
+       * The rest of `medicinePlaceholder` *is* translated — pack size, form,
+       * sold-as and category are ordinary words a Bangla reader would write in
+       * Bangla, and the help text beside "Sold as" quotes the same two words so
+       * the example and the warning cannot disagree.
+       *
+       * In catalogue order: this list is compared as a sequence, so an entry in
+       * the wrong place fails with a diff that shows two identical strings.
+       */
+      'medicinePlaceholder.sku',
+      'medicinePlaceholder.brandName',
+      'medicinePlaceholder.genericName',
+      'medicinePlaceholder.manufacturer',
+      'medicinePlaceholder.strength',
+      'medicinePlaceholder.productImageUrl',
       // The literal pattern the date field accepts. Translating the letters
       // would show somebody a shape the input then refuses — the same trap as
       // rendering Bengali digits into a parser that only reads [0-9].

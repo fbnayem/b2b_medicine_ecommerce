@@ -10,6 +10,7 @@ import {
   Card,
   ErrorState,
   Field,
+  HelpTip,
   Input,
   PageHeader,
   Select,
@@ -44,12 +45,21 @@ const optionalMoney = z.string().refine((value) => value === '' || parseMoney(va
   message: 'Enter an amount like 12.50, or leave it blank.',
 });
 
+/*
+ * `productImageUrl` stays in.
+ *
+ * It used to be omitted here and never collected, so the field had no control
+ * on any screen — and the shared schema's rule about it, that the value is
+ * either an `http(s)` address or a path we already hold, ran nowhere on the
+ * client. It is a real field on the model, the catalogue renders it, and the
+ * import populates it; leaving it out meant it could only ever be set by a
+ * script.
+ */
 const MedicineFormSchema = MedicineFieldsSchema.omit({
   costPriceMinor: true,
   defaultSellingPriceMinor: true,
   mrpMinor: true,
   isActive: true,
-  productImageUrl: true,
 })
   .extend({
     costPrice: money,
@@ -98,24 +108,29 @@ const MedicineFormSchema = MedicineFieldsSchema.omit({
 type MedicineValues = z.input<typeof MedicineFormSchema>;
 type MedicineOutput = z.output<typeof MedicineFormSchema>;
 
-/** `[field, label key, input type]`, in the order somebody reads a pack. */
-const TEXT_FIELDS: Array<[keyof MedicineOutput & string, string, string]> = [
-  ['sku', 'sku', 'text'],
-  ['barcode', 'barcode', 'text'],
-  ['brandName', 'brandName', 'text'],
-  ['genericName', 'genericName', 'text'],
-  ['manufacturer', 'manufacturer', 'text'],
-  ['strength', 'strength', 'text'],
-  ['dosageForm', 'dosageForm', 'text'],
-  ['packSize', 'packSize', 'text'],
-  ['unit', 'unit', 'text'],
-  ['category', 'category', 'text'],
-  ['costPrice', 'costPrice', 'text'],
-  ['sellingPrice', 'sellingPrice', 'text'],
-  ['mrp', 'mrp', 'text'],
-  ['minimumOrderQuantity', 'minimumOrderQuantity', 'number'],
-  ['maximumOrderQuantity', 'maximumOrderQuantity', 'number'],
-];
+/**
+ * The order somebody reads a pack in, and what each field needs said about it.
+ *
+ * **Every string is a literal `t('…')` call, and the verbosity is the point.**
+ * This was a tuple of `[field, key, type]` and the label was looked up as
+ * `` t(`medicineForm.${key}`) `` — a template literal, which
+ * `catalogueKeys.test.ts` deliberately does not match, because it cannot prove
+ * the interpolated half names a real leaf. One invisible family was tolerable.
+ * Adding a placeholder, a hint and a help sentence the same way would have made
+ * four, and a misspelling in any of them renders as `medicineHelp.sku` on the
+ * screen with every test in the repository green.
+ *
+ * Built inside the component so `t` is in scope. About sixty gated call sites
+ * in exchange for a defect class the gate can see.
+ */
+interface FieldSpec {
+  name: keyof MedicineOutput & string;
+  label: string;
+  help: string;
+  placeholder?: string;
+  hint?: string;
+  type: 'text' | 'number';
+}
 
 const OPTIONAL = new Set(['barcode', 'maximumOrderQuantity', 'mrp']);
 
@@ -149,6 +164,7 @@ export function MedicineForm() {
       costPrice: '',
       sellingPrice: '',
       mrp: '',
+      productImageUrl: '',
       minimumOrderQuantity: 1,
       productType: ProductType.MEDICINE,
       classification: MedicineClassification.PRESCRIPTION,
@@ -168,6 +184,9 @@ export function MedicineForm() {
       const response = await apiClient.post('/inventory/medicines', {
         ...rest,
         barcode: rest.barcode || undefined,
+        // Blank means "no picture", which is a value the server stores as
+        // absent rather than as an empty string that fails its own URL rule.
+        productImageUrl: rest.productImageUrl || undefined,
         costPriceMinor: cost.minor,
         defaultSellingPriceMinor: selling.minor,
         mrpMinor: printed.ok ? printed.minor : undefined,
@@ -185,6 +204,134 @@ export function MedicineForm() {
   const errors = form.formState.errors as Record<string, { message?: string } | undefined>;
   const prescription = form.watch('classification') === MedicineClassification.PRESCRIPTION;
 
+  const fields: FieldSpec[] = [
+    {
+      name: 'sku',
+      type: 'text',
+      label: t('medicineForm.sku'),
+      help: t('medicineHelp.sku'),
+      placeholder: t('medicinePlaceholder.sku'),
+    },
+    {
+      name: 'barcode',
+      type: 'text',
+      label: t('medicineForm.barcode'),
+      help: t('medicineHelp.barcode'),
+      placeholder: t('medicinePlaceholder.barcode'),
+      hint: t('medicineHint.barcode'),
+    },
+    {
+      name: 'brandName',
+      type: 'text',
+      label: t('medicineForm.brandName'),
+      help: t('medicineHelp.brandName'),
+      placeholder: t('medicinePlaceholder.brandName'),
+    },
+    {
+      name: 'genericName',
+      type: 'text',
+      label: t('medicineForm.genericName'),
+      help: t('medicineHelp.genericName'),
+      placeholder: t('medicinePlaceholder.genericName'),
+    },
+    {
+      name: 'manufacturer',
+      type: 'text',
+      label: t('medicineForm.manufacturer'),
+      help: t('medicineHelp.manufacturer'),
+      placeholder: t('medicinePlaceholder.manufacturer'),
+    },
+    {
+      name: 'strength',
+      type: 'text',
+      label: t('medicineForm.strength'),
+      help: t('medicineHelp.strength'),
+      placeholder: t('medicinePlaceholder.strength'),
+    },
+    {
+      name: 'dosageForm',
+      type: 'text',
+      label: t('medicineForm.dosageForm'),
+      help: t('medicineHelp.dosageForm'),
+      placeholder: t('medicinePlaceholder.dosageForm'),
+    },
+    {
+      name: 'packSize',
+      type: 'text',
+      label: t('medicineForm.packSize'),
+      help: t('medicineHelp.packSize'),
+      placeholder: t('medicinePlaceholder.packSize'),
+    },
+    {
+      /*
+       * Both a hint and a help sentence, alone among these. A shop ordering
+       * five tablets when they meant five boxes is the most expensive mistake
+       * this form allows, and the warning has to be readable without anybody
+       * pressing anything.
+       */
+      name: 'unit',
+      type: 'text',
+      label: t('medicineForm.unit'),
+      help: t('medicineHelp.unit'),
+      placeholder: t('medicinePlaceholder.unit'),
+      hint: t('medicineHint.unit'),
+    },
+    {
+      name: 'category',
+      type: 'text',
+      label: t('medicineForm.category'),
+      help: t('medicineHelp.category'),
+      placeholder: t('medicinePlaceholder.category'),
+    },
+    {
+      name: 'costPrice',
+      type: 'text',
+      label: t('medicineForm.costPrice'),
+      help: t('medicineHelp.costPrice'),
+      placeholder: t('medicinePlaceholder.costPrice'),
+      hint: t('medicineHint.costPrice'),
+    },
+    {
+      name: 'sellingPrice',
+      type: 'text',
+      label: t('medicineForm.sellingPrice'),
+      help: t('medicineHelp.sellingPrice'),
+      placeholder: t('medicinePlaceholder.sellingPrice'),
+      hint: t('medicineHint.sellingPrice'),
+    },
+    {
+      name: 'mrp',
+      type: 'text',
+      label: t('medicineForm.mrp'),
+      help: t('medicineHelp.mrp'),
+      placeholder: t('medicinePlaceholder.mrp'),
+      hint: t('medicineHint.mrp'),
+    },
+    {
+      name: 'minimumOrderQuantity',
+      type: 'number',
+      label: t('medicineForm.minimumOrderQuantity'),
+      help: t('medicineHelp.minimumOrderQuantity'),
+      placeholder: t('medicinePlaceholder.minimumOrderQuantity'),
+    },
+    {
+      name: 'maximumOrderQuantity',
+      type: 'number',
+      label: t('medicineForm.maximumOrderQuantity'),
+      help: t('medicineHelp.maximumOrderQuantity'),
+      placeholder: t('medicinePlaceholder.maximumOrderQuantity'),
+      hint: t('medicineHint.maximumOrderQuantity'),
+    },
+    {
+      name: 'productImageUrl',
+      type: 'text',
+      label: t('medicineForm.productImageUrl'),
+      help: t('medicineHelp.productImageUrl'),
+      placeholder: t('medicinePlaceholder.productImageUrl'),
+      hint: t('medicineHint.productImageUrl'),
+    },
+  ];
+
   return (
     <>
       <PageHeader
@@ -197,30 +344,53 @@ export function MedicineForm() {
           {failure && <ErrorState message={failure.message} reference={failure.reference} />}
 
           <div className="grid gap-4 md:grid-cols-2">
-            {TEXT_FIELDS.map(([name, key, type]) => (
+            {fields.map((field) => (
               <Field
-                key={name}
-                label={t(`medicineForm.${key}`)}
-                required={!OPTIONAL.has(name) && (!CLINICAL.has(name) || prescription)}
-                error={errors[name]?.message}
+                key={field.name}
+                label={field.label}
+                help={
+                  <HelpTip
+                    label={t('medicineHelp.about', { field: field.label })}
+                    body={field.help}
+                  />
+                }
+                hint={field.hint}
+                required={
+                  !OPTIONAL.has(field.name) &&
+                  field.name !== 'productImageUrl' &&
+                  (!CLINICAL.has(field.name) || prescription)
+                }
+                error={errors[field.name]?.message}
               >
                 <Input
-                  type={type}
-                  min={type === 'number' ? 0 : undefined}
+                  type={field.type}
+                  placeholder={field.placeholder}
+                  min={field.type === 'number' ? 0 : undefined}
                   inputMode={
-                    name === 'costPrice' || name === 'sellingPrice' || name === 'mrp'
+                    field.name === 'costPrice' ||
+                    field.name === 'sellingPrice' ||
+                    field.name === 'mrp'
                       ? 'decimal'
                       : undefined
                   }
                   {...form.register(
-                    name as never,
-                    type === 'number' ? { valueAsNumber: true } : undefined,
+                    field.name as never,
+                    field.type === 'number' ? { valueAsNumber: true } : undefined,
                   )}
                 />
               </Field>
             ))}
 
-            <Field label={t('medicineForm.productType')} error={errors.productType?.message}>
+            <Field
+              label={t('medicineForm.productType')}
+              help={
+                <HelpTip
+                  label={t('medicineHelp.about', { field: t('medicineForm.productType') })}
+                  body={t('medicineHelp.productType')}
+                />
+              }
+              error={errors.productType?.message}
+            >
               <Select {...form.register('productType')}>
                 {Object.values(ProductType).map((value) => (
                   <option key={value} value={value}>
@@ -230,7 +400,16 @@ export function MedicineForm() {
               </Select>
             </Field>
 
-            <Field label={t('medicineForm.classification')} error={errors.classification?.message}>
+            <Field
+              label={t('medicineForm.classification')}
+              help={
+                <HelpTip
+                  label={t('medicineHelp.about', { field: t('medicineForm.classification') })}
+                  body={t('medicineHelp.classification')}
+                />
+              }
+              error={errors.classification?.message}
+            >
               <Select {...form.register('classification')}>
                 {Object.values(MedicineClassification).map((value) => (
                   <option key={value} value={value}>
@@ -240,14 +419,32 @@ export function MedicineForm() {
               </Select>
             </Field>
 
-            <label className="flex min-h-11 items-center gap-2 self-end text-text">
-              <input type="checkbox" {...form.register('coldChain')} />
-              {t('medicineForm.coldChain')}
-            </label>
+            <div className="flex min-h-11 items-center gap-1 self-end">
+              <label className="flex items-center gap-2 text-text">
+                <input type="checkbox" {...form.register('coldChain')} />
+                {t('medicineForm.coldChain')}
+              </label>
+              <HelpTip
+                label={t('medicineHelp.about', { field: t('medicineForm.coldChain') })}
+                body={t('medicineHelp.coldChain')}
+              />
+            </div>
           </div>
 
-          <Field label={t('medicineForm.description')} error={errors.description?.message}>
-            <Textarea {...form.register('description')} />
+          <Field
+            label={t('medicineForm.description')}
+            help={
+              <HelpTip
+                label={t('medicineHelp.about', { field: t('medicineForm.description') })}
+                body={t('medicineHelp.description')}
+              />
+            }
+            error={errors.description?.message}
+          >
+            <Textarea
+              placeholder={t('medicinePlaceholder.description')}
+              {...form.register('description')}
+            />
           </Field>
 
           <div className="flex flex-wrap justify-end gap-2">

@@ -16,6 +16,7 @@ export {
   type LinkButtonProps,
 } from './Button';
 export { Field, Input, Select, Textarea, type FieldProps } from './Field';
+export { HelpTip, type HelpTipProps } from './HelpTip';
 export {
   EmptyState,
   ErrorState,

@@ -27,3 +27,31 @@ configure({ testIdAttribute: 'data-test' });
  * test file.
  */
 afterEach(cleanup);
+
+/**
+ * Layout APIs jsdom does not implement.
+ *
+ * jsdom computes no layout, so it ships no `ResizeObserver` and every element
+ * measures zero. Radix's floating primitives — the popover behind `HelpTip`,
+ * and anything else built on `@floating-ui` — observe their trigger's size to
+ * decide where to put the panel, and throw outright without it.
+ *
+ * A stub that observes nothing is the honest shape here: these tests assert
+ * *what* is shown and *when*, never where it lands on screen, and pretending to
+ * measure would invite an assertion that only passes because the number is
+ * made up. Position is a thing for a real browser, which is what
+ * `e2e/accessibility.spec.ts` is.
+ */
+class NoLayoutResizeObserver implements ResizeObserver {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+
+globalThis.ResizeObserver ??= NoLayoutResizeObserver;
+if (typeof Element !== 'undefined') {
+  Element.prototype.scrollIntoView ??= () => {};
+  // Radix guards its own pointer-capture calls; jsdom defines neither.
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.releasePointerCapture ??= () => {};
+}
