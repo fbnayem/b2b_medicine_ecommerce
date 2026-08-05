@@ -116,34 +116,38 @@ rather than summarised as a percentage — the endpoint that mattered was
 and a percentage would have read "88%" and named nothing. A waiver that goes
 stale fails the build, so the lists can only shrink.
 
-**As of 05 August 2026: 187 routes, 0 undocumented, 31 untested (156 covered).**
+**As of 05 August 2026: 187 routes, 0 undocumented, 183 covered by an
+integration test — and the four that are not are the four the recorder cannot
+see.** Both lists are finished.
+
+What they leave behind is a gate rather than a number. A new route that is
+undocumented, or that no test calls, now fails the build the moment it is added.
+That is what these lists were always for; a percentage could never have provided
+it.
 
 (The route count in this line previously read 165, and the header comments in
 `routeCoverage.waivers.ts` read 150. Both were stale — the same drift that left
 `docs/openapi.json` describing 72 operations against a source declaring 110.
 Counted from `routeTable()` rather than from memory this time.)
 
-Tranches are ordered by what a real user's journey touches rather than by what
-is easy, so a shrinking number means the riskiest endpoints went first. Done so
-far, and what remains:
+Tranches were ordered by what a real user's journey touches rather than by what
+was easy, so the riskiest endpoints went first rather than the cheapest.
 
-| Tranche        | Documented | Tested                              |
-| -------------- | ---------- | ----------------------------------- |
-| Shop owner     | done       | done — through finance              |
-| Finance        | done       | done — 18 endpoints                 |
-| Administration | done       | done — 10 endpoints                 |
-| Warehouse      | done       | done — 10 endpoints                 |
-| Inbox          | done       | done — 6 endpoints                  |
-| Orders, drafts | done       | **not started** — 6                 |
-| Approvals      | done       | **not started** — 5                 |
-| Returns        | done       | **not started** — 5                 |
-| Delivery       | done       | **not started** — 5, plus 4 reports |
-| Fulfilment     | done       | **not started** — 2                 |
+| Tranche        | Documented | Tested | Suite                               | The rule that would have been wrong quietly                            |
+| -------------- | ---------- | ------ | ----------------------------------- | ---------------------------------------------------------------------- |
+| Finance        | done       | 18     | `financeIntegration.test.ts`        | Reading a reconciliation must not repair what it measures              |
+| Administration | done       | 10     | `administrationIntegration.test.ts` | Signing out everywhere includes the device that asked                  |
+| Warehouse      | done       | 10     | `inventoryIntegration.test.ts`      | Damage and quarantine both leave `available`; only one leaves `onHand` |
+| Inbox          | done       | 6      | `inboxIntegration.test.ts`          | `read-all` clears what you had seen, not what arrived after            |
+| Order journey  | done       | 13     | `orderJourneyIntegration.test.ts`   | A saved draft is stock-neutral until it is submitted                   |
+| The last mile  | done       | 14     | `lastMileIntegration.test.ts`       | A rider's board is their own round, not the whole city                 |
 
-Four of the 31 remaining are `/health`, `/health/ready`, `/health/version` and
-`/metrics`, which are mounted ahead of the coverage recorder on purpose and so
-cannot be seen by it. They are exercised in `hardeningIntegration.test.ts`. That
-leaves **27 genuinely untested**, all in the five tranches marked above.
+The four routes still on the untested list are `/health`, `/health/ready`,
+`/health/version` and `/metrics`. They are mounted ahead of the coverage
+recorder on purpose — so a degraded process can still answer a probe and a
+scraper can still be served while the rate limiter is refusing everything else —
+and that position is why the recorder never sees them. All four are exercised in
+`hardeningIntegration.test.ts`.
 
 **Documentation reached zero.** The last 77 went in one pass, and could only be
 written honestly because the roles assertion checks each `roles` list against the

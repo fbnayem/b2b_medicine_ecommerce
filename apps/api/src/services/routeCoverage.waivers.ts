@@ -15,9 +15,15 @@
  *     therefore only shrink, which is the whole point.
  *
  * The counts below are stated as figures rather than as prose because they are
- * the burn-down, and a burn-down nobody can read the number off is a mood. At
- * the time of writing: **187 routes, 187 documented, 156 covered by an
- * integration test.**
+ * the burn-down, and a burn-down nobody can read the number off is a mood.
+ *
+ * **187 routes. 187 documented. 183 reached by an integration test, and the
+ * four that are not are the four the recorder cannot see.**
+ *
+ * Both lists are therefore finished. What they leave behind is a gate rather
+ * than a number: a new route that is undocumented, or that no test calls, now
+ * fails the build the moment it is added — which is what these lists were
+ * always for, and what a percentage could never have provided.
  * (The earlier "150 routes" in this comment was itself stale by 37 — the same
  * drift that left `docs/openapi.json` describing 72 operations against 110.)
  */
@@ -47,39 +53,28 @@ export const UNDOCUMENTED_ROUTES: readonly string[] = [];
 /**
  * Served, but no integration test reaches them.
  *
- * **31 of 187**, from 81. Recorded live by `routeCoverageRecorder()` rather than
- * inferred from test source, so a test that merely mentions a path in a string
- * does not count as covering it.
+ * **4 of 187**, from 81 — and all four are the health probes and `/metrics`,
+ * which the recorder structurally cannot see. Their reason is written beside
+ * them below and it is not "nobody got to them".
  *
- * Four of the thirty-one are the health probes and `/metrics`, which the
- * recorder structurally cannot see; their reason is written beside them below.
- * So **twenty-seven** are genuinely untested, in four tranches that remain:
- * orders and drafts, approvals, returns, and deliveries with their reports.
- * `docs/TESTING.md` carries the table, because "81 → 31" without saying which
- * is the same dishonesty as a percentage.
+ * Coverage is recorded live by `routeCoverageRecorder()` rather than inferred
+ * from test source, so a test that merely mentions a path in a string does not
+ * count as covering it.
  *
- * Four tranches went in: **finance** (18 — the money first, deliberately),
- * **administration** (10, including `POST /users` itself, whose original role
- * bug is now planted and caught rather than only cited), **warehouse** (10),
- * and **the inbox** (6).
+ * Seven tranches went in, ordered by what a real user's journey touches rather
+ * than by what was easy to write:
+ *
+ *   finance         18   the money first, deliberately
+ *   administration  10   including `POST /users` itself, whose original role
+ *                        bug is now planted and caught rather than only cited
+ *   warehouse       10   stock, and the buckets it moves between
+ *   the inbox        6   whose ids belong to whom
+ *   order journey   13   draft, amend, submit, review, reject, pick
+ *   the last mile   14   the delivery board, returns, and four reports
+ *
+ * `docs/TESTING.md` carries the table.
  */
 export const UNTESTED_ROUTES: readonly string[] = [
-  'delete /api/v1/orders/drafts/:id',
-  'get /api/v1/approvals/:id',
-  'get /api/v1/approvals/queue',
-  'get /api/v1/deliveries',
-  'get /api/v1/deliveries/:id',
-  'get /api/v1/deliveries/personnel',
-  'get /api/v1/deliveries/proof/:fileId',
-  'get /api/v1/fulfilment/picking/:id',
-  'get /api/v1/fulfilment/queue',
-  'get /api/v1/orders/:id',
-  'get /api/v1/reports/deliveries',
-  'get /api/v1/reports/orders',
-  'get /api/v1/reports/returns',
-  'get /api/v1/reports/sales/breakdown',
-  'get /api/v1/returns/:id',
-  'get /api/v1/returns/credit-notes/:id',
   /*
    * These four are mounted directly on the application, ahead of the coverage
    * recorder, so that a degraded process can still answer a probe and a scraper
@@ -93,15 +88,4 @@ export const UNTESTED_ROUTES: readonly string[] = [
   'get /health/ready',
   'get /health/version',
   'get /metrics',
-  'patch /api/v1/orders/drafts/:id',
-  'post /api/v1/approvals/:id/clarify',
-  'post /api/v1/approvals/:id/hold',
-  'post /api/v1/approvals/:id/reject',
-  'post /api/v1/deliveries/:id/cancel',
-  'post /api/v1/orders/:id/duplicate',
-  'post /api/v1/orders/drafts',
-  'post /api/v1/orders/drafts/:id/submit',
-  'post /api/v1/returns/:id/collect',
-  'post /api/v1/returns/:id/reject',
-  'post /api/v1/returns/:id/review',
 ];
