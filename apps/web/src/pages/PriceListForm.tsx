@@ -159,15 +159,15 @@ export function PriceListForm({ mode = 'create' }: { mode?: 'create' | 'edit' })
 
   if (editing && existing.isLoading) {
     return (
-      <main>
+      <>
         <PageHeader routeId="price-list-detail" title={t('priceLists.editTitle')} />
         <LoadingState label={t('priceLists.loading')} />
-      </main>
+      </>
     );
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId={editing ? 'price-list-detail' : 'price-list-new'}
         title={editing ? t('priceLists.editTitle') : t('priceLists.addTitle')}
@@ -302,6 +302,6 @@ export function PriceListForm({ mode = 'create' }: { mode?: 'create' | 'edit' })
           </div>
         </form>
       </Card>
-    </main>
+    </>
   );
 }

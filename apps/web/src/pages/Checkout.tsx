@@ -61,7 +61,7 @@ export function Checkout() {
 
   if (items.length === 0) {
     return (
-      <main>
+      <>
         <PageHeader routeId="checkout" title={t('checkout.title')} />
         <EmptyState
           title={t('checkout.empty')}
@@ -72,12 +72,12 @@ export function Checkout() {
             </LinkButton>
           }
         />
-      </main>
+      </>
     );
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="checkout"
         title={t('checkout.title')}
@@ -95,7 +95,7 @@ export function Checkout() {
         */}
         {(page) => <CheckoutForm shop={page.items[0]} />}
       </Resource>
-    </main>
+    </>
   );
 }
 

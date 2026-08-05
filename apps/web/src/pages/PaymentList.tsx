@@ -118,7 +118,7 @@ export function PaymentList({ ownerMode = false }: PaymentListProps) {
   const filtered = Boolean(status || applied.method || applied.q || applied.from || applied.to);
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId={ownerMode ? 'my-payments' : 'payments'}
         title={ownerMode ? t('finance.ownPaymentsTitle') : t('finance.paymentsTitle')}
@@ -218,6 +218,6 @@ export function PaymentList({ ownerMode = false }: PaymentListProps) {
           </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

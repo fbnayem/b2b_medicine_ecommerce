@@ -9,12 +9,13 @@ import {
   Field,
   LinkButton,
   PageHeader,
+  Pagination,
   Resource,
   Select,
   type BadgeTone,
   type Column,
 } from '../components/ui';
-import { useApiCollection } from '../lib/query';
+import { usePagedCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
 
@@ -46,7 +47,7 @@ export function PurchaseOrderList() {
   const { t } = useLanguage();
   const [status, setStatus] = useState('');
 
-  const orders = useApiCollection<PurchaseOrder>(
+  const orders = usePagedCollection<PurchaseOrder>(
     ['purchase-orders', status],
     `/purchasing/orders${status ? `?status=${status}` : ''}`,
   );
@@ -105,7 +106,7 @@ export function PurchaseOrderList() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="purchase-orders"
         title={t('purchasing.ordersTitle')}
@@ -142,15 +143,23 @@ export function PurchaseOrderList() {
         }
       >
         {(page) => (
-          <DataTable
-            caption={t('purchasing.ordersTitle')}
-            columns={columns}
-            rows={page.items}
-            rowKey={(order) => order._id}
-            rowTest={(order) => order.reference}
-          />
+          <>
+            <DataTable
+              caption={t('purchasing.ordersTitle')}
+              columns={columns}
+              rows={page.items}
+              rowKey={(order) => order._id}
+              rowTest={(order) => order.reference}
+            />
+            <Pagination
+              page={page.page}
+              limit={page.limit}
+              total={page.total}
+              onPage={orders.setPage}
+            />
+          </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

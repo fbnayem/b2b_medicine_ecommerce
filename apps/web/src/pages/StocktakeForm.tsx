@@ -45,7 +45,7 @@ export function StocktakeForm() {
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="stocktake-new"
         title={t('stocktake.openTitle')}
@@ -75,6 +75,6 @@ export function StocktakeForm() {
           </div>
         </form>
       </Card>
-    </main>
+    </>
   );
 }

@@ -5,10 +5,11 @@ import {
   EmptyState,
   LinkButton,
   PageHeader,
+  Pagination,
   Resource,
   type Column,
 } from '../components/ui';
-import { useApiCollection } from '../lib/query';
+import { usePagedCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 
 /**
@@ -23,7 +24,7 @@ import { useLanguage } from '../lib/useLanguage';
  */
 export function WarehouseList() {
   const { t } = useLanguage();
-  const warehouses = useApiCollection<Warehouse>(['warehouses'], '/inventory/warehouses');
+  const warehouses = usePagedCollection<Warehouse>(['warehouses'], '/inventory/warehouses');
 
   const columns: ReadonlyArray<Column<Warehouse>> = [
     {
@@ -68,7 +69,7 @@ export function WarehouseList() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="warehouses"
         title={t('warehouses.title')}
@@ -87,15 +88,23 @@ export function WarehouseList() {
         empty={<EmptyState title={t('warehouses.none')} description={t('warehouses.noneBody')} />}
       >
         {(page) => (
-          <DataTable
-            caption={t('warehouses.title')}
-            columns={columns}
-            rows={page.items}
-            rowKey={(row) => row._id}
-            rowTest={(row) => row.code}
-          />
+          <>
+            <DataTable
+              caption={t('warehouses.title')}
+              columns={columns}
+              rows={page.items}
+              rowKey={(row) => row._id}
+              rowTest={(row) => row.code}
+            />
+            <Pagination
+              page={page.page}
+              limit={page.limit}
+              total={page.total}
+              onPage={warehouses.setPage}
+            />
+          </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

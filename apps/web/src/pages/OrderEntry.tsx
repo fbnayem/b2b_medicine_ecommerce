@@ -343,7 +343,7 @@ export function OrderEntry() {
   const ready = lines.length > 0 && Boolean(addressId) && !quote.isError;
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="order-entry"
         title={t('orderEntry.title')}
@@ -542,6 +542,6 @@ export function OrderEntry() {
           </>
         )}
       </div>
-    </main>
+    </>
   );
 }

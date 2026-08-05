@@ -137,7 +137,7 @@ export function RecallTrace() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="recall"
         title={t('purchasing.recallTitle')}
@@ -330,7 +330,7 @@ export function RecallTrace() {
           </Card>
         </>
       )}
-    </main>
+    </>
   );
 }
 

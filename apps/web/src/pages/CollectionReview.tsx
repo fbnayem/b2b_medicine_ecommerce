@@ -192,7 +192,7 @@ export function CollectionReview() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="collections"
         title={t('finance.collectionsTitle')}
@@ -220,6 +220,6 @@ export function CollectionReview() {
           />
         )}
       </Resource>
-    </main>
+    </>
   );
 }

@@ -105,7 +105,7 @@ export function PurchaseOrderForm() {
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="purchase-order-new"
         title={t('purchasing.newOrderTitle')}
@@ -222,6 +222,6 @@ export function PurchaseOrderForm() {
           </div>
         </form>
       </Card>
-    </main>
+    </>
   );
 }

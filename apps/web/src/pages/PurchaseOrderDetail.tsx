@@ -183,7 +183,7 @@ export function PurchaseOrderDetail() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="purchase-order-detail"
         title={t('purchasing.ordersTitle')}
@@ -418,6 +418,6 @@ export function PurchaseOrderDetail() {
           );
         }}
       </Resource>
-    </main>
+    </>
   );
 }

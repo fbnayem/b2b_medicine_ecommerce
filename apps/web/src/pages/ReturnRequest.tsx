@@ -227,7 +227,7 @@ export function ReturnRequest() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="return-new"
         title={t('returns.requestTitle')}
@@ -328,6 +328,6 @@ export function ReturnRequest() {
           </Card>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

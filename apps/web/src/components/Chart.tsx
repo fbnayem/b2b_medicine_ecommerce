@@ -2,6 +2,23 @@ import { useId } from 'react';
 import { formatMoneyMinor, formatQuantity } from '@medsupply/utilities';
 import { chartDark, chartLight } from '@medsupply/design-tokens';
 import { resolveTheme, storedTheme } from '../lib/theme';
+import { useLanguage } from '../lib/useLanguage';
+import { EmptyState, Table, Td, Th } from './ui';
+
+/**
+ * The analytics charts.
+ *
+ * Colour came from the token package and was always right; **geometry** came
+ * from `chart`, `chart-bars`, `chart-bar-group`, `chart-bar-stack`,
+ * `share-track` and `share-fill` in `inventory.css`, which was deleted. So the
+ * lines still drew and the bar charts did not: a stack of unsized `<div>`s with
+ * inline percentage heights against no height at all, and share bars with no
+ * track to fill. Both analytics screens have been rendering that way.
+ *
+ * Rebuilt on utilities. The one rule worth keeping in view is that the SVG is
+ * `aria-hidden` and the same numbers are always present as a real table — a
+ * chart is decoration to anybody who cannot see it.
+ */
 
 export interface ChartSeries {
   key: string;
@@ -57,41 +74,60 @@ function tickIndexes(count: number) {
   return ticks;
 }
 
-/**
- * A chart is decoration for people who can see it and useless to everyone else,
- * so the SVG is hidden from assistive technology and the same numbers are
- * always present as a real table.
- */
-function DataTable({
+function ChartFigures({
   title,
   labels,
   series,
   money,
 }: Required<Pick<ChartProps, 'title' | 'labels' | 'series'>> & { money: boolean }) {
+  const { t } = useLanguage();
   return (
-    <table className="chart-data">
-      <caption>{title}</caption>
+    <Table className="mt-4 text-sm">
+      <caption className="px-3 py-2 text-start text-sm text-text-muted">
+        {title} — {t('charts.figures')}
+      </caption>
       <thead>
         <tr>
-          <th scope="col">Period</th>
+          <Th>{t('charts.period')}</Th>
           {series.map((entry) => (
-            <th key={entry.key} scope="col">
+            <Th key={entry.key} numeric>
               {entry.label}
-            </th>
+            </Th>
           ))}
         </tr>
       </thead>
       <tbody>
         {labels.map((label, index) => (
           <tr key={label}>
-            <th scope="row">{label}</th>
+            <Th scope="row" className="font-normal text-text">
+              {label}
+            </Th>
             {series.map((entry) => (
-              <td key={entry.key}>{formatValue(entry.values[index] ?? 0, money)}</td>
+              <Td key={entry.key} numeric>
+                {formatValue(entry.values[index] ?? 0, money)}
+              </Td>
             ))}
           </tr>
         ))}
       </tbody>
-    </table>
+    </Table>
+  );
+}
+
+function Legend({ series }: { series: ChartSeries[] }) {
+  return (
+    <ul className="mt-3 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-sm text-text-muted">
+      {series.map((entry, index) => (
+        <li key={entry.key} className="flex items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="size-3 shrink-0 rounded-sm"
+            style={{ background: entry.colour ?? palette()[index % palette().length] }}
+          />
+          {entry.label}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -101,8 +137,9 @@ export function LineChart({
   series,
   money = false,
   height = 220,
-  emptyMessage = 'No data for this period.',
+  emptyMessage,
 }: ChartProps) {
+  const { t } = useLanguage();
   const gradientId = useId();
   const width = 720;
   const padding = { top: 16, right: 16, bottom: 28, left: 16 };
@@ -114,7 +151,7 @@ export function LineChart({
   const span = max - min || 1;
 
   if (!labels.length || !series.length) {
-    return <p className="state chart-empty">{emptyMessage}</p>;
+    return <EmptyState title={emptyMessage ?? t('charts.noData')} />;
   }
 
   const pointX = (index: number) =>
@@ -123,13 +160,14 @@ export function LineChart({
   const pointY = (value: number) => padding.top + plotHeight - ((value - min) / span) * plotHeight;
 
   return (
-    <figure className="chart">
+    <figure className="m-0">
       <svg
         aria-hidden="true"
         focusable="false"
         role="presentation"
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
+        className="block h-[13.75rem] w-full"
       >
         <defs>
           <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
@@ -138,11 +176,12 @@ export function LineChart({
           </linearGradient>
         </defs>
         <line
-          className="chart-axis"
           x1={padding.left}
           x2={width - padding.right}
           y1={pointY(Math.max(0, min))}
           y2={pointY(Math.max(0, min))}
+          stroke="var(--color-border)"
+          strokeWidth="1"
         />
         {series.map((entry, seriesIndex) => {
           const colour = entry.colour ?? palette()[seriesIndex % palette().length];
@@ -158,57 +197,54 @@ export function LineChart({
                 />
               ) : null}
               <polyline
-                className="chart-line"
                 points={points.join(' ')}
+                fill="none"
                 stroke={colour}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                // `preserveAspectRatio="none"` stretches the viewBox, and a
+                // scaled stroke would make each series a different thickness.
+                vectorEffect="non-scaling-stroke"
                 strokeDasharray={DASHES[seriesIndex % DASHES.length]}
               />
             </g>
           );
         })}
       </svg>
-      <ul className="chart-legend">
-        {series.map((entry, index) => (
-          <li key={entry.key}>
-            <span
-              className="chart-swatch"
-              style={{ background: entry.colour ?? palette()[index % palette().length] }}
-            />
-            {entry.label}
-          </li>
-        ))}
-      </ul>
-      <figcaption className="chart-axis-labels">
+      <Legend series={series} />
+      <figcaption className="mt-1 flex justify-between gap-2 text-xs text-text-muted">
         {tickIndexes(labels.length).map((index) => (
           <span key={labels[index]}>{labels[index]}</span>
         ))}
       </figcaption>
-      <DataTable title={title} labels={labels} series={series} money={money} />
+      <ChartFigures title={title} labels={labels} series={series} money={money} />
     </figure>
   );
 }
 
-export function BarChart({
-  title,
-  labels,
-  series,
-  money = false,
-  emptyMessage = 'No data for this period.',
-}: ChartProps) {
+export function BarChart({ title, labels, series, money = false, emptyMessage }: ChartProps) {
+  const { t } = useLanguage();
   if (!labels.length || !series.length) {
-    return <p className="state chart-empty">{emptyMessage}</p>;
+    return <EmptyState title={emptyMessage ?? t('charts.noData')} />;
   }
   const max = Math.max(1, ...series.flatMap((entry) => entry.values));
   return (
-    <figure className="chart">
-      <div className="chart-bars" aria-hidden="true">
+    <figure className="m-0">
+      {/*
+        A fixed plot height, because the bars are sized as a percentage of their
+        column. With no height on the container — which is what the deleted
+        stylesheet used to supply — every percentage resolved against zero and
+        the chart drew nothing.
+      */}
+      <div aria-hidden="true" className="flex h-56 items-end gap-2 overflow-x-auto">
         {labels.map((label, index) => (
-          <div className="chart-bar-group" key={label}>
-            <div className="chart-bar-stack">
+          <div key={label} className="flex h-full min-w-10 flex-1 flex-col items-center gap-1">
+            <div className="flex h-full w-full items-end justify-center gap-0.5">
               {series.map((entry, seriesIndex) => (
                 <span
                   key={entry.key}
-                  className="chart-bar"
+                  className="w-full max-w-6 rounded-t-sm"
                   style={{
                     height: `${Math.round(((entry.values[index] ?? 0) / max) * 100)}%`,
                     background: entry.colour ?? palette()[seriesIndex % palette().length],
@@ -216,22 +252,12 @@ export function BarChart({
                 />
               ))}
             </div>
-            <small>{label}</small>
+            <small className="truncate text-xs text-text-muted">{label}</small>
           </div>
         ))}
       </div>
-      <ul className="chart-legend">
-        {series.map((entry, index) => (
-          <li key={entry.key}>
-            <span
-              className="chart-swatch"
-              style={{ background: entry.colour ?? palette()[index % palette().length] }}
-            />
-            {entry.label}
-          </li>
-        ))}
-      </ul>
-      <DataTable title={title} labels={labels} series={series} money={money} />
+      <Legend series={series} />
+      <ChartFigures title={title} labels={labels} series={series} money={money} />
     </figure>
   );
 }
@@ -246,30 +272,38 @@ export function ShareBars({
   title,
   slices,
   money = false,
-  emptyMessage = 'Nothing to break down yet.',
+  emptyMessage,
 }: {
   title: string;
   slices: ShareSlice[];
   money?: boolean;
   emptyMessage?: string;
 }) {
+  const { t } = useLanguage();
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
-  if (!slices.length || total === 0) return <p className="state chart-empty">{emptyMessage}</p>;
+  if (!slices.length || total === 0) {
+    return <EmptyState title={emptyMessage ?? t('charts.nothingToBreakDown')} />;
+  }
   return (
-    <ul className="share-bars" aria-label={title}>
+    <ul aria-label={title} className="flex list-none flex-col gap-2 p-0">
       {slices.map((slice, index) => (
-        <li key={slice.key}>
-          <span className="share-label">{slice.label}</span>
-          <span className="share-track">
+        <li
+          key={slice.key}
+          className="grid grid-cols-[minmax(6rem,1fr)_2fr_auto] items-center gap-3"
+        >
+          <span className="truncate text-sm text-text">{slice.label}</span>
+          <span className="h-2 w-full overflow-hidden rounded-full bg-surface-sunken">
             <span
-              className="share-fill"
+              className="block h-full rounded-full"
               style={{
                 width: `${Math.max(2, Math.round((slice.value / total) * 100))}%`,
                 background: palette()[index % palette().length],
               }}
             />
           </span>
-          <span className="share-value">{formatValue(slice.value, money)}</span>
+          <span className="text-sm tabular-nums text-text-muted">
+            {formatValue(slice.value, money)}
+          </span>
         </li>
       ))}
     </ul>

@@ -125,7 +125,7 @@ export function ReturnList() {
   const filtered = Boolean(applied.status || applied.q);
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="returns"
         title={isOwner ? t('returns.titleOwner') : t('returns.titleStaff')}
@@ -196,6 +196,6 @@ export function ReturnList() {
           </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

@@ -90,6 +90,18 @@ export default defineConfig({
       testMatch: /smoke\.spec\.ts/,
       use: { baseURL: `http://127.0.0.1:${DEV_PORT}` },
     },
+    {
+      /*
+       * Every destination on the menu, opened as a role permitted to open it,
+       * asserting no error card and no refused request. Its own project because
+       * it is the slowest tier — one sign-in and one page load per screen — and
+       * because it is the one worth running against the built bundle when a
+       * deployment is in doubt.
+       */
+      name: 'screens',
+      testMatch: /screens\.spec\.ts/,
+      use: { baseURL: `http://127.0.0.1:${PREVIEW_PORT}` },
+    },
   ],
 
   webServer: [

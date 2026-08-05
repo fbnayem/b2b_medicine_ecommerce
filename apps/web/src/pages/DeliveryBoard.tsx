@@ -44,7 +44,7 @@ export function DeliveryBoard() {
   );
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="deliveries"
         title={t('delivery.title')}
@@ -133,6 +133,6 @@ export function DeliveryBoard() {
           </ul>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

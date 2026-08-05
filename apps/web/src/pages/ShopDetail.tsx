@@ -96,7 +96,7 @@ export function ShopDetail() {
   }
 
   return (
-    <main>
+    <>
       <Resource
         query={query}
         loadingLabel={t('shops.loadingOne')}
@@ -230,6 +230,6 @@ export function ShopDetail() {
           );
         }}
       </Resource>
-    </main>
+    </>
   );
 }

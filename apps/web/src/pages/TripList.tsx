@@ -9,12 +9,13 @@ import {
   Field,
   LinkButton,
   PageHeader,
+  Pagination,
   Resource,
   Select,
   type BadgeTone,
   type Column,
 } from '../components/ui';
-import { useApiCollection } from '../lib/query';
+import { usePagedCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { useAuthStore } from '../store/useAuth';
 import { formatFinanceDate } from '../lib/finance';
@@ -38,7 +39,7 @@ export function TripList() {
    */
   const isRider = user?.role === UserRole.DELIVERY_PERSON;
 
-  const trips = useApiCollection<Trip>(
+  const trips = usePagedCollection<Trip>(
     ['trips', status],
     `/trips${status ? `?status=${status}` : ''}`,
   );
@@ -87,7 +88,7 @@ export function TripList() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="trips"
         title={isRider ? t('trips.myTitle') : t('trips.title')}
@@ -121,15 +122,23 @@ export function TripList() {
         empty={<EmptyState title={t('trips.none')} description={t('trips.noneBody')} />}
       >
         {(page) => (
-          <DataTable
-            caption={t('trips.title')}
-            columns={columns}
-            rows={page.items}
-            rowKey={(trip) => trip._id}
-            rowTest={(trip) => trip.reference}
-          />
+          <>
+            <DataTable
+              caption={t('trips.title')}
+              columns={columns}
+              rows={page.items}
+              rowKey={(trip) => trip._id}
+              rowTest={(trip) => trip.reference}
+            />
+            <Pagination
+              page={page.page}
+              limit={page.limit}
+              total={page.total}
+              onPage={trips.setPage}
+            />
+          </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

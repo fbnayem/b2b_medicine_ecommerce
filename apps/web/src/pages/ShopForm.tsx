@@ -98,7 +98,7 @@ export function ShopForm() {
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="shop-new"
         title={t('shops.addTitle')}
@@ -165,6 +165,6 @@ export function ShopForm() {
           </div>
         </form>
       </Card>
-    </main>
+    </>
   );
 }

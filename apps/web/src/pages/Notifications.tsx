@@ -97,7 +97,7 @@ export function Notifications() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="notifications"
         title={t('notifications.title')}
@@ -210,6 +210,6 @@ export function Notifications() {
           </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

@@ -186,7 +186,7 @@ export function SecurityCentre() {
   const active = (sessions.data?.items ?? []).filter((session) => !session.revokedAt);
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="security"
         title={t('security.title')}
@@ -310,6 +310,6 @@ export function SecurityCentre() {
             <p className="text-text-muted">{t('security.deploymentUnavailable')}</p>
           )
         ))}
-    </main>
+    </>
   );
 }

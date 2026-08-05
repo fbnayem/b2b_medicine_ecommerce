@@ -271,7 +271,7 @@ export function InventoryDashboard() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="inventory"
         title={t('inventory.title')}
@@ -428,6 +428,6 @@ export function InventoryDashboard() {
           </Resource>
         </Card>
       </div>
-    </main>
+    </>
   );
 }

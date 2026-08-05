@@ -88,7 +88,7 @@ export function ShopAccount() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="shop-account"
         title={t('account.title')}
@@ -181,6 +181,6 @@ export function ShopAccount() {
           </Resource>
         </Card>
       </div>
-    </main>
+    </>
   );
 }

@@ -46,7 +46,7 @@ export function ActivityFeed() {
   });
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="activity"
         title={t('activity.title')}
@@ -104,6 +104,6 @@ export function ActivityFeed() {
           </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

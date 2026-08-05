@@ -201,6 +201,8 @@ describe('ActivityTimeline', () => {
 
     get.mockResolvedValueOnce({ data: { data: [] } });
     render(<ActivityTimeline entityType={ActivityEntityType.ORDER} entityId="order-2" />);
-    expect(await screen.findByText('No activity has been recorded yet.')).toBeTruthy();
+    // Through the catalogue now, and through the shared `EmptyState`, rather
+    // than a hand-written English sentence in an unstyled paragraph.
+    expect(await screen.findByText('Nothing has happened yet')).toBeTruthy();
   });
 });

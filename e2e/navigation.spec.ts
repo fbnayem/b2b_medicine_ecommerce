@@ -83,7 +83,15 @@ test.describe('role-aware navigation', () => {
     await expect(firstShop).toBeVisible({ timeout: 15_000 });
     await firstShop.click();
 
-    const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' });
+    /*
+     * By test id, not by accessible name. This asserted
+     * `{ name: 'Breadcrumb' }` and had been failing since the label began
+     * coming from the catalogue — it reads "Where you are" in English, and
+     * something else again in Bangla. `docs/TESTING.md` bans `getByText` for
+     * translatable strings; an accessible name built from one is the same
+     * thing wearing a different hat.
+     */
+    const crumbs = page.getByTestId(TEST_IDS.breadcrumb);
     await expect(crumbs).toBeVisible();
     await expect(crumbs).toContainText('Shops');
   });

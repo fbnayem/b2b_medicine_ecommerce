@@ -948,6 +948,27 @@ export const bn: Catalogue = {
     couldNotLoad: 'কার্যক্রমের তালিকা লোড করা যায়নি।',
     none: 'এখনও কিছু নেই',
     noneBody: 'কাজ শুরু হলে এখানে দেখা যাবে।',
+    timelineTitle: 'ইতিহাস',
+    timelineNone: 'এখনও কিছু ঘটেনি',
+    timelineNoneBody: 'এই নথিতে কেউ যা যা করবেন, প্রতিটি ধাপ এখানে থাকবে।',
+    timelineCouldNotLoad: 'এই ইতিহাস লোড করা যায়নি।',
+  },
+
+  charts: {
+    period: 'সময়কাল',
+    noData: 'এই সময়ের কোনো তথ্য নেই।',
+    nothingToBreakDown: 'ভাগ করে দেখানোর মতো কিছু এখনও নেই।',
+    figures: 'এই লেখচিত্রের পেছনের সংখ্যাগুলি',
+  },
+
+  accountSummary: {
+    currentDue: 'এখন পাওনা',
+    overdue: 'মেয়াদোত্তীর্ণ',
+    availableCredit: 'বাকি ক্রেডিট',
+    utilisation: 'ব্যবহৃত ক্রেডিট',
+    utilisationNote: 'এই হিসাবের সীমার তুলনায়',
+    blocked: 'বাকিতে অর্ডার বন্ধ আছে',
+    blockedWithReason: 'বাকিতে অর্ডার বন্ধ আছে: {{reason}}',
   },
 
   finance: {
@@ -2133,6 +2154,17 @@ export const bn: Catalogue = {
   notifications: {
     title: 'বিজ্ঞপ্তি',
     subtitle: 'আপনি যা জানতে চেয়েছেন, তার মধ্যে যা যা ঘটেছে।',
+    bellNone: 'বিজ্ঞপ্তি, সবই পড়া হয়েছে',
+    bellUnread: 'বিজ্ঞপ্তি, {{count}}টি অপঠিত',
+    recent: 'সাম্প্রতিক',
+    bellMarkAllRead: 'সব পড়া হিসেবে চিহ্নিত করুন',
+    bellLoading: 'আপনার বিজ্ঞপ্তি আনা হচ্ছে',
+    bellEmpty: 'এখনও কিছু নেই',
+    bellEmptyBody: 'কোনো কিছুতে আপনার নজর দরকার হলে এখানে জানানো হবে।',
+    viewAll: 'সব বিজ্ঞপ্তি দেখুন',
+    justNow: 'এইমাত্র',
+    minutesAgo: '{{count}} মিনিট আগে',
+    hoursAgo: '{{count}} ঘণ্টা আগে',
     loading: 'আপনার বিজ্ঞপ্তি লোড হচ্ছে',
     couldNotLoad: 'আপনার বিজ্ঞপ্তি লোড করা যায়নি।',
     none: 'নতুন কিছু নেই',
@@ -2235,6 +2267,7 @@ export const bn: Catalogue = {
     dark: 'অন্ধকার',
     system: 'আমার ডিভাইস অনুযায়ী',
     skipToContent: 'মূল অংশে যান',
+    collapseSidebar: 'মেনু সরু করুন',
   },
 
   navGroup: {
@@ -2511,6 +2544,8 @@ export const bn: Catalogue = {
     UNAUTHORIZED: 'আপনাকে সাইন আউট করা হয়েছে। চালিয়ে যেতে আবার সাইন ইন করুন।',
     FORBIDDEN: 'এই কাজটি করার অনুমতি আপনার অ্যাকাউন্টে নেই।',
     NOT_FOUND: 'এটি খুঁজে পাওয়া যায়নি। হয়তো সরিয়ে ফেলা হয়েছে।',
+    NO_SUCH_ENDPOINT:
+      'এই পর্দাটি সার্ভারের কাছে এমন কিছু চেয়েছে যা সার্ভার দেয় না। পৃষ্ঠাটি আবার লোড করুন — বারবার হলে বুঝতে হবে সার্ভারে এই অ্যাপের চেয়ে পুরোনো সংস্করণ চলছে।',
     RATE_LIMITED: 'অনেকবার চেষ্টা হয়েছে। এক মিনিট পরে আবার চেষ্টা করুন।',
     VALIDATION_ERROR: 'কিছু তথ্য ঠিক নেই। চিহ্নিত ঘরগুলো দেখুন।',
     CREDIT_LIMIT: 'এই অর্ডারে দোকানের বাকির সীমা পেরিয়ে যাবে।',

@@ -5,11 +5,12 @@ import {
   EmptyState,
   LinkButton,
   PageHeader,
+  Pagination,
   Resource,
   StatusPill,
   type Column,
 } from '../components/ui';
-import { useApiCollection } from '../lib/query';
+import { usePagedCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
 
@@ -26,7 +27,7 @@ import { formatFinanceDate, formatMinor } from '../lib/finance';
  */
 export function OrderList() {
   const { t } = useLanguage();
-  const query = useApiCollection<Order>(['orders'], '/orders');
+  const query = usePagedCollection<Order>(['orders'], '/orders');
 
   const columns: ReadonlyArray<Column<Order>> = [
     {
@@ -59,7 +60,7 @@ export function OrderList() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="orders"
         title={t('orders.title')}
@@ -87,15 +88,29 @@ export function OrderList() {
         }
       >
         {(orders) => (
-          <DataTable
-            caption={t('orders.title')}
-            columns={columns}
-            rows={orders.items}
-            rowKey={(order) => order._id}
-            rowTest={(order) => order.reference}
-          />
+          <>
+            <DataTable
+              caption={t('orders.title')}
+              columns={columns}
+              rows={orders.items}
+              rowKey={(order) => order._id}
+              rowTest={(order) => order.reference}
+            />
+            {/*
+              `/orders` answers twenty rows by default and this screen showed
+              exactly those, with nothing to say more existed. A shop owner with
+              a month of trading saw their most recent twenty and no way to
+              reach the rest.
+            */}
+            <Pagination
+              page={orders.page}
+              limit={orders.limit}
+              total={orders.total}
+              onPage={query.setPage}
+            />
+          </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

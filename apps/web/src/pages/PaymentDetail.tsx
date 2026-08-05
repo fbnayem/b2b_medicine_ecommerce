@@ -86,7 +86,7 @@ export function PaymentDetail({ ownerMode = false }: PaymentDetailProps) {
   }
 
   return (
-    <main>
+    <>
       <Resource
         query={query}
         loadingLabel={t('finance.loadingPayment')}
@@ -301,6 +301,6 @@ export function PaymentDetail({ ownerMode = false }: PaymentDetailProps) {
           );
         }}
       </Resource>
-    </main>
+    </>
   );
 }

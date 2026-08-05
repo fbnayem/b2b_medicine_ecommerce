@@ -990,6 +990,37 @@ export const en = {
     couldNotLoad: 'The activity feed could not be loaded.',
     none: 'Nothing here yet',
     noneBody: 'Events appear here as people work.',
+    /* The per-record timeline embedded in order, delivery and return details. */
+    timelineTitle: 'History',
+    timelineNone: 'Nothing has happened yet',
+    timelineNoneBody: 'Each step somebody takes on this record is listed here.',
+    timelineCouldNotLoad: 'This history could not be loaded.',
+  },
+
+  /**
+   * The charts on the analytics screens. A chart is decoration to anybody who
+   * cannot see it, so the same numbers are always rendered as a table beside
+   * it — and that table needs a heading in both languages like any other.
+   */
+  charts: {
+    period: 'Period',
+    noData: 'No data for this period.',
+    nothingToBreakDown: 'Nothing to break down yet.',
+    figures: 'The figures behind this chart',
+  },
+
+  /**
+   * The four credit figures shown above a customer account, on the ledger and
+   * on a shop owner's own account screen.
+   */
+  accountSummary: {
+    currentDue: 'Owed now',
+    overdue: 'Overdue',
+    availableCredit: 'Credit left',
+    utilisation: 'Credit used',
+    utilisationNote: 'of the limit on this account',
+    blocked: 'Credit ordering is blocked',
+    blockedWithReason: 'Credit ordering is blocked: {{reason}}',
   },
 
   finance: {
@@ -2239,6 +2270,23 @@ export const en = {
   notifications: {
     title: 'Notifications',
     subtitle: 'What has happened that you asked to be told about.',
+    /*
+     * The bell panel. These were nine hard-coded English strings in
+     * `NotificationBell.tsx`, on the one component that renders on every
+     * screen — so switching the application to Bangla left the first thing
+     * anybody looks at in English, which reads as the switch being broken.
+     */
+    bellNone: 'Notifications, none unread',
+    bellUnread: 'Notifications, {{count}} unread',
+    recent: 'Recent',
+    bellMarkAllRead: 'Mark all read',
+    bellLoading: 'Fetching your notifications',
+    bellEmpty: 'Nothing yet',
+    bellEmptyBody: 'You will be told here when something needs your attention.',
+    viewAll: 'View all notifications',
+    justNow: 'just now',
+    minutesAgo: '{{count}}m ago',
+    hoursAgo: '{{count}}h ago',
     loading: 'Loading your notifications',
     couldNotLoad: 'Your notifications could not be loaded.',
     none: 'Nothing to catch up on',
@@ -2353,6 +2401,7 @@ export const en = {
     dark: 'Dark',
     system: 'Follow my device',
     skipToContent: 'Skip to the main content',
+    collapseSidebar: 'Narrow the menu',
   },
 
   /**
@@ -2676,6 +2725,15 @@ export const en = {
     UNAUTHORIZED: 'You have been signed out. Sign in again to carry on.',
     FORBIDDEN: 'Your account does not have permission to do that.',
     NOT_FOUND: 'That could not be found. It may have been removed.',
+    /*
+     * Deliberately not the sentence above. `NOT_FOUND` means the record is
+     * gone; this means the *address* is not served, which is a different fact
+     * with a different remedy. Until this code existed, a browser running
+     * against a server too old to have `/trips` told a distributor their
+     * delivery rounds had been deleted.
+     */
+    NO_SUCH_ENDPOINT:
+      'This screen asked the server for something it does not offer. Reload the page — if it keeps happening, the server is running an older version than this app.',
     RATE_LIMITED: 'Too many attempts. Wait a minute and try again.',
     VALIDATION_ERROR: 'Some of what was entered is not valid. Check the highlighted fields.',
     CREDIT_LIMIT: 'This order would take the shop past its credit limit.',

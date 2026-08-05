@@ -142,7 +142,7 @@ export function ControlledRegister() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="controlled-register"
         title={t('purchasing.registerTitle')}
@@ -214,6 +214,6 @@ export function ControlledRegister() {
           </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

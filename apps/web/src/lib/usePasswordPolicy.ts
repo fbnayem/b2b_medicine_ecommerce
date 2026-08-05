@@ -11,6 +11,15 @@ import { apiClient } from '../api/client';
  *
  * Eight is the floor in `@medsupply/validation`, so it is the safe assumption
  * while the real value is on its way or if the request fails.
+ *
+ * **This asked `GET /settings/security`, which the server has never served** —
+ * `settingsRoutes.ts` mounts `GET /settings` and `PUT /settings/:group`, and
+ * there is no per-group read. The `catch` below swallowed the 404 by design, so
+ * the form silently used the floor no matter what an administrator had
+ * configured: a policy of twelve characters was never enforced by the field,
+ * only by the server's refusal afterwards. Found by the screen sweep in
+ * `e2e/screens.spec.ts`, which asserts that no screen makes a request the
+ * server refuses.
  */
 const FLOOR = 8;
 
@@ -23,9 +32,9 @@ export function usePasswordPolicy(): number {
     if (cached !== null) return;
     let cancelled = false;
     apiClient
-      .get('/settings/security')
+      .get('/settings')
       .then((response) => {
-        const value = Number(response.data?.data?.values?.passwordMinLength);
+        const value = Number(response.data?.data?.settings?.security?.passwordMinLength);
         if (cancelled || !Number.isInteger(value) || value < FLOOR) return;
         cached = value;
         setMinimum(value);

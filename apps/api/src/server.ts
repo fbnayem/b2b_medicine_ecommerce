@@ -54,6 +54,30 @@ const startServer = async () => {
   startNotificationSweeper();
   await startNotificationSchedules();
 
+  /*
+   * A port that is already taken must stop this process, loudly.
+   *
+   * There was no `'error'` listener here, so `EADDRINUSE` surfaced as an
+   * uncaught exception — a stack trace that scrolls past in a `--parallel`
+   * turbo run, while the process that *did* hold the port carried on serving.
+   * That is how a build from thirty-four hours earlier answered every request
+   * for a day and a half: six route groups added in the meantime returned 404,
+   * and the only visible symptom was screens reporting that records had been
+   * removed. The remedy is a sentence naming the port, not a stack.
+   */
+  httpServer.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      logger.error(
+        `Port ${port} is already in use, so this server did not start. ` +
+          'Another instance is answering on it — very likely an older build. ' +
+          'Stop it before starting this one.',
+      );
+    } else {
+      logger.error('The server could not open its port', { port, reason: error.message });
+    }
+    process.exit(1);
+  });
+
   httpServer.listen(port, () => {
     logger.info('API listening', {
       port,

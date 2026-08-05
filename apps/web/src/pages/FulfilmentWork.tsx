@@ -397,7 +397,7 @@ export function FulfilmentWork() {
   }
 
   return (
-    <main>
+    <>
       <Resource
         query={query}
         loadingLabel={t('picking.loading')}
@@ -737,6 +737,6 @@ export function FulfilmentWork() {
           </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

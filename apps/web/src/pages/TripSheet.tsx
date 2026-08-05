@@ -119,7 +119,7 @@ export function TripSheet() {
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="trip-detail"
         title={t('trips.title')}
@@ -292,6 +292,6 @@ export function TripSheet() {
           );
         }}
       </Resource>
-    </main>
+    </>
   );
 }

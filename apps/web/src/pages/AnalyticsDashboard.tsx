@@ -56,7 +56,7 @@ export function AnalyticsDashboard() {
     })[bucket] ?? bucket;
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="analytics"
         title={t('analytics.title')}
@@ -266,6 +266,6 @@ export function AnalyticsDashboard() {
           </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

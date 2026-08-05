@@ -80,7 +80,7 @@ export function CustomerLedger() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="shop-ledger"
         title={t('finance.ledgerTitle')}
@@ -140,6 +140,6 @@ export function CustomerLedger() {
           )}
         </Resource>
       </div>
-    </main>
+    </>
   );
 }

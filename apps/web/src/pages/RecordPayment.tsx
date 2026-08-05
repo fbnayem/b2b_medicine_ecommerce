@@ -164,7 +164,7 @@ export function RecordPayment() {
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="payment-new"
         title={t('finance.recordTitle')}
@@ -342,6 +342,6 @@ export function RecordPayment() {
           </Card>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

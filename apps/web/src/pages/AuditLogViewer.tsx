@@ -60,7 +60,7 @@ export function AuditLogViewer() {
   const reset = () => setPage(1);
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="audit"
         title={t('audit.title')}
@@ -169,6 +169,6 @@ export function AuditLogViewer() {
           </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

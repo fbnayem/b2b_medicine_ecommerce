@@ -1001,3 +1001,108 @@ planting the defect it claims to catch.
 - Still open from the go-live list: SMS provider procurement, an
   `ERROR_REPORTING_DSN` adapter, and a scheduled backup — `backup.ts` exists and
   nothing runs it on a timer.
+
+## Phase 25 — What the screenshots actually were
+
+### Status
+
+Complete.
+
+### Scope
+
+Repair every screen reported broken, find the ones that were broken and not
+reported, and make the interface easier to use and better to look at — the
+sidebar's length, the colour, and the density of the list screens.
+
+### Completed work
+
+**The cause of thirteen of the fourteen broken screens was a stale process, not
+code.** The API on `:5000` had been started thirty-four hours earlier with
+`start` rather than `dev`; two later `pnpm dev` stacks lost the port to
+`EADDRINUSE` and stayed alive, because `node --watch` does not exit when its
+script fails. Trips, pricing, stocktakes, warehouses, `/orders/quote` and
+`/media` had all been added since. The server published 65 paths against the
+repository's 167.
+
+**The fourteenth, and three more nobody had reported, were a deleted
+stylesheet.** `inventory.css` went when the pages were converted;
+`uiDiscipline.test.ts` globs `pages/` only, so `components/` was never audited
+and thirty-seven class names went on being written for a file that no longer
+existed.
+
+### Files created
+
+- `apps/web/src/components/navIcons.tsx`
+- `apps/web/src/components/ui/ProductImage.tsx`
+- `apps/web/src/components/ui/ListToolbar.tsx`
+- `apps/web/src/components/ui/TableLink.tsx`
+- `apps/web/src/lib/sidebarState.ts`
+- `apps/web/src/testing/orphanClasses.test.ts`
+- `apps/web/src/testing/apiPaths.test.ts`
+- `e2e/screens.spec.ts`
+
+### Files modified
+
+`apps/api/scripts/dev.mjs`, `apps/api/src/server.ts`,
+`apps/api/src/middlewares/error.ts`, `apps/api/src/services/hardeningIntegration.test.ts`,
+`apps/web/src/components/{AppShell,NotificationBell,Chart,FinanceSummaryCards,ActivityTimeline}.tsx`,
+`apps/web/src/components/ui/{Data,StatusPill,index}.ts(x)`, `apps/web/src/index.css`,
+`apps/web/src/lib/{query,tokenParity.test,usePasswordPolicy}.ts`,
+`packages/design-tokens/{index.ts,theme.css}`, `packages/i18n/{en,bn}.ts`,
+`e2e/{fixtures,navigation.spec}.ts`, `playwright.config.ts`, and 58 page files
+(`<main>` → fragment; nine also gained pagination).
+
+### Database changes
+
+None.
+
+### API changes
+
+`notFoundHandler` answers `NO_SUCH_ENDPOINT` rather than `NOT_FOUND` for an
+address that is not served. No route, schema or permission changed.
+
+### Web changes
+
+The notification panel, both analytics charts, the account credit figures and
+the per-record history rebuilt on the design system; a real `@media print`
+block; a shared `ProductImage` that reserves its box and falls back on error;
+sidebar icons, collapsible groups and a rail; a four-step neutral ladder and two
+new status tones; `ListToolbar`, `TableLink`, `Stat`/`StatGrid`; pagination on
+nine list screens; nested `<main>` landmarks removed from 58 pages.
+
+### Mobile changes
+
+None. `packages/design-tokens` gained tokens and mobile consumes it, but no
+mobile screen changed; its 93 tests pass unchanged.
+
+### Tests added
+
+`orphanClasses.test.ts` (4), `apiPaths.test.ts` (3), `screens.spec.ts` (42), and
+18 new contrast assertions in `tokenParity.test.ts`.
+
+### Test results
+
+API 169 unit, 192 integration, 5 reconciliation. Web 217. Mobile 93. Browser 99,
+of which the 42 new screen tests. Typecheck, lint and build clean apart from
+seven pre-existing fast-refresh warnings in files not touched here.
+
+### Known limitations
+
+- The screen sweep opens every destination **without a path parameter**. Detail
+  screens need a real record and belong in a journey spec; they are not covered
+  by this gate.
+- `apiPaths.test.ts` verifies the _resource_ for the five call sites that build
+  their last segment from a variable action. A renamed action is caught by the
+  union at the call site, which is a compile error, not by this gate. The
+  financial reports are the exception: their union is read from the source and
+  every member checked.
+- The rail and the collapsed groups are stored per browser, not per account.
+- Sidebar pending counts were considered and left out: they would break the
+  frozen `exact: true` link-name matching in six specs, and need a server
+  aggregate that does not exist.
+
+### Next phase dependencies
+
+The three gates hold the ground this phase recovered. Go-live items remain as
+listed in Phase 24: SMS provider procurement, an `ERROR_REPORTING_DSN` adapter,
+and a scheduled backup.

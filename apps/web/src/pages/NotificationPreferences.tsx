@@ -133,7 +133,7 @@ export function NotificationPreferences() {
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="notification-preferences"
         title={t('notifications.preferencesTitle')}
@@ -291,6 +291,6 @@ export function NotificationPreferences() {
           </Resource>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

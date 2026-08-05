@@ -245,7 +245,7 @@ export function ReturnDetail() {
   ];
 
   return (
-    <main>
+    <>
       <Resource
         query={query}
         loadingLabel={t('returnDetail.loading')}
@@ -745,6 +745,6 @@ export function ReturnDetail() {
           );
         }}
       </Resource>
-    </main>
+    </>
   );
 }

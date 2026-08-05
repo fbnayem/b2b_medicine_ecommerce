@@ -91,6 +91,7 @@ export const TEST_IDS = {
   sidebar: 'app-sidebar',
   search: 'app-search',
   accountMenu: 'app-account-menu',
+  breadcrumb: 'breadcrumb',
   toast: 'toast',
   dialog: 'dialog',
   dialogConfirm: 'dialog-confirm',

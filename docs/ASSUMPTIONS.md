@@ -351,3 +351,53 @@ reads a decision rather than guesses at an intention.
 - **A tag with no closing `>` is stripped wherever text is cut.** One row of the
   real sample ends `...</p>\n55:Tcad,<h` inside its quoted field — the exporter
   truncated it mid-write — and capping a description can produce the same shape.
+
+## What the screenshots turned out to be (phase 25)
+
+- **A development server that has stopped reloading is a class of defect, not an
+  accident.** The process answering `:5000` had been started thirty-four hours
+  earlier with `start` rather than `dev`, and two later `pnpm dev` stacks had
+  lost the port to `EADDRINUSE` and stayed alive anyway, so the terminal looked
+  healthy. Six route groups added in the meantime — trips, pricing, stocktakes,
+  warehouses, `/orders/quote`, `/media` — answered 404, which the client renders
+  as "It may have been removed". **Fourteen screens looked like data loss and
+  were a stale binary.** `dev.mjs` now refuses to start on a busy port and
+  `server.ts` exits on `EADDRINUSE` with a sentence rather than a stack trace.
+- **A 404 for an address is not a 404 for a record**, and they no longer share a
+  code. `notFoundHandler` emits `NO_SUCH_ENDPOINT`, worded as what it is: this
+  build of the client is asking for something this build of the server does not
+  serve.
+- **The port probe binds exactly as the server binds — no host.** The first
+  version passed `'0.0.0.0'` and reported the port free while the API was
+  answering on it, because Windows treats the IPv4 and IPv6 wildcards as
+  distinct addresses. A check that cannot fail is the defect it was written to
+  prevent.
+- **Deleting a stylesheet is only finished when every file that referenced it is
+  audited.** `inventory.css` went when the _pages_ were converted;
+  `uiDiscipline.test.ts` globs `pages/`, so `components/` was never looked at
+  and thirty-seven class names went on being written for a file that no longer
+  existed. Four components rendered unstyled on at least seven screens, and
+  three print layouts printed the application chrome around the document. A
+  class that resolves to nothing is not a CSS error — it is silence.
+- **The new gate is "this class cannot resolve", not "components must use the
+  primitives".** The second is a matter of taste and would be argued with; the
+  first is a fact about the build, and a fact is what a gate can hold.
+- **Two status tones were added rather than repainting the palette.** Ten of the
+  twenty-two order statuses rendered in the same blue, so a queue could not be
+  scanned — every pill had to be read. `progress` (teal) is work happening
+  inside the building and `transit` (plum) is work that has left it. Both are
+  hues already in the chart palette, and both clear 4.5:1 on their own subtle
+  background in each theme.
+- **`success` deliberately stays equal to `brand`.** In a green-branded product
+  that collision is semantically honest, and the separation that was actually
+  missing is between the phases of the lifecycle, not between a verdict and the
+  brand.
+- **Light mode had two greys and now has four.** `canvas`, `surface-sunken` and
+  `surface-hover` were all `neutral.50`, so a hovered row was exactly the colour
+  of the page behind it. `surface-raised` still equals `surface`: on a light
+  theme elevation is carried by the shadow, because there is nothing above
+  white to go to.
+- **A list that stops without saying so is a correctness defect, not polish.**
+  Nine list screens fetched the server's default page — twenty rows for orders —
+  and displayed exactly that with no indication anything followed. The reader
+  has no reason to doubt it, which makes it worse than an error.

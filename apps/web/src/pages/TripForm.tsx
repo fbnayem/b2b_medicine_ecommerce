@@ -94,7 +94,7 @@ export function TripForm() {
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="trip-new"
         title={t('trips.planTitle')}
@@ -251,6 +251,6 @@ export function TripForm() {
           </Button>
         </div>
       </form>
-    </main>
+    </>
   );
 }

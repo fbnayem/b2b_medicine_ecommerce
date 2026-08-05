@@ -23,11 +23,23 @@ interface AppError {
   stack?: string;
 }
 
-/** Unknown routes get the same JSON envelope as everything else. */
+/**
+ * Unknown routes get the same JSON envelope as everything else — but not the
+ * same code as a record that does not exist.
+ *
+ * Both used to answer `NOT_FOUND`, and the client catalogue renders that as
+ * "That could not be found. It may have been removed." So when a browser ran
+ * against a server too old to have `/trips`, a distributor was told their
+ * delivery rounds had been deleted. They had not: the address was never served.
+ *
+ * These are different facts with different remedies — one is "look somewhere
+ * else", the other is "this build is behind" — so they are now different codes
+ * and different sentences.
+ */
 export const notFoundHandler = (req: Request, res: Response) => {
   res.status(404).json({
     error: {
-      code: 'NOT_FOUND',
+      code: 'NO_SUCH_ENDPOINT',
       message: `No route matches ${req.method} ${req.path}`,
       correlationId: correlationId(),
     },

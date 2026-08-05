@@ -82,7 +82,7 @@ export function CustomerStatement({ ownerMode = false }: CustomerStatementProps)
   ];
 
   return (
-    <main>
+    <>
       <div className="print:hidden">
         <PageHeader
           routeId={ownerMode ? 'my-statement' : 'shop-statement'}
@@ -176,6 +176,6 @@ export function CustomerStatement({ ownerMode = false }: CustomerStatementProps)
           </Card>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

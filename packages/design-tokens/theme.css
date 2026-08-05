@@ -23,8 +23,8 @@
   --color-canvas: #f4f6f5;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
-  --color-surface-sunken: #f4f6f5;
-  --color-surface-hover: #f4f6f5;
+  --color-surface-sunken: #e8ebe9;
+  --color-surface-hover: #eef1ef;
 
   --color-border: #d5dbd7;
   --color-border-strong: #b3bdb7;
@@ -46,6 +46,10 @@
   --color-danger-subtle: #fdf2f2;
   --color-info: #1f5fa8;
   --color-info-subtle: #eff4fb;
+  --color-progress: #0f6f78;
+  --color-progress-subtle: #eaf5f6;
+  --color-transit: #7a3f6d;
+  --color-transit-subtle: #f7eff5;
 
   --color-ring: #1f815d;
 
@@ -71,7 +75,7 @@
   --color-surface: #161b18;
   --color-surface-raised: #242b26;
   --color-surface-sunken: #0d100e;
-  --color-surface-hover: #242b26;
+  --color-surface-hover: #1d231f;
 
   --color-border: #374039;
   --color-border-strong: #485349;
@@ -93,6 +97,10 @@
   --color-danger-subtle: #7a1616;
   --color-info: #b0c9ea;
   --color-info-subtle: #123a66;
+  --color-progress: #7fc9d1;
+  --color-progress-subtle: #083f45;
+  --color-transit: #d9a8cc;
+  --color-transit-subtle: #4a2641;
 
   --color-ring: #71bd9c;
 
@@ -133,6 +141,10 @@
   --color-danger-subtle: var(--color-danger-subtle);
   --color-info: var(--color-info);
   --color-info-subtle: var(--color-info-subtle);
+  --color-progress: var(--color-progress);
+  --color-progress-subtle: var(--color-progress-subtle);
+  --color-transit: var(--color-transit);
+  --color-transit-subtle: var(--color-transit-subtle);
 
   --color-ring: var(--color-ring);
 

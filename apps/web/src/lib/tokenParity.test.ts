@@ -125,6 +125,21 @@ describe('the palette meets the contrast it claims', () => {
     ['danger on surface', 'color-danger', 'color-surface'],
     ['warning on surface', 'color-warning', 'color-surface'],
     ['info on surface', 'color-info', 'color-surface'],
+    ['progress on surface', 'color-progress', 'color-surface'],
+    ['transit on surface', 'color-transit', 'color-surface'],
+    /*
+     * A `Badge` is `text-<tone>` on `bg-<tone>-subtle`, and that pair was never
+     * asserted — only the tone against the plain surface was. Two tones were
+     * being added here, so the pairing they are actually rendered in is now
+     * held to the same floor as everything else.
+     */
+    ['brand on its own subtle', 'color-brand', 'color-brand-subtle'],
+    ['success on its own subtle', 'color-success', 'color-success-subtle'],
+    ['warning on its own subtle', 'color-warning', 'color-warning-subtle'],
+    ['danger on its own subtle', 'color-danger', 'color-danger-subtle'],
+    ['info on its own subtle', 'color-info', 'color-info-subtle'],
+    ['progress on its own subtle', 'color-progress', 'color-progress-subtle'],
+    ['transit on its own subtle', 'color-transit', 'color-transit-subtle'],
   ];
 
   for (const [label, foreground, background] of PAIRS) {

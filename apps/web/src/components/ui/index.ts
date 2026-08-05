@@ -31,13 +31,19 @@ export {
   FilterTabs,
   PageHeader,
   Pagination,
+  Stat,
+  StatGrid,
   Table,
   Td,
   Th,
   type BadgeTone,
   type PageHeaderProps,
+  type StatProps,
 } from './Data';
 export { DataTable, type Column, type DataTableProps } from './DataTable';
+export { ListToolbar, type ListToolbarProps } from './ListToolbar';
+export { TableLink } from './TableLink';
+export { ProductImage, type ProductImageProps } from './ProductImage';
 export { Resource, type ResourceProps } from './Resource';
 export { StatusPill, statusLabel, type StatusKind } from './StatusPill';
 export { toast, Toaster } from './toast';

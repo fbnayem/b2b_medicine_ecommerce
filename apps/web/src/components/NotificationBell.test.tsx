@@ -107,7 +107,10 @@ describe('NotificationBell', () => {
     );
     fireEvent.click(await screen.findByRole('button', { name: /Notifications/ }));
     expect(await screen.findByText('Unable to load notifications.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    // "Try again", not "Retry": the panel now uses the shared `ErrorState`
+    // rather than its own markup, so the recovery action is worded the same
+    // here as on every other screen that can fail.
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
     view.unmount();
   });
 

@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { createServer } from 'node:net';
+import { readFileSync } from 'node:fs';
 
 /**
  * The development server.
@@ -21,6 +23,70 @@ import { once } from 'node:events';
  */
 
 const children = [];
+
+/**
+ * Refuse to start when something already holds the port.
+ *
+ * `node --watch` does not exit when the script it runs fails, so a server child
+ * that died on `EADDRINUSE` left this supervisor alive and `pnpm dev` looking
+ * healthy. Three stacks accumulated that way, and the process actually
+ * answering was a `node dist/server.js` started thirty-four hours earlier —
+ * serving a build without `/trips`, `/pricing`, `/stocktakes`, `/warehouses`,
+ * `/orders/quote` or `/media`. Fourteen screens reported that records had been
+ * removed, and nothing anywhere said the word "port".
+ *
+ * Checking first turns that day and a half into one sentence.
+ */
+async function portIsFree(port) {
+  const probe = createServer();
+  return new Promise((resolve) => {
+    probe.once('error', () => resolve(false));
+    probe.once('listening', () => probe.close(() => resolve(true)));
+    /*
+     * No host, because that is exactly how `server.ts` binds.
+     *
+     * This mattered: the first version passed `'0.0.0.0'` and reported the port
+     * free while the API was answering on it. Windows treats the IPv4 and IPv6
+     * wildcards as distinct addresses, so a probe on `0.0.0.0` does not collide
+     * with the server's dual-stack `::` bind — and a check that cannot fail is
+     * the same defect as no check at all, which is what this file exists to
+     * prevent. Verified: `listen(5000)` and `listen(5000, '::')` both answer
+     * EADDRINUSE where `'0.0.0.0'` and `'127.0.0.1'` report free.
+     */
+    probe.listen(port);
+  });
+}
+
+/*
+ * Resolve the port the way the server will, without importing `env.ts`: this
+ * file runs before anything is compiled. `dotenv` is loaded by `server.ts`, so
+ * `process.env` does not carry `.env` yet — read it here rather than probing a
+ * port nobody is going to use. The default matches `env.ts`'s own, and
+ * `server.ts`'s `'error'` handler is the backstop if this resolves wrongly.
+ */
+function configuredPort() {
+  if (process.env.PORT) return Number(process.env.PORT);
+  try {
+    const file = readFileSync(new URL('../.env', import.meta.url), 'utf8');
+    const match = /^\s*PORT\s*=\s*(\d+)/m.exec(file);
+    if (match) return Number(match[1]);
+  } catch {
+    // No `.env` — a container, or a first run. The default is right there.
+  }
+  return 5000;
+}
+
+const port = configuredPort();
+if (!(await portIsFree(port))) {
+  console.error(
+    `\nPort ${port} is already in use, so the API was not started.\n` +
+      'Something else is answering on it — most likely an API process left over\n' +
+      'from an earlier run, which will keep serving whatever build it loaded.\n\n' +
+      `  Windows:  netstat -ano | findstr :${port}   then  taskkill /PID <pid> /F\n` +
+      `  macOS/Linux:  lsof -ti :${port} | xargs kill\n`,
+  );
+  process.exit(1);
+}
 
 // Each command is a single fixed string rather than a command plus an argument
 // array: `shell: true` with separate arguments concatenates them unescaped,

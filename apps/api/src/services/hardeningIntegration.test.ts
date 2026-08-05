@@ -390,11 +390,19 @@ test('a correlation identifier is returned, honoured and recorded', async () => 
   assert.match(oversized.headers.get('x-request-id') ?? '', /^[\w-]{8,64}$/);
 });
 
-test('an unknown route answers in the same envelope as everything else', async () => {
+test('an unknown route says the address is unserved, not that a record is gone', async () => {
   const response = await call('/api/v1/does-not-exist');
   assert.equal(response.status, 404);
   const error = (response.body as { error: { code: string; correlationId?: string } }).error;
-  assert.equal(error.code, 'NOT_FOUND');
+  /*
+   * `NO_SUCH_ENDPOINT`, not `NOT_FOUND`. Both are 404s and they are not the
+   * same fact: one means the record was removed, the other that this build of
+   * the client is asking for an address this build of the server never served.
+   * They shared a code once, and the client catalogue renders `NOT_FOUND` as
+   * "It may have been removed" — so a browser running against a server too old
+   * to have `/trips` told a distributor their delivery rounds had been deleted.
+   */
+  assert.equal(error.code, 'NO_SUCH_ENDPOINT');
   assert.ok(error.correlationId);
 });
 

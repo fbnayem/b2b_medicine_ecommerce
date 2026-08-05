@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import * as Tooltip from '@radix-ui/react-tooltip';
+import {
+  ChevronDown,
+  ChevronRight,
+  Menu as MenuIcon,
+  PanelLeft,
+  PanelLeftClose,
+} from 'lucide-react';
 import {
   NAV_GROUP_LABEL,
   NAV_BY_ID,
@@ -23,6 +31,8 @@ import { LANGUAGE_LABEL, LANGUAGES } from '@medsupply/i18n';
 import { applyTheme, storedTheme, setTheme, type ThemeChoice } from '../lib/theme';
 import { useBranding } from '../lib/useBranding';
 import { routeIdForPath } from '../app/routes';
+import { NAV_ICON } from './navIcons';
+import { useCollapsedGroups, useRail } from '../lib/sidebarState';
 
 /**
  * The authenticated chrome.
@@ -56,6 +66,7 @@ export function AppShell() {
   const { t, language, setLanguage } = useLanguage();
   const [theme, setThemeChoice] = useState<ThemeChoice>(() => storedTheme());
   const [navOpen, setNavOpen] = useState(false);
+  const { rail, toggle: toggleRail } = useRail();
 
   // One realtime connection for the whole authenticated session, not one per
   // guarded route group — the old arrangement opened and closed a socket every
@@ -94,21 +105,35 @@ export function AppShell() {
 
   return (
     <AskProvider>
-      <div data-test="app-shell" className="min-h-screen bg-canvas text-text">
+      {/*
+        The header's height, declared once on the shell so the header and the
+        sidebar's sticky offset read the same value. It was written out as
+        `3.25rem` in two separate class names, and a change to the header's
+        padding left the sidebar either short of the viewport or scrolling
+        behind it, with nothing to connect cause to effect.
+      */}
+      <div
+        data-test="app-shell"
+        style={{ ['--header-h' as string]: '3.25rem' }}
+        className="min-h-screen bg-canvas text-text"
+      >
         <a href="#main" className="skip-link">
           {t('nav.skipToContent')}
         </a>
         <RouteAnnouncer />
 
-        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-surface px-4 py-2">
+        <header className="sticky top-0 z-10 flex h-[var(--header-h)] items-center gap-3 border-b border-border bg-surface px-4">
           <button
             type="button"
             onClick={() => setNavOpen((open) => !open)}
             aria-expanded={navOpen}
             aria-controls="app-sidebar"
-            className="min-h-11 rounded-md border border-border px-3 lg:hidden"
+            aria-label={t('nav.sections')}
+            className="flex size-11 items-center justify-center rounded-md border border-border lg:hidden"
           >
-            Menu
+            {/* Was the literal word "Menu", untranslated, on the one control a
+                phone user needs before they can reach anything else. */}
+            <MenuIcon aria-hidden="true" size={20} />
           </button>
 
           <Link to="/dashboard" className="text-lg font-semibold text-brand">
@@ -134,44 +159,7 @@ export function AppShell() {
         </header>
 
         <div className="flex">
-          <nav
-            id="app-sidebar"
-            data-test="app-sidebar"
-            aria-label={t('nav.sections')}
-            className={[
-              'w-64 shrink-0 border-e border-border bg-surface p-3',
-              'lg:block lg:sticky lg:top-[3.25rem] lg:h-[calc(100vh-3.25rem)] lg:overflow-y-auto',
-              navOpen ? 'block fixed inset-y-0 start-0 z-[100] overflow-y-auto' : 'hidden',
-            ].join(' ')}
-          >
-            {grouped.map(({ group, items: groupItems }) => (
-              <div key={group} className="mb-4">
-                <h2 className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
-                  {translatedOr(t, `navGroup.${group}`, NAV_GROUP_LABEL[group])}
-                </h2>
-                <ul className="flex flex-col gap-0.5">
-                  {groupItems.map((item) => (
-                    <li key={item.id}>
-                      <NavLink
-                        to={item.path}
-                        end={item.path === '/dashboard'}
-                        className={({ isActive }) =>
-                          [
-                            'flex min-h-11 items-center rounded-md px-3 text-sm',
-                            isActive
-                              ? 'bg-brand-subtle font-semibold text-brand'
-                              : 'text-text hover:bg-surface-hover',
-                          ].join(' ')
-                        }
-                      >
-                        {translatedOr(t, `navItem.${item.id}`, item.label)}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </nav>
+          <Sidebar groups={grouped} open={navOpen} rail={rail} onRail={toggleRail} />
 
           {/*
             `tabIndex={-1}` so `RouteAnnouncer` can move focus here after a
@@ -186,6 +174,165 @@ export function AppShell() {
         <Toaster />
       </div>
     </AskProvider>
+  );
+}
+
+interface SidebarGroup {
+  group: NavGroup;
+  items: NavItem[];
+}
+
+/**
+ * The navigation.
+ *
+ * Three things changed, and each one addresses the same complaint: a super
+ * admin is offered thirty-seven destinations and the list simply scrolled.
+ *
+ * **Icons.** `NavItem.icon` has been in `@medsupply/navigation` since the shell
+ * was built and the web has never read it, so every row was identical text and
+ * finding one meant reading the lot. They are `aria-hidden`: the accessible
+ * name of each link must stay exactly its label, because six end-to-end specs
+ * match on `getByRole('link', { name, exact: true })` — an icon that
+ * contributed a word to that name would break all of them, which is precisely
+ * why it is worth saying out loud here.
+ *
+ * **Collapsible groups**, remembered. The group holding the current page is
+ * always open regardless of what was stored, so a collapse can never hide the
+ * page somebody is looking at.
+ *
+ * **A rail.** Collapsed to icons for people who know where things are, with the
+ * label in a tooltip for the moment they do not.
+ */
+function Sidebar({
+  groups,
+  open,
+  rail,
+  onRail,
+}: {
+  groups: SidebarGroup[];
+  open: boolean;
+  rail: boolean;
+  onRail: () => void;
+}) {
+  const { t } = useLanguage();
+  const { pathname } = useLocation();
+  const { collapsed, toggle } = useCollapsedGroups();
+
+  const holdsCurrentPage = (items: NavItem[]) =>
+    items.some((item) => pathname === item.path || pathname.startsWith(`${item.path}/`));
+
+  return (
+    <nav
+      id="app-sidebar"
+      data-test="app-sidebar"
+      aria-label={t('nav.sections')}
+      className={[
+        'shrink-0 border-e border-border bg-surface p-2',
+        rail ? 'lg:w-16' : 'w-64',
+        // `--header-h` is published by the header itself, so this no longer
+        // guesses at 3.25rem in two places and drift silently.
+        'lg:block lg:sticky lg:top-[var(--header-h)] lg:h-[calc(100vh-var(--header-h))] lg:overflow-y-auto',
+        open ? 'block fixed inset-y-0 start-0 z-[100] w-64 overflow-y-auto' : 'hidden',
+      ].join(' ')}
+    >
+      <Tooltip.Provider delayDuration={200}>
+        {groups.map(({ group, items }) => {
+          const current = holdsCurrentPage(items);
+          const shut = !rail && collapsed.includes(group) && !current;
+          const label = translatedOr(t, `navGroup.${group}`, NAV_GROUP_LABEL[group]);
+          return (
+            <div key={group} className="mb-2">
+              {rail ? (
+                <hr className="my-2 border-border first:hidden" />
+              ) : (
+                <h2>
+                  <button
+                    type="button"
+                    onClick={() => toggle(group)}
+                    aria-expanded={!shut}
+                    className={[
+                      'flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-start',
+                      'text-xs font-semibold uppercase tracking-wide hover:bg-surface-hover',
+                      // The heading says which section you are in, which is the
+                      // one thing the old sidebar never indicated at all.
+                      current ? 'text-brand' : 'text-text-muted',
+                    ].join(' ')}
+                  >
+                    {shut ? (
+                      <ChevronRight aria-hidden="true" size={14} />
+                    ) : (
+                      <ChevronDown aria-hidden="true" size={14} />
+                    )}
+                    {label}
+                  </button>
+                </h2>
+              )}
+              {!shut && (
+                <ul className="flex flex-col gap-0.5">
+                  {items.map((item) => {
+                    const Icon = NAV_ICON[item.icon];
+                    const words = translatedOr(t, `navItem.${item.id}`, item.label);
+                    const link = (
+                      <NavLink
+                        to={item.path}
+                        end={item.path === '/dashboard'}
+                        className={({ isActive }) =>
+                          [
+                            'flex min-h-11 items-center gap-3 rounded-md px-3 text-sm',
+                            rail ? 'lg:justify-center lg:px-0' : '',
+                            isActive
+                              ? 'bg-brand-subtle font-semibold text-brand'
+                              : 'text-text hover:bg-surface-hover',
+                          ].join(' ')
+                        }
+                      >
+                        <Icon aria-hidden="true" size={18} className="shrink-0" />
+                        <span className={rail ? 'lg:sr-only' : ''}>{words}</span>
+                      </NavLink>
+                    );
+                    return (
+                      <li key={item.id}>
+                        {rail ? (
+                          <Tooltip.Root>
+                            <Tooltip.Trigger asChild>{link}</Tooltip.Trigger>
+                            <Tooltip.Portal>
+                              <Tooltip.Content
+                                side="right"
+                                sideOffset={8}
+                                className="z-[200] rounded-md border border-border bg-surface px-2 py-1 text-sm text-text shadow-md"
+                              >
+                                {words}
+                              </Tooltip.Content>
+                            </Tooltip.Portal>
+                          </Tooltip.Root>
+                        ) : (
+                          link
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </Tooltip.Provider>
+
+      {/* Wide screens only: on a phone the sidebar is already a sheet. */}
+      <button
+        type="button"
+        onClick={onRail}
+        aria-pressed={rail}
+        className="mt-2 hidden min-h-11 w-full items-center gap-3 rounded-md px-3 text-sm text-text-muted hover:bg-surface-hover lg:flex"
+      >
+        {rail ? (
+          <PanelLeft aria-hidden="true" size={18} className="shrink-0" />
+        ) : (
+          <PanelLeftClose aria-hidden="true" size={18} className="shrink-0" />
+        )}
+        <span className={rail ? 'sr-only' : ''}>{t('nav.collapseSidebar')}</span>
+      </button>
+    </nav>
   );
 }
 
@@ -210,7 +357,17 @@ function Breadcrumbs() {
   if (trail.length <= 1) return null;
 
   return (
-    <nav aria-label={t('nav.breadcrumb')} className="mb-3">
+    <nav
+      // A stable id as well as the label. `navigation.spec.ts` matched on
+      // `getByRole('navigation', { name: 'Breadcrumb' })` and has been failing
+      // since this label started coming from the catalogue — it reads "Where
+      // you are" in English and something else again in Bangla.
+      // `docs/TESTING.md` bans `getByText` for translatable strings for exactly
+      // this reason, and an accessible name built from one is the same thing.
+      data-test="breadcrumb"
+      aria-label={t('nav.breadcrumb')}
+      className="mb-3"
+    >
       <ol className="flex flex-wrap items-center gap-1 text-sm text-text-muted">
         {trail.map((item, index) => {
           const last = index === trail.length - 1;

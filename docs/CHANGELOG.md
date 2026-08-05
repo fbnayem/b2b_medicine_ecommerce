@@ -1,5 +1,131 @@
 # Changelog
 
+## Phase 25 — what the screenshots actually were
+
+Four screens were reported broken. The real number was fourteen, the cause was
+not what it looked like, and every automated gate in this repository was green
+throughout.
+
+### Thirteen of them were one stale process
+
+The API answering `:5000` had been started thirty-four hours earlier with
+`start` rather than `dev`, so it loaded its modules once and never re-read them.
+`tsc --watch` kept `dist/` current the whole time; nothing reloaded it. Two later
+`pnpm dev` stacks had lost the port to `EADDRINUSE` and **stayed alive anyway**,
+because `node --watch` does not exit when its script fails — so the terminal
+looked healthy while a day-and-a-half-old binary answered every request.
+
+Six route groups had been added in the meantime: trips, pricing, stocktakes,
+warehouses, `/orders/quote` and `/media`. All of them returned 404, and the
+client renders a 404 as "That could not be found. It may have been removed." So
+a distributor was told their delivery rounds had been deleted, and their
+catalogue photographs drew the browser's broken-image glyph. The proof was the
+server's own contract: it published **65 paths** where the repository has 167.
+
+Three changes, so this cannot happen quietly again. `dev.mjs` probes the port
+before spawning anything and refuses to start when it is taken, naming it.
+`server.ts` has an `'error'` listener on `listen` and exits with one sentence
+instead of a stack trace that scrolls past in a parallel turbo run. And
+`notFoundHandler` no longer answers `NOT_FOUND` for an address that is not
+served — that is `NO_SUCH_ENDPOINT`, worded as what it is: this build of the
+client is asking for something this build of the server does not have.
+
+The port probe is worth one more line. The first version bound `0.0.0.0` and
+reported the port free while the API was answering on it, because Windows treats
+the IPv4 and IPv6 wildcards as distinct addresses. It now binds exactly as the
+server binds — no host — which is the difference between a check and a comfort.
+
+### The notification panel was a stylesheet that had been deleted
+
+`inventory.css` — 1,104 lines — went when the **pages** were migrated onto the
+design system. `uiDiscipline.test.ts` globs `../pages/*.tsx`, so `components/`
+was never audited, and **thirty-seven class names went on being written for a
+file that no longer existed**.
+
+A class that resolves to nothing is not a CSS error. It is silence. So the
+notification panel had no position, no background, no z-index and no padding —
+it rendered transparently over the page, and Tailwind's Preflight, which zeroes
+`h2` and `p` margins and strips `ul` padding, closed the last gaps. That is
+where "…submittedShafin Pharmacy submitted an order request.ORDER · 04 Aug 2026"
+came from: three inline spans with nothing between them.
+
+Three more components were in the same state and nobody had reported them: the
+charts on both analytics screens drew no bars at all, the four credit figures on
+the ledger and the shop account were bare label/value pairs, and the history on
+the order, delivery and return detail screens was an undifferentiated run of
+paragraphs. The same deletion left `invoice-print`, `package-label` and
+`receipt-print` orphaned with **no `@media print` block anywhere in the
+application**, so a storekeeper printing a package label got the sidebar around
+it.
+
+All four are rebuilt on the primitives, the print rules are real, and the panel
+is now a portalled Radix popover like the account menu beside it — which also
+closes the focus-trap gap `Dialog.tsx` has documented since phase 4.
+
+### A queue of orders could not be scanned
+
+Ten of the twenty-two order statuses rendered in the same blue: submitted, under
+review, preparing, packing, packed, invoiced, ready, assigned, handed over,
+picked up. Colour that says nothing costs the reader the same as no colour and
+takes the space of something useful, so the pill had to be read, one row at a
+time.
+
+The lifecycle now reads as phases. `progress` (teal) is work happening inside
+the building; `transit` (plum) is work that has left it. Both hues were already
+in the chart palette; both clear 4.5:1 against their own background in both
+themes, and the parity test now checks each tone against the subtle background
+it is actually rendered on — a pairing it had never asserted.
+
+Light mode also had two greys where it needed four: `canvas`, `surface-sunken`
+and `surface-hover` were all the same value, so a hovered table row was exactly
+the colour of the page behind it.
+
+### The sidebar, and thirty-seven identical rows
+
+`NavItem.icon` has been in `@medsupply/navigation` since the shell was built —
+seventeen semantic names, required on all seventy-one entries, "resolved by each
+client to its own icon set". Mobile did. The web never read the field, so a
+super admin got thirty-seven rows of identical text, all seven groups expanded,
+about 1,900px of sidebar that scrolled on every laptop.
+
+Icons now render, groups collapse and remember it, the group holding the current
+page is always open regardless, and there is a rail for people who know where
+things are. The icons are `aria-hidden` deliberately: six specs match sidebar
+links on `getByRole('link', { name, exact: true })`, and a word contributed to
+that name would break all of them.
+
+### Nine lists were showing page one and saying nothing
+
+Only six of the thirty list screens rendered pagination. The rest asked for a
+collection, received the server's default page — twenty rows for orders — and
+displayed exactly that with no indication anything followed. That is worse than
+an error: the reader has no reason to doubt it, so last week's order is simply
+not there and the screen looks entirely healthy. `usePagedCollection` wires the
+`total`, `page` and `limit` the server has always sent, and returns to page one
+when a filter changes.
+
+### Three gates, each proved against the defect it claims to catch
+
+- **`orphanClasses.test.ts`** — a class name no stylesheet declares and Tailwind
+  cannot generate, across `pages/`, `components/` and `app/`. Proved by putting
+  `className="bell-panel"` back.
+- **`screens.spec.ts`** — every `NAV_ITEMS` destination, opened as a role
+  permitted to open it, asserting no error card, no refused request and no
+  broken image. Proved by pointing `TripList` at an address the server does not
+  serve. Its first honest run found a real one: `usePasswordPolicy` had been
+  calling `GET /settings/security`, which has never existed, and swallowing the
+  404 — so the administrative password field always used the floor of eight
+  instead of the configured minimum.
+- **`apiPaths.test.ts`** — every path the web app requests reconciled against
+  `docs/openapi.json`. It passes today; it is prevention, and it exists because
+  of how this failure presents: not as a crash, but as a screen telling somebody
+  their records were deleted.
+
+The second of those needed correcting before it was worth anything. The first
+version asserted `toHaveCount(0)` immediately and **passed with the defect
+planted**, because an assertion that something is absent is satisfied instantly
+while the request that would produce it is still in flight.
+
 ## Phase 24 — the pictures, the specification, and the menu
 
 Three things this project believed were true and were not, each found by

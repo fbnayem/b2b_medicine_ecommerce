@@ -7,10 +7,11 @@ import {
   EmptyState,
   LinkButton,
   PageHeader,
+  Pagination,
   Resource,
   type Column,
 } from '../components/ui';
-import { useApiCollection } from '../lib/query';
+import { usePagedCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 
 /**
@@ -23,7 +24,7 @@ import { useLanguage } from '../lib/useLanguage';
  */
 export function SchemeList() {
   const { t } = useLanguage();
-  const schemes = useApiCollection<SchemeRecord>(['schemes'], '/pricing/schemes');
+  const schemes = usePagedCollection<SchemeRecord>(['schemes'], '/pricing/schemes');
 
   const columns: ReadonlyArray<Column<SchemeRecord>> = [
     {
@@ -75,7 +76,7 @@ export function SchemeList() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="schemes"
         title={t('schemes.title')}
@@ -94,15 +95,23 @@ export function SchemeList() {
         empty={<EmptyState title={t('schemes.none')} description={t('schemes.noneBody')} />}
       >
         {(page) => (
-          <DataTable
-            caption={t('schemes.title')}
-            columns={columns}
-            rows={page.items}
-            rowKey={(row) => row._id}
-            rowTest={(row) => row.reference}
-          />
+          <>
+            <DataTable
+              caption={t('schemes.title')}
+              columns={columns}
+              rows={page.items}
+              rowKey={(row) => row._id}
+              rowTest={(row) => row.reference}
+            />
+            <Pagination
+              page={page.page}
+              limit={page.limit}
+              total={page.total}
+              onPage={schemes.setPage}
+            />
+          </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

@@ -118,15 +118,15 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
 
   if (editing && existing.isLoading) {
     return (
-      <main>
+      <>
         <PageHeader routeId="scheme-detail" title={t('schemes.editTitle')} />
         <LoadingState label={t('schemes.loading')} />
-      </main>
+      </>
     );
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId={editing ? 'scheme-detail' : 'scheme-new'}
         title={editing ? t('schemes.editTitle') : t('schemes.addTitle')}
@@ -246,6 +246,6 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
           </div>
         </form>
       </Card>
-    </main>
+    </>
   );
 }

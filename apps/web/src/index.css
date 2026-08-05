@@ -138,3 +138,57 @@
     top: 8px;
   }
 }
+
+/* ─── Print ────────────────────────────────────────────────────────────── */
+
+/*
+ * The three documents this application prints from the browser: an invoice, a
+ * package label and a payment receipt.
+ *
+ * `invoice-print`, `package-label` and `receipt-print` were the names of rules
+ * in `inventory.css`, which was deleted when the pages moved onto the design
+ * system. Nothing replaced them and no `@media print` block was ever written,
+ * so from that day a storekeeper printing a package label got the sidebar, the
+ * header, the notification bell and the account menu around it — on a label.
+ *
+ * They stay as class names rather than becoming utilities because they say
+ * something a utility cannot: *this element is the document*. Everything else
+ * on the page is chrome, and chrome does not get printed.
+ */
+@media print {
+  [data-test='app-shell'] > header,
+  #app-sidebar,
+  .skip-link,
+  /* Breadcrumbs and pagination are navigation; paper has neither. */
+  nav[aria-label],
+  [data-sonner-toaster],
+  [data-print='hide'] {
+    display: none !important;
+  }
+
+  #main {
+    padding: 0 !important;
+  }
+
+  .invoice-print,
+  .package-label,
+  .receipt-print {
+    /* The screen card becomes the sheet itself. */
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* A label is one sheet; two would be thrown away. */
+  .package-label,
+  .receipt-print {
+    page-break-inside: avoid;
+  }
+
+  @page {
+    margin: 12mm;
+  }
+}

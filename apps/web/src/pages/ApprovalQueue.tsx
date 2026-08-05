@@ -68,7 +68,7 @@ export function ApprovalQueue() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="approvals"
         title={t('approvals.title')}
@@ -103,6 +103,6 @@ export function ApprovalQueue() {
           />
         )}
       </Resource>
-    </main>
+    </>
   );
 }

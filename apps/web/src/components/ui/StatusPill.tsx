@@ -34,6 +34,23 @@ import { useLanguage } from '../../lib/useLanguage';
  * refuses.
  */
 
+/**
+ * The lifecycle, read as phases rather than as twenty-two separate words.
+ *
+ * Ten of these were `info`, which meant a manager scanning the order list could
+ * not tell "submitted" from "packed" from "picked up" without reading each pill
+ * — so the colour carried no information and the list had to be read line by
+ * line. The phases below are the ones a person actually distinguishes:
+ *
+ *   neutral   nothing is happening yet, or it is over without an outcome
+ *   info      somebody has to decide
+ *   warning   somebody has to decide and it is not going smoothly
+ *   success   a decision went the right way
+ *   danger    a decision went the wrong way
+ *   progress  being worked on inside the building
+ *   transit   has left the building
+ *   brand     with the customer right now — the one moment worth spotting
+ */
 const ORDER: Record<OrderStatus, BadgeTone> = {
   [OrderStatus.DRAFT]: 'neutral',
   [OrderStatus.SUBMITTED]: 'info',
@@ -42,14 +59,14 @@ const ORDER: Record<OrderStatus, BadgeTone> = {
   [OrderStatus.APPROVED]: 'success',
   [OrderStatus.PARTIALLY_APPROVED]: 'warning',
   [OrderStatus.REJECTED]: 'danger',
-  [OrderStatus.PREPARING]: 'info',
-  [OrderStatus.PACKING]: 'info',
-  [OrderStatus.PACKED]: 'info',
-  [OrderStatus.INVOICE_GENERATED]: 'info',
-  [OrderStatus.READY_FOR_DELIVERY]: 'info',
-  [OrderStatus.DELIVERY_ASSIGNED]: 'info',
-  [OrderStatus.HANDED_TO_DELIVERY]: 'info',
-  [OrderStatus.PICKED_UP]: 'info',
+  [OrderStatus.PREPARING]: 'progress',
+  [OrderStatus.PACKING]: 'progress',
+  [OrderStatus.PACKED]: 'progress',
+  [OrderStatus.INVOICE_GENERATED]: 'progress',
+  [OrderStatus.READY_FOR_DELIVERY]: 'transit',
+  [OrderStatus.DELIVERY_ASSIGNED]: 'transit',
+  [OrderStatus.HANDED_TO_DELIVERY]: 'transit',
+  [OrderStatus.PICKED_UP]: 'transit',
   [OrderStatus.OUT_FOR_DELIVERY]: 'brand',
   [OrderStatus.DELIVERED]: 'success',
   [OrderStatus.PARTIALLY_DELIVERED]: 'warning',
@@ -61,9 +78,9 @@ const ORDER: Record<OrderStatus, BadgeTone> = {
 
 const DELIVERY: Record<DeliveryStatus, BadgeTone> = {
   [DeliveryStatus.READY_FOR_ASSIGNMENT]: 'warning',
-  [DeliveryStatus.ASSIGNED]: 'info',
-  [DeliveryStatus.HANDED_OVER]: 'info',
-  [DeliveryStatus.PICKED_UP]: 'info',
+  [DeliveryStatus.ASSIGNED]: 'transit',
+  [DeliveryStatus.HANDED_OVER]: 'transit',
+  [DeliveryStatus.PICKED_UP]: 'transit',
   [DeliveryStatus.OUT_FOR_DELIVERY]: 'brand',
   [DeliveryStatus.ARRIVED]: 'brand',
   [DeliveryStatus.DELIVERED]: 'success',
@@ -87,8 +104,10 @@ const RETURN: Record<ReturnStatus, BadgeTone> = {
   [ReturnStatus.APPROVED]: 'success',
   [ReturnStatus.PARTIALLY_APPROVED]: 'warning',
   [ReturnStatus.REJECTED]: 'danger',
-  [ReturnStatus.COLLECTED]: 'info',
-  [ReturnStatus.RECEIVED]: 'info',
+  // A return travels the same two phases as an order, in reverse: collected is
+  // on the road, received is being worked on in the building.
+  [ReturnStatus.COLLECTED]: 'transit',
+  [ReturnStatus.RECEIVED]: 'progress',
   [ReturnStatus.COMPLETED]: 'success',
   [ReturnStatus.CANCELLED]: 'neutral',
 };

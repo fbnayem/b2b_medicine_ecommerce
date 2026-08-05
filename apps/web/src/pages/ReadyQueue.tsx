@@ -27,7 +27,7 @@ export function ReadyQueue() {
   const ready = useApiCollection<ReadyPackage>(['fulfilment-ready'], '/fulfilment/ready');
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="fulfilment-ready"
         title={t('fulfilment.readyTitle')}
@@ -93,6 +93,6 @@ export function ReadyQueue() {
           </ul>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

@@ -182,7 +182,7 @@ export function MedicineForm() {
   const prescription = form.watch('classification') === MedicineClassification.PRESCRIPTION;
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="medicine-new"
         title={t('medicineForm.title')}
@@ -254,6 +254,6 @@ export function MedicineForm() {
           </div>
         </form>
       </Card>
-    </main>
+    </>
   );
 }

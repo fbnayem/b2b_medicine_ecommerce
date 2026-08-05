@@ -246,7 +246,7 @@ export function SystemSettings() {
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="settings"
         title={t('settings.title')}
@@ -303,6 +303,6 @@ export function SystemSettings() {
           </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

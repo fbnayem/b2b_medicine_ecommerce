@@ -73,3 +73,24 @@ export const NO_PAGE_HEADER: readonly string[] = [];
  * nothing inside it.
  */
 export const UNTRANSLATED: readonly string[] = [];
+
+/**
+ * Files still writing a class name that nothing can resolve.
+ *
+ * **Empty, and it starts empty**, which is unusual here and deliberate. The
+ * thirty-seven orphaned names this gate was written for — `bell-panel`,
+ * `chart-bar-group`, `metric-grid`, `timeline-summary` and the rest — were all
+ * removed in the same change that added the rule, because every one of them was
+ * a screen a user had already reported as broken. There was nothing to burn
+ * down: there was a defect.
+ *
+ * The list exists so the thirty-eighth fails the build rather than joining a
+ * silence. A class that resolves to nothing is not a CSS error; it is a page
+ * that renders and looks wrong, and only to whoever opens it.
+ *
+ * Paths are relative to `src/`, e.g. `components/NotificationBell.tsx`, because
+ * this rule spans `pages/`, `components/` and `app/` — and the fact that the
+ * older rules cover only `pages/` is precisely how the four broken components
+ * shipped.
+ */
+export const ORPHAN_CLASSES: readonly string[] = [];

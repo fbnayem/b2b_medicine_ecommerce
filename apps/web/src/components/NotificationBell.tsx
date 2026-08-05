@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import * as Popover from '@radix-ui/react-popover';
 import { Bell } from 'lucide-react';
 import {
   RealtimeEvent,
+  type NotificationCategory,
   type NotificationRecord,
   type UnreadNotificationSummary,
 } from '@medsupply/shared-types';
@@ -10,16 +12,43 @@ import { useAuthStore } from '../store/useAuth';
 import { useNotificationStore } from '../store/useNotifications';
 import { useRealtimeEvent } from '../realtime/useRealtime';
 import { formatFinanceDate } from '../lib/finance';
+import { useLanguage } from '../lib/useLanguage';
+import { EmptyState, ErrorState, LoadingState } from './ui';
 
-function relativeTime(value: string) {
+/**
+ * The bell, and the panel behind it.
+ *
+ * Every class name this component used — `notification-bell`, `bell-panel`,
+ * `bell-item-title`, `link-button`, `state` — was defined in `inventory.css`,
+ * which was deleted once the *pages* moved onto the design system. Nothing
+ * caught it, because `uiDiscipline.test.ts` only ever globbed `pages/`. So the
+ * panel had no position, no background, no z-index and no padding: it rendered
+ * transparently over the page, and Tailwind's Preflight — which zeroes `h2`
+ * and `p` margins and strips `ul` padding — closed the last gaps, leaving
+ * "…submittedShafin Pharmacy submitted an order request.ORDER · 04 Aug 2026"
+ * and "View all notificationsPreferences" as literal run-together text.
+ *
+ * Rebuilt on Radix, matching `AccountMenu` in `AppShell.tsx`: portalled, so it
+ * cannot be trapped inside the header's stacking context, and dismissed by
+ * Escape and outside-click without this component owning document listeners.
+ * A popover rather than a menu, because the content is a list of links with a
+ * heading and a footer rather than a set of commands.
+ */
+
+/** Newest first, and a date once "hours ago" stops being the useful answer. */
+function relativeTime(
+  value: string,
+  t: (path: string, values?: Record<string, string | number>) => string,
+): string {
   const seconds = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1000));
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 60) return t('notifications.justNow');
+  if (seconds < 3600) return t('notifications.minutesAgo', { count: Math.floor(seconds / 60) });
+  if (seconds < 86_400) return t('notifications.hoursAgo', { count: Math.floor(seconds / 3600) });
   return formatFinanceDate(value);
 }
 
 export function NotificationBell() {
+  const { t, c } = useLanguage();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const unread = useNotificationStore((state) => state.unread);
   const recent = useNotificationStore((state) => state.recent);
@@ -33,7 +62,6 @@ export function NotificationBell() {
   const markAllRead = useNotificationStore((state) => state.markAllRead);
 
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -51,127 +79,155 @@ export function NotificationBell() {
     isAuthenticated,
   );
 
-  // Closing on an outside click keeps the panel from covering the page content.
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
-
   if (!isAuthenticated) return null;
 
-  const toggle = () => {
-    const next = !open;
+  const openChanged = (next: boolean) => {
     setOpen(next);
     if (next) void loadRecent();
   };
 
   return (
-    <div className="notification-bell" ref={containerRef}>
-      <button
-        type="button"
-        className="bell-button"
-        aria-label={
-          unread.total ? `Notifications, ${unread.total} unread` : 'Notifications, none unread'
-        }
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        onClick={toggle}
-      >
-        <Bell aria-hidden="true" size={20} />
-        {unread.total > 0 ? (
-          <span className="bell-badge">{unread.total > 99 ? '99+' : unread.total}</span>
-        ) : null}
-      </button>
+    <Popover.Root open={open} onOpenChange={openChanged}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          data-test="notification-bell"
+          aria-label={
+            unread.total
+              ? t('notifications.bellUnread', { count: unread.total })
+              : t('notifications.bellNone')
+          }
+          className="relative flex size-11 items-center justify-center rounded-md border border-border text-text hover:bg-surface-hover"
+        >
+          <Bell aria-hidden="true" size={20} />
+          {unread.total > 0 && (
+            <span
+              // `aria-hidden`: the count is already in the button's label, and
+              // announcing it twice is worse than not styling it at all.
+              aria-hidden="true"
+              className="absolute -end-1 -top-1 min-w-5 rounded-full bg-danger px-1 text-center text-xs font-semibold leading-5 text-text-inverse"
+            >
+              {unread.total > 99 ? '99+' : unread.total}
+            </span>
+          )}
+        </button>
+      </Popover.Trigger>
 
-      {open ? (
-        <div className="bell-panel" role="dialog" aria-label="Recent notifications">
-          <header>
-            <h2>Notifications</h2>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={6}
+          className="z-[200] flex max-h-[min(28rem,calc(100vh-5rem))] w-[min(24rem,calc(100vw-2rem))] flex-col rounded-lg border border-border bg-surface shadow-lg"
+        >
+          <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold text-text">{t('notifications.recent')}</h2>
             <button
               type="button"
-              className="link-button"
               disabled={unread.total === 0}
               onClick={() => void markAllRead()}
+              className="rounded text-sm text-brand underline underline-offset-2 disabled:text-text-muted disabled:no-underline"
             >
-              Mark all read
+              {t('notifications.bellMarkAllRead')}
             </button>
           </header>
 
-          {error ? (
-            <p className="state error">
-              {error}
-              <button type="button" onClick={() => void loadRecent()}>
-                Retry
-              </button>
-            </p>
-          ) : null}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {error ? (
+              <ErrorState className="m-3" message={error} onRetry={() => void loadRecent()} />
+            ) : loading ? (
+              <LoadingState label={t('notifications.bellLoading')} />
+            ) : recent.length === 0 ? (
+              <EmptyState
+                className="m-3 border-0 px-4 py-8"
+                title={t('notifications.bellEmpty')}
+                description={t('notifications.bellEmptyBody')}
+              />
+            ) : (
+              <ul className="flex flex-col">
+                {recent.map((notification) => {
+                  const seen = Boolean(notification.readAt);
+                  /*
+                   * Blocks, not inline spans. The three were `<span>`s on
+                   * adjacent JSX lines, and JSX drops whitespace-only lines
+                   * between elements — which is why the title, the body and the
+                   * meta arrived as one unbroken sentence.
+                   */
+                  const body = (
+                    <>
+                      <span className="flex items-center gap-2">
+                        {!seen && (
+                          <span
+                            aria-hidden="true"
+                            className="size-2 shrink-0 rounded-full bg-brand"
+                          />
+                        )}
+                        <span className={seen ? 'text-text' : 'font-semibold text-text'}>
+                          {notification.title}
+                        </span>
+                      </span>
+                      <span className="block text-sm text-text-muted">{notification.body}</span>
+                      <span className="block text-xs text-text-muted">
+                        {/* Was the raw enum: rows read "ORDER · 04 Aug 2026". */}
+                        {
+                          c.notificationCategory[notification.category as NotificationCategory]
+                        } · {relativeTime(notification.createdAt, t)}
+                      </span>
+                    </>
+                  );
+                  const rowClass = [
+                    'flex w-full flex-col gap-1 border-b border-border px-4 py-3 text-start',
+                    'hover:bg-surface-hover',
+                    seen ? '' : 'bg-brand-subtle/40',
+                  ].join(' ');
+                  return (
+                    <li key={notification._id}>
+                      {notification.link ? (
+                        <Link
+                          to={notification.link}
+                          className={rowClass}
+                          onClick={() => {
+                            setOpen(false);
+                            if (!seen) void markRead([notification._id]);
+                          }}
+                        >
+                          {body}
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          className={rowClass}
+                          onClick={() => {
+                            if (!seen) void markRead([notification._id]);
+                          }}
+                        >
+                          {body}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
 
-          {loading ? (
-            <p className="state">Loading notifications...</p>
-          ) : recent.length === 0 ? (
-            <p className="state">You have no notifications yet.</p>
-          ) : (
-            <ul>
-              {recent.map((notification) => {
-                const body = (
-                  <>
-                    <span className="bell-item-title">{notification.title}</span>
-                    <span className="bell-item-body">{notification.body}</span>
-                    <span className="bell-item-meta">
-                      {notification.category} · {relativeTime(notification.createdAt)}
-                    </span>
-                  </>
-                );
-                return (
-                  <li key={notification._id} className={notification.readAt ? '' : 'unread'}>
-                    {notification.link ? (
-                      <Link
-                        to={notification.link}
-                        onClick={() => {
-                          setOpen(false);
-                          if (!notification.readAt) void markRead([notification._id]);
-                        }}
-                      >
-                        {body}
-                      </Link>
-                    ) : (
-                      <button
-                        type="button"
-                        className="bell-item-plain"
-                        onClick={() => {
-                          if (!notification.readAt) void markRead([notification._id]);
-                        }}
-                      >
-                        {body}
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          <footer>
-            <Link to="/notifications" onClick={() => setOpen(false)}>
-              View all notifications
+          <footer className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
+            <Link
+              to="/notifications"
+              onClick={() => setOpen(false)}
+              className="text-sm text-brand underline underline-offset-2"
+            >
+              {t('notifications.viewAll')}
             </Link>
-            <Link to="/notifications/preferences" onClick={() => setOpen(false)}>
-              Preferences
+            <Link
+              to="/notifications/preferences"
+              onClick={() => setOpen(false)}
+              className="text-sm text-brand underline underline-offset-2"
+            >
+              {t('notifications.preferencesTitle')}
             </Link>
           </footer>
-        </div>
-      ) : null}
-    </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }

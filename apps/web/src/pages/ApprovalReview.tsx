@@ -329,7 +329,7 @@ export function ApprovalReview() {
   }
 
   return (
-    <main>
+    <>
       <Resource
         query={query}
         loadingLabel={t('approvals.loadingOne')}
@@ -533,6 +533,6 @@ export function ApprovalReview() {
           );
         }}
       </Resource>
-    </main>
+    </>
   );
 }

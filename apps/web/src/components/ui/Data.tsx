@@ -51,6 +51,59 @@ export function PageHeader({ routeId, title, description, actions }: PageHeaderP
   );
 }
 
+export interface StatProps {
+  label: ReactNode;
+  value: ReactNode;
+  /** A sentence under the figure — what it is measured against, or since when. */
+  note?: ReactNode;
+  tone?: 'neutral' | 'warning' | 'danger';
+  className?: string;
+}
+
+/**
+ * One figure, labelled.
+ *
+ * `FinanceSummaryCards` drew these with `metric-grid`, a class from the deleted
+ * `inventory.css`, and the analytics dashboard hand-rolls nine bare `Card`s
+ * with their own type sizes. A figure somebody reads at a glance should be the
+ * largest thing in its box and the label the smallest, and that decision is
+ * worth making once.
+ */
+export function Stat({ label, value, note, tone = 'neutral', className }: StatProps) {
+  const emphasis = {
+    neutral: 'text-text',
+    warning: 'text-warning',
+    danger: 'text-danger',
+  }[tone];
+  return (
+    <div
+      className={clsx(
+        'flex flex-col gap-1 rounded-lg border border-border bg-surface px-4 py-3',
+        className,
+      )}
+    >
+      <span className="text-xs font-medium uppercase tracking-wide text-text-muted">{label}</span>
+      <span className={clsx('text-2xl font-semibold tabular-nums', emphasis)}>{value}</span>
+      {note && <span className="text-sm text-text-muted">{note}</span>}
+    </div>
+  );
+}
+
+/** The grid these sit in, so four metrics wrap the same way on every screen. */
+export function StatGrid({ className, children, ...rest }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={clsx(
+        'grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))]',
+        className,
+      )}
+      {...rest}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function Table({ className, children, ...rest }: HTMLAttributes<HTMLTableElement>) {
   return (
     // The wrapper scrolls, not the page body. A table wider than the viewport
@@ -109,7 +162,14 @@ export function Td({
   );
 }
 
-export type BadgeTone = 'neutral' | 'brand' | 'success' | 'warning' | 'danger' | 'info';
+/**
+ * `progress` and `transit` are the two additions, and they exist because a
+ * queue of orders could not be scanned: ten of the twenty-two order statuses
+ * were rendered in the same `info` blue, so telling "packed" from "submitted"
+ * meant reading every pill instead of seeing the shape of the queue.
+ */
+export type BadgeTone =
+  'neutral' | 'brand' | 'success' | 'warning' | 'danger' | 'info' | 'progress' | 'transit';
 
 const TONES: Record<BadgeTone, string> = {
   neutral: 'bg-surface-sunken text-text-muted border-border',
@@ -118,6 +178,8 @@ const TONES: Record<BadgeTone, string> = {
   warning: 'bg-warning-subtle text-warning border-warning',
   danger: 'bg-danger-subtle text-danger border-danger',
   info: 'bg-info-subtle text-info border-info',
+  progress: 'bg-progress-subtle text-progress border-progress',
+  transit: 'bg-transit-subtle text-transit border-transit',
 };
 
 export interface BadgeProps {

@@ -32,7 +32,7 @@ export function FulfilmentQueue() {
   );
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="fulfilment"
         title={t('fulfilment.title')}
@@ -90,6 +90,6 @@ export function FulfilmentQueue() {
           </ul>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

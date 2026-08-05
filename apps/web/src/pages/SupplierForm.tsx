@@ -75,7 +75,7 @@ export function SupplierForm() {
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="supplier-new"
         title={t('purchasing.newSupplierTitle')}
@@ -137,6 +137,6 @@ export function SupplierForm() {
           </div>
         </form>
       </Card>
-    </main>
+    </>
   );
 }

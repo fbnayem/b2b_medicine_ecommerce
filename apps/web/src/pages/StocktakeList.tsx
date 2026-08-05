@@ -9,12 +9,13 @@ import {
   Field,
   LinkButton,
   PageHeader,
+  Pagination,
   Resource,
   Select,
   type BadgeTone,
   type Column,
 } from '../components/ui';
-import { useApiCollection } from '../lib/query';
+import { usePagedCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate } from '../lib/finance';
 
@@ -29,7 +30,7 @@ export function StocktakeList() {
   const { t } = useLanguage();
   const [status, setStatus] = useState('');
 
-  const counts = useApiCollection<StocktakeListRow>(
+  const counts = usePagedCollection<StocktakeListRow>(
     ['stocktakes', status],
     `/stocktakes${status ? `?status=${status}` : ''}`,
   );
@@ -102,7 +103,7 @@ export function StocktakeList() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="stocktakes"
         title={t('stocktake.title')}
@@ -134,15 +135,23 @@ export function StocktakeList() {
         empty={<EmptyState title={t('stocktake.none')} description={t('stocktake.noneBody')} />}
       >
         {(page) => (
-          <DataTable
-            caption={t('stocktake.title')}
-            columns={columns}
-            rows={page.items}
-            rowKey={(row) => row._id}
-            rowTest={(row) => row.reference}
-          />
+          <>
+            <DataTable
+              caption={t('stocktake.title')}
+              columns={columns}
+              rows={page.items}
+              rowKey={(row) => row._id}
+              rowTest={(row) => row.reference}
+            />
+            <Pagination
+              page={page.page}
+              limit={page.limit}
+              total={page.total}
+              onPage={counts.setPage}
+            />
+          </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

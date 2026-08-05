@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   QueryClient,
   useQuery,
@@ -136,4 +137,52 @@ export function useApiCollection<T>(
       ),
     ...options,
   });
+}
+
+/**
+ * A list that can be read past its first page.
+ *
+ * Only six of the thirty list screens rendered `<Pagination>`. The rest asked
+ * for a collection, got the server's default page — twenty rows for orders —
+ * and displayed exactly that, with **no indication that anything followed**. A
+ * list that silently stops is worse than an error: the reader has no reason to
+ * doubt it, so an order placed last week is simply not there, and the screen
+ * looks entirely healthy while it happens.
+ *
+ * The server has always answered with `total`, `page` and `limit`, and
+ * `normaliseCollection` has always carried them through. Nothing was missing
+ * except somebody asking for page two.
+ */
+export function usePagedCollection<T>(
+  key: readonly unknown[],
+  /** The path, with any filters already applied. `page` is appended here. */
+  url: string,
+  options?: Omit<UseQueryOptions<Collection<T>>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<Collection<T>> & { page: number; setPage: (page: number) => void } {
+  const [page, setPage] = useState(1);
+
+  /*
+   * Changing a filter returns to the first page.
+   *
+   * Without this, narrowing a list while on page four shows an empty screen —
+   * the filter matches nine rows, page four of nine rows is nothing — and it
+   * reads as "no results" rather than as "you are past the end".
+   */
+  const filterKey = JSON.stringify(key);
+  const [seenKey, setSeenKey] = useState(filterKey);
+  if (filterKey !== seenKey) {
+    setSeenKey(filterKey);
+    if (page !== 1) setPage(1);
+  }
+
+  const query = useApiCollection<T>(
+    [...key, 'page', page],
+    `${url}${url.includes('?') ? '&' : '?'}page=${page}`,
+    options,
+  );
+
+  return { ...query, page, setPage } as UseQueryResult<Collection<T>> & {
+    page: number;
+    setPage: (page: number) => void;
+  };
 }

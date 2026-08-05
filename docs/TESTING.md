@@ -33,12 +33,59 @@ pnpm exec playwright test --project=journey         # tier 1 workflows
 
 ### Tiers
 
-| Tier                     | Files                   | Contract                                                                                                             |
-| ------------------------ | ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 1 — domain workflows     | `journey.spec.ts`       | **Must survive the redesign untouched.** Navigates by URL and asserts on text a person reads, never on a class name. |
-| 2 — page-level state     | `smoke.spec.ts`         | Signs in as each role and asserts the page mounted. Stable across restyling.                                         |
-| 3 — navigation and shell | (phase 3)               | **Expected to be rewritten** when the app shell lands. Budgeted, not pretended away.                                 |
-| — accessibility          | `accessibility.spec.ts` | Axe at strict zero across fifteen screens.                                                                           |
+| Tier                     | Files                   | Contract                                                                                                                    |
+| ------------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 1 — domain workflows     | `journey.spec.ts`       | **Must survive the redesign untouched.** Navigates by URL and asserts on text a person reads, never on a class name.        |
+| 2 — page-level state     | `smoke.spec.ts`         | Signs in as each role and asserts the page mounted. Stable across restyling.                                                |
+| 3 — navigation and shell | `navigation.spec.ts`    | The sidebar, search, account menu, breadcrumbs and dark mode. Rewritten when the shell landed, as budgeted.                 |
+| 4 — every screen         | `screens.spec.ts`       | Opens **every** `NAV_ITEMS` destination as a role permitted to open it: no error card, no refused request, no broken image. |
+| — accessibility          | `accessibility.spec.ts` | Axe at strict zero across fifteen screens.                                                                                  |
+
+### Why tier 4 exists
+
+Four screens were reported broken by hand; the real number was fourteen, and
+every gate in this repository was green throughout. Each was measuring something
+adjacent to the problem:
+
+- `smoke.spec.ts` asserts the page mounted — and a page showing "Something went
+  wrong" has mounted.
+- `expectPageRendered` asserts there are words on the screen. An error card is
+  words on the screen.
+- `collectConsoleErrors` **filters out `Failed to load resource`**, which is
+  exactly what a 404 API call and a broken image produce. That filter is right
+  for what it was written for, and it is why a 404-ing screen was invisible.
+- `accessibility.spec.ts` scans nine screens. None of the fourteen.
+
+So tier 4 asserts the two things a person notices and nothing else did: no
+`error-state`, and no response in the 4xx/5xx range for a request the page made.
+It walks `NAV_ITEMS` rather than a list somebody maintains, so a screen added
+next month is covered on the day it is added.
+
+**It waits before it asserts, and that is load-bearing.** The first version went
+straight to `toHaveCount(0)` and _passed with a 404 planted_, because an
+assertion that something is absent is satisfied instantly while the request that
+would produce it is still in flight. Proved by pointing `TripList` at
+`/delivery-rounds` and watching the sweep go red — and on its first honest run it
+found a real one: `usePasswordPolicy` had been calling `GET /settings/security`,
+an address the server has never served, and swallowing the 404 — so the
+administrative password field always used the floor of eight rather than the
+configured minimum.
+
+### The other two gates added with it
+
+| Gate                                         | Catches                                                                                                       | Proved by                                          |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `apps/web/src/testing/orphanClasses.test.ts` | A class name no stylesheet declares and Tailwind cannot generate — across `pages/`, `components/` and `app/`. | Restoring `className="bell-panel"`.                |
+| `apps/web/src/testing/apiPaths.test.ts`      | A path the web app requests that `docs/openapi.json` does not serve.                                          | Renaming `/trips` to `/delivery-rounds` in a page. |
+
+`orphanClasses` is the one that matters most, because it is the gate the
+existing `uiDiscipline.test.ts` should have been: that file globs `../pages/*.tsx`
+only, so when `inventory.css` was deleted after the pages were converted,
+`components/` was never audited and **thirty-seven class names went on being
+written for a stylesheet that no longer existed**. Four components rendered
+unstyled across seven screens and three print layouts printed the application
+chrome around the document. A class that resolves to nothing is not a CSS error;
+it is silence.
 
 ### The test-id contract
 
@@ -55,6 +102,7 @@ builds.
 | `app-account-menu`                    | `AppShell`   | Account menu, which owns sign-out.                                                |
 | `page-<routeId>`                      | `PageHeader` | One per page, **emitted from the route manifest** so it cannot drift.             |
 | `toast` / `dialog` / `dialog-confirm` | primitives   | Exactly one implementation each.                                                  |
+| `breadcrumb`                          | `AppShell`   | The trail. **By id, not by accessible name** — the label is translated.           |
 | `empty-state` / `error-state`         | primitives   | Distinguishes "nothing here" from "this broke".                                   |
 | `row-<reference>`                     | list rows    | The **server-generated domain reference** (`ORD-2026-000001`), never an ObjectId. |
 

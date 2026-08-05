@@ -114,7 +114,7 @@ export function DeliveryDetail() {
   }
 
   return (
-    <main>
+    <>
       <Resource
         query={query}
         loadingLabel={t('deliveryDetail.loading')}
@@ -486,6 +486,6 @@ export function DeliveryDetail() {
           );
         }}
       </Resource>
-    </main>
+    </>
   );
 }

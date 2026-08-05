@@ -7,10 +7,11 @@ import {
   EmptyState,
   LinkButton,
   PageHeader,
+  Pagination,
   Resource,
   type Column,
 } from '../components/ui';
-import { useApiCollection } from '../lib/query';
+import { usePagedCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 
 /**
@@ -24,7 +25,7 @@ import { useLanguage } from '../lib/useLanguage';
  */
 export function PriceListList() {
   const { t } = useLanguage();
-  const lists = useApiCollection<PriceListRecord>(['price-lists'], '/pricing/price-lists');
+  const lists = usePagedCollection<PriceListRecord>(['price-lists'], '/pricing/price-lists');
 
   const columns: ReadonlyArray<Column<PriceListRecord>> = [
     {
@@ -83,7 +84,7 @@ export function PriceListList() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="price-lists"
         title={t('priceLists.title')}
@@ -102,15 +103,23 @@ export function PriceListList() {
         empty={<EmptyState title={t('priceLists.none')} description={t('priceLists.noneBody')} />}
       >
         {(page) => (
-          <DataTable
-            caption={t('priceLists.title')}
-            columns={columns}
-            rows={page.items}
-            rowKey={(row) => row._id}
-            rowTest={(row) => row.reference}
-          />
+          <>
+            <DataTable
+              caption={t('priceLists.title')}
+              columns={columns}
+              rows={page.items}
+              rowKey={(row) => row._id}
+              rowTest={(row) => row.reference}
+            />
+            <Pagination
+              page={page.page}
+              limit={page.limit}
+              total={page.total}
+              onPage={lists.setPage}
+            />
+          </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

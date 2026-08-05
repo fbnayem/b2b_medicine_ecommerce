@@ -152,7 +152,7 @@ export function UserAdministration() {
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="users"
         title={t('users.title')}
@@ -329,6 +329,6 @@ export function UserAdministration() {
           </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

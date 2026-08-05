@@ -140,7 +140,7 @@ export function Cart() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="cart"
         title={t('cart.title')}
@@ -181,6 +181,6 @@ export function Cart() {
           </div>
         </div>
       )}
-    </main>
+    </>
   );
 }

@@ -68,7 +68,7 @@ export function OrderDetail() {
   }
 
   return (
-    <main>
+    <>
       <Resource
         query={order}
         loadingLabel={t('orders.loadingOne')}
@@ -184,6 +184,6 @@ export function OrderDetail() {
           );
         }}
       </Resource>
-    </main>
+    </>
   );
 }

@@ -136,7 +136,7 @@ function AnalyticsReportPage({ kind }: { kind: ReportKind }) {
     })[bucket] ?? bucket;
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId={ROUTE_IDS[kind]}
         title={t(`reports.${kind}Title`)}
@@ -198,7 +198,7 @@ function AnalyticsReportPage({ kind }: { kind: ReportKind }) {
           )
         }
       </Resource>
-    </main>
+    </>
   );
 }
 

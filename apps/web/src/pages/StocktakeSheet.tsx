@@ -275,7 +275,7 @@ export function StocktakeSheet() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="stocktake-detail"
         title={t('stocktake.title')}
@@ -399,7 +399,7 @@ export function StocktakeSheet() {
           );
         }}
       </Resource>
-    </main>
+    </>
   );
 }
 

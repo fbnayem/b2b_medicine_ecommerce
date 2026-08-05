@@ -13,12 +13,12 @@ import {
   Input,
   LinkButton,
   PageHeader,
+  ProductImage,
   Resource,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
-import { mediaUrl } from '../api/config';
 
 /**
  * The line under the name, built from whichever parts exist.
@@ -63,7 +63,7 @@ export function MedicineList() {
   }
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="medicines"
         title={t('catalogue.title')}
@@ -105,7 +105,6 @@ export function MedicineList() {
           <ul className="grid list-none grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-4 p-0">
             {page.items.map((medicine) => {
               const inStock = (medicine.totalAvailable ?? 0) > 0;
-              const picture = mediaUrl(medicine.productImageUrl);
               return (
                 <li key={medicine._id}>
                   <Card
@@ -120,22 +119,7 @@ export function MedicineList() {
                           : t('catalogue.listedInactive')}
                       </Badge>
                     </div>
-                    {picture && (
-                      /*
-                       * Decorative, so the alt text is empty: the brand name is
-                       * the next element and a screen reader announcing the
-                       * picture would read it twice. `contain` because these are
-                       * photographs of packaging at whatever aspect ratio the
-                       * supplier shot them, and cropping a box loses the part a
-                       * person recognises it by.
-                       */
-                      <img
-                        src={picture}
-                        alt=""
-                        loading="lazy"
-                        className="h-32 w-full rounded-md bg-surface-sunken object-contain"
-                      />
-                    )}
+                    <ProductImage path={medicine.productImageUrl} />
                     <h2 className="text-lg font-semibold text-text">
                       <Link className="text-brand underline" to={`/medicines/${medicine._id}`}>
                         {[medicine.brandName, medicine.strength].filter(Boolean).join(' ')}
@@ -172,6 +156,6 @@ export function MedicineList() {
           </ul>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

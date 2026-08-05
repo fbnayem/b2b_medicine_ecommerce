@@ -9,13 +9,13 @@ import {
   EmptyState,
   LinkButton,
   PageHeader,
+  ProductImage,
   Resource,
   type Column,
 } from '../components/ui';
 import { useApiCollection, useApiResource } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
-import { mediaUrl } from '../api/config';
 
 /**
  * Joins whichever parts of a description exist.
@@ -80,7 +80,7 @@ export function MedicineDetail() {
   ];
 
   return (
-    <main>
+    <>
       <Resource
         query={medicine}
         loadingLabel={t('catalogue.loadingOne')}
@@ -97,16 +97,7 @@ export function MedicineDetail() {
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
                 <h2 className="mb-2 text-lg font-semibold text-text">{t('catalogue.about')}</h2>
-                {mediaUrl(item.productImageUrl) && (
-                  // Empty alt: the packaging is here to be recognised, and every
-                  // word a screen reader could get from it is already in the
-                  // heading above and the list below.
-                  <img
-                    src={mediaUrl(item.productImageUrl)}
-                    alt=""
-                    className="mb-3 h-48 w-full rounded-md bg-surface-sunken object-contain"
-                  />
-                )}
+                <ProductImage path={item.productImageUrl} className="mb-3 h-48" />
                 <dl className="m-0">
                   <Detail label={t('common.reference')}>
                     {item.reference} · {item.sku}
@@ -168,6 +159,6 @@ export function MedicineDetail() {
           </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

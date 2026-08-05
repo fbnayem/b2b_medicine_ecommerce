@@ -171,7 +171,7 @@ function FinancialReportPage({ kind }: { kind: ReportKind }) {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId={ROUTE_IDS[kind]}
         title={t(TITLE_KEYS[kind])}
@@ -288,7 +288,7 @@ function FinancialReportPage({ kind }: { kind: ReportKind }) {
           />
         )}
       </Resource>
-    </main>
+    </>
   );
 }
 

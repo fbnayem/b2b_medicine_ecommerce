@@ -7,11 +7,12 @@ import {
   Field,
   LinkButton,
   PageHeader,
+  Pagination,
   Resource,
   Select,
   type Column,
 } from '../components/ui';
-import { useApiCollection } from '../lib/query';
+import { usePagedCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate } from '../lib/finance';
 
@@ -40,7 +41,7 @@ export function SupplierList() {
   const { t } = useLanguage();
   const [includeInactive, setIncludeInactive] = useState(false);
 
-  const suppliers = useApiCollection<Supplier>(
+  const suppliers = usePagedCollection<Supplier>(
     ['suppliers', includeInactive],
     `/purchasing/suppliers${includeInactive ? '?includeInactive=true' : ''}`,
   );
@@ -107,7 +108,7 @@ export function SupplierList() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="suppliers"
         title={t('purchasing.suppliersTitle')}
@@ -143,15 +144,23 @@ export function SupplierList() {
         }
       >
         {(page) => (
-          <DataTable
-            caption={t('purchasing.suppliersTitle')}
-            columns={columns}
-            rows={page.items}
-            rowKey={(row) => row._id}
-            rowTest={(row) => row.reference}
-          />
+          <>
+            <DataTable
+              caption={t('purchasing.suppliersTitle')}
+              columns={columns}
+              rows={page.items}
+              rowKey={(row) => row._id}
+              rowTest={(row) => row.reference}
+            />
+            <Pagination
+              page={page.page}
+              limit={page.limit}
+              total={page.total}
+              onPage={suppliers.setPage}
+            />
+          </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }

@@ -64,7 +64,7 @@ export function WarehouseForm() {
     setForm((current) => ({ ...current, [name]: value }));
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="warehouse-new"
         title={t('warehouses.addTitle')}
@@ -137,6 +137,6 @@ export function WarehouseForm() {
           </div>
         </form>
       </Card>
-    </main>
+    </>
   );
 }

@@ -10,12 +10,13 @@ import {
   Input,
   LinkButton,
   PageHeader,
+  Pagination,
   Resource,
   Select,
   StatusPill,
   type Column,
 } from '../components/ui';
-import { useApiCollection } from '../lib/query';
+import { usePagedCollection } from '../lib/query';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
 
@@ -36,7 +37,7 @@ export function ShopList() {
   const params = new URLSearchParams();
   if (applied.search) params.set('search', applied.search);
   if (applied.status) params.set('status', applied.status);
-  const shops = useApiCollection<Shop>(
+  const shops = usePagedCollection<Shop>(
     ['shops', applied.search, applied.status],
     `/shops${params.size ? `?${params.toString()}` : ''}`,
   );
@@ -84,7 +85,7 @@ export function ShopList() {
   ];
 
   return (
-    <main>
+    <>
       <PageHeader
         routeId="shops"
         title={t('shops.title')}
@@ -131,15 +132,23 @@ export function ShopList() {
         empty={<EmptyState title={t('shops.none')} description={t('shops.noneBody')} />}
       >
         {(page) => (
-          <DataTable
-            caption={t('shops.title')}
-            columns={columns}
-            rows={page.items}
-            rowKey={(shop) => shop._id}
-            rowTest={(shop) => shop.reference}
-          />
+          <>
+            <DataTable
+              caption={t('shops.title')}
+              columns={columns}
+              rows={page.items}
+              rowKey={(shop) => shop._id}
+              rowTest={(shop) => shop.reference}
+            />
+            <Pagination
+              page={page.page}
+              limit={page.limit}
+              total={page.total}
+              onPage={shops.setPage}
+            />
+          </>
         )}
       </Resource>
-    </main>
+    </>
   );
 }
