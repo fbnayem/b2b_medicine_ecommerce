@@ -1,4 +1,5 @@
 import { useId, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { CreateInDialog, type CreateSpec } from './CreateInDialog';
 import { Field, Input } from './Field';
 
 /**
@@ -46,6 +47,14 @@ export interface SearchPickerProps {
   onChoose: (value: string) => void;
   /** The current choice, rendered under the box so it survives the term changing. */
   chosen?: ReactNode;
+  /**
+   * Omit entirely when the viewer may not create one.
+   *
+   * The same contract `PickOrCreate` uses, because it is the same act. A
+   * searching picker needs it more, if anything: the reason you are typing a
+   * name that finds nothing is usually that the record does not exist yet.
+   */
+  create?: CreateSpec;
 }
 
 export function SearchPicker({
@@ -62,6 +71,7 @@ export function SearchPicker({
   emptyLabel,
   onChoose,
   chosen,
+  create,
 }: SearchPickerProps) {
   const listId = `${useId()}-results`;
   const [highlighted, setHighlighted] = useState(0);
@@ -94,19 +104,34 @@ export function SearchPicker({
 
   return (
     <Field label={label} id={id} required={required} hint={hint} error={error} help={help}>
-      <Input
-        value={term}
-        onChange={(event) => {
-          onTermChange(event.target.value);
-          setHighlighted(0);
-        }}
-        onKeyDown={onKeyDown}
-        placeholder={placeholder}
-        role="combobox"
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-autocomplete="list"
-      />
+      <div className="flex flex-wrap items-start gap-2">
+        <Input
+          className="min-w-0 flex-1"
+          value={term}
+          onChange={(event) => {
+            onTermChange(event.target.value);
+            setHighlighted(0);
+          }}
+          onKeyDown={onKeyDown}
+          placeholder={placeholder}
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-autocomplete="list"
+        />
+        {create && (
+          <CreateInDialog
+            create={create}
+            onCreated={(newId) => {
+              // The term found nothing, which is usually why somebody reached
+              // for this. Clearing it puts the new record's own name on screen
+              // instead of leaving a search that still matches nothing.
+              onChoose(newId);
+              onTermChange('');
+            }}
+          />
+        )}
+      </div>
       {chosen && <p className="text-sm text-text-muted">{chosen}</p>}
       {open && (
         <ul id={listId} role="listbox" className="flex flex-col rounded-md border border-border">

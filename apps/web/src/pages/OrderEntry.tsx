@@ -12,11 +12,14 @@ import {
   Field,
   Input,
   PageHeader,
+  PickOrCreate,
   Select,
   toast,
   type Column,
 } from '../components/ui';
-import { useApiCollection } from '../lib/query';
+import { useApiResource } from '../lib/query';
+import { CustomerPicker } from '../components/pickers';
+import { DeliveryAddressForm } from '../components/DeliveryAddressForm';
 import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { formatMinor } from '../lib/finance';
@@ -110,6 +113,13 @@ export function OrderEntry() {
   const user = useAuthStore((state) => state.user);
 
   const [shopId, setShopId] = useState('');
+  /*
+   * The chosen customer's own name, kept beside the id.
+   *
+   * The picker searches now rather than listing the first hundred, so the
+   * record cannot be found again by scanning a list once the term has moved on.
+   */
+  const [shopLabel, setShopLabel] = useState('');
   const [addressId, setAddressId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CREDIT);
   const [term, setTerm] = useState('');
@@ -132,7 +142,6 @@ export function OrderEntry() {
    */
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
 
-  const shops = useApiCollection<Shop>(keys.shops.picker('entry'), '/shops?limit=100');
   const debounced = useDebounced(term);
 
   const results = useQuery<Medicine[]>({
@@ -153,7 +162,17 @@ export function OrderEntry() {
   const candidates = useMemo(() => results.data ?? [], [results.data]);
   useEffect(() => setHighlighted(0), [debounced]);
 
-  const shop = shops.data?.items.find((entry) => entry._id === shopId);
+  /*
+   * The chosen customer, fetched rather than found.
+   *
+   * Its delivery addresses are what the next field offers, and adding one
+   * writes to the shop — so this has to be a live read that an invalidation
+   * refreshes, not a row plucked out of whatever page the picker last showed.
+   */
+  const chosenShop = useApiResource<Shop>(keys.shops.one(shopId), `/shops/${shopId}`, {
+    enabled: Boolean(shopId),
+  });
+  const shop = chosenShop.data;
 
   /*
    * The quote is the screen's arithmetic, done by the server.
@@ -364,32 +383,46 @@ export function OrderEntry() {
 
         <Card>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label={t('orderEntry.customer')} required>
-              <Select
-                value={shopId}
-                onChange={(event) => {
-                  setShopId(event.target.value);
-                  setAddressId('');
-                }}
-              >
-                <option value="">{t('orderEntry.chooseCustomer')}</option>
-                {(shops.data?.items ?? []).map((entry) => (
-                  <option key={entry._id} value={entry._id}>
-                    {entry.name} · {entry.reference}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label={t('orderEntry.deliverTo')} required>
-              <Select value={addressId} onChange={(event) => setAddressId(event.target.value)}>
-                <option value="">{t('orderEntry.chooseAddress')}</option>
-                {addressesOf(shop).map((address) => (
-                  <option key={address._id} value={address._id}>
-                    {address.label} — {address.line1}, {address.city}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <CustomerPicker
+              label={t('orderEntry.customer')}
+              required
+              chosenLabel={shopLabel || undefined}
+              onChoose={(entry) => {
+                setShopId(entry._id);
+                setShopLabel(entry.name ?? '');
+                // Addresses belong to a customer, so a different customer means
+                // the one already chosen is somebody else's.
+                setAddressId('');
+              }}
+            />
+            <PickOrCreate
+              label={t('orderEntry.deliverTo')}
+              required
+              placeholder={t('orderEntry.chooseAddress')}
+              value={addressId}
+              onChange={setAddressId}
+              options={addressesOf(shop).map((address) => ({
+                value: address._id,
+                label: `${address.label} — ${address.line1}, ${address.city}`,
+              }))}
+              create={
+                /*
+                 * Only once a customer is chosen — an address belongs to one,
+                 * and there is nothing to attach it to before that.
+                 */
+                shop
+                  ? {
+                      label: t('addresses.addButton'),
+                      title: t('addresses.addTitle'),
+                      description: t('addresses.addBody'),
+                      invalidates: keys.shops.all,
+                      render: (done, cancel) => (
+                        <DeliveryAddressForm shop={shop} onCreated={done} onCancel={cancel} />
+                      ),
+                    }
+                  : undefined
+              }
+            />
             <Field label={t('orderEntry.payment')}>
               <Select
                 value={paymentMethod}

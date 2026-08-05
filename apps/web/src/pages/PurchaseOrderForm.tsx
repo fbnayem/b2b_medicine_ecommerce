@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { parseMoney } from '@medsupply/utilities';
-import type { Medicine, Supplier } from '@medsupply/shared-types';
 import { apiClient, errorMessage, failureReference } from '../api/client';
 import {
   Button,
@@ -12,12 +11,11 @@ import {
   Input,
   LinkButton,
   PageHeader,
-  Select,
   Textarea,
   toast,
   type FormProblem,
 } from '../components/ui';
-import { useApiCollection } from '../lib/query';
+import { MedicinePicker, SupplierPicker } from '../components/pickers';
 import { keys } from '../lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
@@ -26,12 +24,26 @@ import { formatMinor } from '../lib/finance';
 interface Line {
   key: number;
   medicineId: string;
+  /**
+   * What the picker showed when it was chosen.
+   *
+   * Kept beside the id so the line can name its medicine after the search term
+   * has moved on. The alternative is a request per line to fetch back a name
+   * the form had in its hands a moment earlier.
+   */
+  medicineLabel: string;
   quantity: string;
   unitCost: string;
 }
 
 let nextKey = 1;
-const emptyLine = (): Line => ({ key: nextKey++, medicineId: '', quantity: '', unitCost: '' });
+const emptyLine = (): Line => ({
+  key: nextKey++,
+  medicineId: '',
+  medicineLabel: '',
+  quantity: '',
+  unitCost: '',
+});
 
 /** Whole units only. A cleared field is nothing ordered, never `NaN`. */
 const units = (value: string) => {
@@ -48,16 +60,8 @@ export function PurchaseOrderForm() {
   const { t, language } = useLanguage();
   const queryClient = useQueryClient();
 
-  const suppliers = useApiCollection<Supplier>(
-    keys.purchasing.suppliers({ includeInactive: false }),
-    '/purchasing/suppliers',
-  );
-  const medicines = useApiCollection<Medicine>(
-    keys.medicines.picker(),
-    '/inventory/medicines?limit=100',
-  );
-
   const [supplierId, setSupplierId] = useState('');
+  const [supplierLabel, setSupplierLabel] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
   const [supplierReference, setSupplierReference] = useState('');
   const [notes, setNotes] = useState('');
@@ -139,20 +143,16 @@ export function PurchaseOrderForm() {
           {attempt > 0 && <FormNotice problems={problems} focusKey={attempt} />}
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t('purchasing.supplier')} required id={SUPPLIER_FIELD}>
-              <Select
-                required
-                value={supplierId}
-                onChange={(event) => setSupplierId(event.target.value)}
-              >
-                <option value="">{t('purchasing.supplier')}</option>
-                {(suppliers.data?.items ?? []).map((supplier) => (
-                  <option key={supplier._id} value={supplier._id}>
-                    {supplier.name} · {supplier.reference}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <SupplierPicker
+              label={t('purchasing.supplier')}
+              id={SUPPLIER_FIELD}
+              required
+              chosenLabel={supplierLabel || undefined}
+              onChoose={(supplier) => {
+                setSupplierId(supplier._id);
+                setSupplierLabel(supplier.name ?? '');
+              }}
+            />
             <Field label={t('purchasing.expectedDate')}>
               <Input
                 type="date"
@@ -175,19 +175,17 @@ export function PurchaseOrderForm() {
           <div id={LINES_PANEL} tabIndex={-1} className="flex flex-col gap-3">
             {lines.map((line) => (
               <div key={line.key} className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr_auto]">
-                <Field label={t('purchasing.chooseMedicine')}>
-                  <Select
-                    value={line.medicineId}
-                    onChange={(event) => patch(line.key, { medicineId: event.target.value })}
-                  >
-                    <option value="">{t('purchasing.chooseMedicine')}</option>
-                    {(medicines.data?.items ?? []).map((medicine) => (
-                      <option key={medicine._id} value={medicine._id}>
-                        {medicine.brandName} · {medicine.strength}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
+                <MedicinePicker
+                  label={t('purchasing.chooseMedicine')}
+                  chosenLabel={line.medicineLabel || undefined}
+                  onChoose={(medicine) =>
+                    patch(line.key, {
+                      medicineId: medicine._id,
+                      medicineLabel:
+                        `${medicine.brandName ?? ''} ${medicine.strength ?? ''}`.trim(),
+                    })
+                  }
+                />
                 <Field label={t('purchasing.quantity')}>
                   <Input
                     inputMode="numeric"

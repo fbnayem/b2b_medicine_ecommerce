@@ -17,6 +17,7 @@ import {
   controlledSubstanceByShop,
   controlledSubstanceRegister,
 } from '../services/controlledSubstanceService';
+import { containsFilter } from '../services/requestSanitiser';
 
 function actor(req: AuthRequest) {
   return { _id: req.user!._id, role: req.user!.role as UserRole };
@@ -26,7 +27,21 @@ export async function listSuppliers(req: AuthRequest, res: Response, next: NextF
   try {
     const page = Math.max(1, Number(req.query.page ?? 1));
     const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
-    const filter = req.query.includeInactive === 'true' ? {} : { isActive: true };
+    const filter: Record<string, unknown> =
+      req.query.includeInactive === 'true' ? {} : { isActive: true };
+    /*
+     * A search, because the picker that reads this could not see past fifty.
+     *
+     * Every form that chooses a supplier read one unpaged page of fifty and
+     * said nothing about the rest, so a distributor with more suppliers than
+     * that simply could not raise an order against the ones below the cut. The
+     * term is escaped through `containsFilter` — it was a user-controlled
+     * pattern on `/shops` once, and that is not a mistake worth making twice.
+     */
+    if (typeof req.query.search === 'string' && req.query.search.trim()) {
+      const term = containsFilter(req.query.search.trim());
+      filter.$or = [{ name: term }, { reference: term }, { contactName: term }];
+    }
 
     const [items, total] = await Promise.all([
       Supplier.find(filter)
@@ -163,11 +178,9 @@ export async function controlledRegister(req: AuthRequest, res: Response, next: 
       : new Date(to.getTime() - 30 * 86_400_000);
 
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
-      return res
-        .status(400)
-        .json({
-          error: { code: 'INVALID_PERIOD', message: 'Give a start date before the end date.' },
-        });
+      return res.status(400).json({
+        error: { code: 'INVALID_PERIOD', message: 'Give a start date before the end date.' },
+      });
     }
 
     const [register, byShop] = await Promise.all([

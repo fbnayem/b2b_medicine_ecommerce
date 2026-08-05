@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { Supplier } from '@medsupply/shared-types';
 import { apiClient, errorMessage, failureReference } from '../api/client';
 import {
   Button,
@@ -41,7 +42,27 @@ const FIELDS: Array<[FieldName, string, string, boolean]> = [
   ['paymentTermsDays', 'paymentTerms', 'number', false],
 ];
 
-export function SupplierForm() {
+/**
+ * Two hosts, one form.
+ *
+ * As a page it carries its own heading and card and returns to the list. In a
+ * dialog it is the `<form>` alone and hands the new record's id back to the
+ * picker that opened it — because the point of creating from inside another
+ * form is not leaving it.
+ */
+export interface SupplierFormProps {
+  /**
+   * Present means "in a dialog": no page chrome, no navigation.
+   *
+   * The whole record goes back, not only its id. A picker that has just cleared
+   * its search term has nothing left to look the name up in, and fetching it
+   * again to render a word the form already had is a request for nothing.
+   */
+  onCreated?: (record: Supplier) => void;
+  onCancel?: () => void;
+}
+
+export function SupplierForm({ onCreated, onCancel }: SupplierFormProps = {}) {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const queryClient = useQueryClient();
@@ -54,7 +75,7 @@ export function SupplierForm() {
     setFailure(undefined);
     setSubmitting(true);
     try {
-      await apiClient.post('/purchasing/suppliers', {
+      const response = await apiClient.post('/purchasing/suppliers', {
         name: form.name,
         contactName: form.contactName || undefined,
         primaryPhone: form.primaryPhone,
@@ -67,7 +88,8 @@ export function SupplierForm() {
       });
       queryClient.invalidateQueries({ queryKey: keys.purchasing.all });
       toast.success(t('purchasing.supplierSaved', { name: form.name }));
-      navigate('/purchasing/suppliers');
+      if (onCreated) onCreated(response.data.data as Supplier);
+      else navigate('/purchasing/suppliers');
     } catch (caught) {
       setFailure({
         message: errorMessage(caught, language, t('purchasing.supplierFailed')),
@@ -77,6 +99,60 @@ export function SupplierForm() {
       setSubmitting(false);
     }
   }
+
+  const body = (
+    <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
+      {failure && <ErrorState message={failure.message} reference={failure.reference} />}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {FIELDS.map(([name, key, type, required]) => (
+          <Field
+            key={name}
+            label={key === 'phone' || key === 'email' ? t(`fields.${key}`) : t(`purchasing.${key}`)}
+            required={required}
+          >
+            <Input
+              type={type}
+              required={required}
+              value={form[name]}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, [name]: event.target.value }))
+              }
+            />
+          </Field>
+        ))}
+      </div>
+
+      <Field label={t('fields.address')}>
+        <Textarea
+          rows={2}
+          value={form.address}
+          onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
+        />
+      </Field>
+
+      <Field label={t('fields.notes')}>
+        <Textarea
+          rows={3}
+          value={form.notes}
+          onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+        />
+      </Field>
+
+      <div className="flex flex-wrap justify-end gap-2">
+        {onCancel && (
+          <Button type="button" onClick={onCancel}>
+            {t('common.cancel')}
+          </Button>
+        )}
+        <Button type="submit" variant="primary" busy={submitting}>
+          {t('purchasing.saveSupplier')}
+        </Button>
+      </div>
+    </form>
+  );
+
+  if (onCreated) return body;
 
   return (
     <>
@@ -88,59 +164,7 @@ export function SupplierForm() {
           <LinkButton to="/purchasing/suppliers">{t('purchasing.suppliersTitle')}</LinkButton>
         }
       />
-
-      <Card className="max-w-2xl">
-        <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
-          {failure && <ErrorState message={failure.message} reference={failure.reference} />}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {FIELDS.map(([name, key, type, required]) => (
-              <Field
-                key={name}
-                label={
-                  key === 'phone' || key === 'email' ? t(`fields.${key}`) : t(`purchasing.${key}`)
-                }
-                required={required}
-              >
-                <Input
-                  type={type}
-                  required={required}
-                  value={form[name]}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, [name]: event.target.value }))
-                  }
-                />
-              </Field>
-            ))}
-          </div>
-
-          <Field label={t('fields.address')}>
-            <Textarea
-              rows={2}
-              value={form.address}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, address: event.target.value }))
-              }
-            />
-          </Field>
-
-          <Field label={t('fields.notes')}>
-            <Textarea
-              rows={3}
-              value={form.notes}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, notes: event.target.value }))
-              }
-            />
-          </Field>
-
-          <div className="flex justify-end">
-            <Button type="submit" variant="primary" busy={submitting}>
-              {t('purchasing.saveSupplier')}
-            </Button>
-          </div>
-        </form>
-      </Card>
+      <Card className="max-w-2xl">{body}</Card>
     </>
   );
 }

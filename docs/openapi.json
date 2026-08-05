@@ -1674,6 +1674,9 @@
                   "billingAddress": {
                     "type": "object",
                     "properties": {
+                      "_id": {
+                        "type": "string"
+                      },
                       "label": {
                         "type": "string",
                         "minLength": 1
@@ -1714,6 +1717,9 @@
                     "items": {
                       "type": "object",
                       "properties": {
+                        "_id": {
+                          "type": "string"
+                        },
                         "label": {
                           "type": "string",
                           "minLength": 1
@@ -2036,6 +2042,9 @@
                   "billingAddress": {
                     "type": "object",
                     "properties": {
+                      "_id": {
+                        "type": "string"
+                      },
                       "label": {
                         "type": "string",
                         "minLength": 1
@@ -2075,6 +2084,9 @@
                     "items": {
                       "type": "object",
                       "properties": {
+                        "_id": {
+                          "type": "string"
+                        },
                         "label": {
                           "type": "string",
                           "minLength": 1

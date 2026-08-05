@@ -209,7 +209,20 @@ const CLINICAL = new Set(['genericName', 'strength', 'dosageForm']);
  * whereas a medicine is patched field-wise and two managers editing different
  * fields both land.
  */
-export function MedicineForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
+export interface MedicineFormProps {
+  mode?: 'create' | 'edit';
+  /**
+   * Present means "in a dialog": no page chrome, and the new medicine's id goes
+   * back to the picker that opened it rather than the browser going to it.
+   *
+   * Only ever set alongside `mode: 'create'` — editing is reached from the
+   * medicine's own page, where there is nothing to return to.
+   */
+  onCreated?: (record: Medicine) => void;
+  onCancel?: () => void;
+}
+
+export function MedicineForm({ mode = 'create', onCreated, onCancel }: MedicineFormProps) {
   const { t, language } = useLanguage();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -322,6 +335,11 @@ export function MedicineForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) 
       // under that one prefix, which is the whole reason the keys are shaped
       // that way — a price changed here shows on the list without a reload.
       if (editing) toast.success(t('medicineForm.saved', { name: rest.brandName }));
+      if (onCreated && !editing) {
+        toast.success(t('medicineForm.saved', { name: rest.brandName }));
+        onCreated(response.data.data as Medicine);
+        return;
+      }
       navigate(`/medicines/${editing ? params.id : response.data.data._id}`);
     } catch (caught) {
       setFailure({
@@ -498,129 +516,130 @@ export function MedicineForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) 
     );
   }
 
+  const body = (
+    <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
+      {failure && <ErrorState message={failure.message} reference={failure.reference} />}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {fields.map((field) => (
+          <Field
+            key={field.name}
+            label={field.label}
+            help={
+              <HelpTip label={t('medicineHelp.about', { field: field.label })} body={field.help} />
+            }
+            hint={field.hint}
+            required={
+              !OPTIONAL.has(field.name) &&
+              field.name !== 'productImageUrl' &&
+              (!CLINICAL.has(field.name) || prescription)
+            }
+            error={errors[field.name]?.message}
+          >
+            <Input
+              type={field.type}
+              placeholder={field.placeholder}
+              min={field.type === 'number' ? 0 : undefined}
+              inputMode={
+                field.name === 'costPrice' || field.name === 'sellingPrice' || field.name === 'mrp'
+                  ? 'decimal'
+                  : undefined
+              }
+              {...form.register(
+                field.name as never,
+                field.type === 'number' ? { valueAsNumber: true } : undefined,
+              )}
+            />
+          </Field>
+        ))}
+
+        <Field
+          label={t('medicineForm.productType')}
+          help={
+            <HelpTip
+              label={t('medicineHelp.about', { field: t('medicineForm.productType') })}
+              body={t('medicineHelp.productType')}
+            />
+          }
+          error={errors.productType?.message}
+        >
+          <Select {...form.register('productType')}>
+            {Object.values(ProductType).map((value) => (
+              <option key={value} value={value}>
+                {t(`productType.${value}`)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field
+          label={t('medicineForm.classification')}
+          help={
+            <HelpTip
+              label={t('medicineHelp.about', { field: t('medicineForm.classification') })}
+              body={t('medicineHelp.classification')}
+            />
+          }
+          error={errors.classification?.message}
+        >
+          <Select {...form.register('classification')}>
+            {Object.values(MedicineClassification).map((value) => (
+              <option key={value} value={value}>
+                {value.replaceAll('_', ' ').toLowerCase()}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <div className="flex min-h-11 items-center gap-1 self-end">
+          <label className="flex items-center gap-2 text-text">
+            <input type="checkbox" {...form.register('coldChain')} />
+            {t('medicineForm.coldChain')}
+          </label>
+          <HelpTip
+            label={t('medicineHelp.about', { field: t('medicineForm.coldChain') })}
+            body={t('medicineHelp.coldChain')}
+          />
+        </div>
+      </div>
+
+      <Field
+        label={t('medicineForm.description')}
+        help={
+          <HelpTip
+            label={t('medicineHelp.about', { field: t('medicineForm.description') })}
+            body={t('medicineHelp.description')}
+          />
+        }
+        error={errors.description?.message}
+      >
+        <Textarea
+          placeholder={t('medicinePlaceholder.description')}
+          {...form.register('description')}
+        />
+      </Field>
+
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button type="button" onClick={() => (onCancel ? onCancel() : navigate(-1))}>
+          {t('common.cancel')}
+        </Button>
+        <Button type="submit" variant="primary" busy={form.formState.isSubmitting}>
+          {form.formState.isSubmitting
+            ? t('medicineForm.saving')
+            : editing
+              ? t('medicineForm.saveChanges')
+              : t('medicineForm.save')}
+        </Button>
+      </div>
+    </form>
+  );
+
+  if (onCreated) return body;
+
   return (
     <>
       {header}
-      <Card className="max-w-3xl">
-        <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
-          {failure && <ErrorState message={failure.message} reference={failure.reference} />}
-
-          <div className="grid gap-4 md:grid-cols-2">
-            {fields.map((field) => (
-              <Field
-                key={field.name}
-                label={field.label}
-                help={
-                  <HelpTip
-                    label={t('medicineHelp.about', { field: field.label })}
-                    body={field.help}
-                  />
-                }
-                hint={field.hint}
-                required={
-                  !OPTIONAL.has(field.name) &&
-                  field.name !== 'productImageUrl' &&
-                  (!CLINICAL.has(field.name) || prescription)
-                }
-                error={errors[field.name]?.message}
-              >
-                <Input
-                  type={field.type}
-                  placeholder={field.placeholder}
-                  min={field.type === 'number' ? 0 : undefined}
-                  inputMode={
-                    field.name === 'costPrice' ||
-                    field.name === 'sellingPrice' ||
-                    field.name === 'mrp'
-                      ? 'decimal'
-                      : undefined
-                  }
-                  {...form.register(
-                    field.name as never,
-                    field.type === 'number' ? { valueAsNumber: true } : undefined,
-                  )}
-                />
-              </Field>
-            ))}
-
-            <Field
-              label={t('medicineForm.productType')}
-              help={
-                <HelpTip
-                  label={t('medicineHelp.about', { field: t('medicineForm.productType') })}
-                  body={t('medicineHelp.productType')}
-                />
-              }
-              error={errors.productType?.message}
-            >
-              <Select {...form.register('productType')}>
-                {Object.values(ProductType).map((value) => (
-                  <option key={value} value={value}>
-                    {t(`productType.${value}`)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-
-            <Field
-              label={t('medicineForm.classification')}
-              help={
-                <HelpTip
-                  label={t('medicineHelp.about', { field: t('medicineForm.classification') })}
-                  body={t('medicineHelp.classification')}
-                />
-              }
-              error={errors.classification?.message}
-            >
-              <Select {...form.register('classification')}>
-                {Object.values(MedicineClassification).map((value) => (
-                  <option key={value} value={value}>
-                    {value.replaceAll('_', ' ').toLowerCase()}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-
-            <div className="flex min-h-11 items-center gap-1 self-end">
-              <label className="flex items-center gap-2 text-text">
-                <input type="checkbox" {...form.register('coldChain')} />
-                {t('medicineForm.coldChain')}
-              </label>
-              <HelpTip
-                label={t('medicineHelp.about', { field: t('medicineForm.coldChain') })}
-                body={t('medicineHelp.coldChain')}
-              />
-            </div>
-          </div>
-
-          <Field
-            label={t('medicineForm.description')}
-            help={
-              <HelpTip
-                label={t('medicineHelp.about', { field: t('medicineForm.description') })}
-                body={t('medicineHelp.description')}
-              />
-            }
-            error={errors.description?.message}
-          >
-            <Textarea
-              placeholder={t('medicinePlaceholder.description')}
-              {...form.register('description')}
-            />
-          </Field>
-
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button onClick={() => navigate(-1)}>{t('common.cancel')}</Button>
-            <Button type="submit" variant="primary" busy={form.formState.isSubmitting}>
-              {form.formState.isSubmitting
-                ? t('medicineForm.saving')
-                : editing
-                  ? t('medicineForm.saveChanges')
-                  : t('medicineForm.save')}
-            </Button>
-          </div>
-        </form>
-      </Card>
+      <Card className="max-w-3xl">{body}</Card>
     </>
   );
 }

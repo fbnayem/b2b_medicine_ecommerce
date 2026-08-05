@@ -91,6 +91,19 @@ export const canEditCommercial = (role: Role) => has(CATALOGUE_MANAGERS, role);
  */
 export const canSeeCost = (role: Role) => has(CATALOGUE_MANAGERS, role);
 
+/** `adminRoles` — `shopRoutes.ts`. Only these may register a customer. */
+const SHOP_CREATORS = [UserRole.SUPER_ADMIN, UserRole.ADMIN] as const;
+
+/**
+ * Register a new customer.
+ *
+ * Narrower than everything else a manager does on those screens, and worth
+ * naming for it: a MANAGER reaches both order entry and record-a-payment, and
+ * `POST /shops` refuses them. A picker that offered them the button would be
+ * offering a 403.
+ */
+export const canCreateShop = (role: Role) => has(SHOP_CREATORS, role);
+
 /**
  * Which accounts this person may bring into existence.
  *

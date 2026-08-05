@@ -734,6 +734,8 @@ export const en = {
     priceList: 'Price list',
     priceListHint: 'Which list this customer is charged from.',
     priceListDefault: 'The default list',
+    priceListTruncated:
+      'Showing {{shown}} of {{total}} price lists. Open the price list screen to see the rest.',
     title: 'Shops',
     subtitle: 'Every pharmacy we supply, and how much credit each one has.',
     add: 'Add a shop',
@@ -2652,6 +2654,44 @@ export const en = {
    * the same defect the status wording rule exists to stop, in the one place
    * that rule was not looking.
    */
+  /**
+   * The pickers every form shares.
+   *
+   * One set of words, because the act is the same wherever it happens: type
+   * enough to narrow the list, choose, or make the record that is not there.
+   */
+  /**
+   * Where a delivery goes.
+   *
+   * A shop's addresses were set by the seed script and by nothing else — no
+   * screen anywhere could append one — and a customer with no address cannot
+   * order at all.
+   */
+  addresses: {
+    add: 'Add this address',
+    added: '{{label}} has been added.',
+    addFailed: 'This address could not be added.',
+    addTitle: 'Add a delivery address',
+    addBody: 'It is saved against the customer, so it is there for every later order too.',
+    addButton: 'Add an address',
+    label: 'What to call it',
+    labelHint: 'How the rider will recognise it — "Shop front", "Back godown".',
+    line1: 'Street address',
+    line2: 'Area or landmark',
+    city: 'City',
+    district: 'District',
+    postalCode: 'Post code',
+    line1Hint: 'At least five characters — enough for a rider to find it.',
+  },
+
+  pickers: {
+    medicinePlaceholder: 'Type a brand name or a stock code',
+    supplierPlaceholder: 'Type a supplier name',
+    customerPlaceholder: 'Type a shop name, phone or reference',
+    chosen: 'Chosen: {{name}}',
+    medicineCreated: 'It goes straight onto this form once you save it.',
+  },
+
   classification: {
     PRESCRIPTION: 'On prescription',
     OTC: 'Over the counter',

@@ -523,3 +523,22 @@ reads a decision rather than guesses at an intention.
   six characters, a picture is an address — and a control nobody has typed into
   holds `''`, which is neither. The inner rule is unwrapped from the shared
   schema rather than restated.
+- **No warehouse picker, and the reason is a model gap not a UI one.** The
+  stocktake and goods-receipt forms take a `warehouseLocation`, which the server
+  matches as a _string_ against `MedicineBatch.warehouseLocation`. It is not a
+  reference to the `Warehouse` model. A picker there would send an id matched
+  against nothing, producing a stocktake that silently covers zero batches —
+  worse than the free-text field it replaced, because it would look correct.
+- **A picker's creation form hands back the whole record, not its id.** A
+  picker that has just cleared its search term has nothing left to look the name
+  up in, and fetching it again to render a word the form already held is a
+  request for nothing.
+- **`AddressSchema` carries an optional `_id`.** Delivery addresses are patched
+  as a whole array, so adding one means sending the existing ones back. Without
+  the id in the schema they were stripped, Mongoose minted new ones, and a
+  picker holding the old id pointed at nothing.
+- **The price list field on `ShopForm` links out rather than opening a dialog.**
+  A repeating line editor is more than a dialog should hold, and the field is
+  optional so leaving costs less than it does on a round with stops already
+  chosen. What had to change was the silence: it read one page of twenty-five
+  with nothing on screen saying there were more.

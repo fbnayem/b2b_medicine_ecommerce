@@ -1,7 +1,5 @@
-import { useState, type ReactNode } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { Button } from './Button';
-import { Dialog } from './Dialog';
+import { type ReactNode } from 'react';
+import { CreateInDialog, type CreateSpec } from './CreateInDialog';
 import { Field, Select } from './Field';
 
 /**
@@ -51,22 +49,8 @@ export interface PickOrCreateProps {
   onChange: (value: string) => void;
   options: readonly PickOrCreateOption[];
   className?: string;
-  /**
-   * Omit entirely when the viewer may not create one.
-   *
-   * `render` is handed a `done(id)` to call when the record exists, and a
-   * `cancel()`. The hosted form draws its own buttons: a submit has to be
-   * inside its own `<form>` to be that form's submit.
-   */
-  create?: {
-    /** The button beside the picker, and the dialog's title. */
-    label: string;
-    title: string;
-    description?: ReactNode;
-    /** The key family to invalidate, from `lib/queryKeys`. */
-    invalidates: readonly unknown[];
-    render: (done: (id: string) => void, cancel: () => void) => ReactNode;
-  };
+  /** Omit entirely when the viewer may not create one. */
+  create?: CreateSpec;
 }
 
 export function PickOrCreate({
@@ -83,15 +67,6 @@ export function PickOrCreate({
   className,
   create,
 }: PickOrCreateProps) {
-  const [open, setOpen] = useState(false);
-  const queryClient = useQueryClient();
-
-  async function created(newId: string) {
-    if (create) await queryClient.invalidateQueries({ queryKey: create.invalidates });
-    onChange(newId);
-    setOpen(false);
-  }
-
   return (
     <Field label={label} id={id} required={required} hint={hint} error={error} help={help}>
       <div className={className ?? 'flex flex-wrap items-start gap-2'}>
@@ -109,32 +84,7 @@ export function PickOrCreate({
           ))}
         </Select>
 
-        {create && (
-          <>
-            <Button type="button" onClick={() => setOpen(true)}>
-              {create.label}
-            </Button>
-            <Dialog
-              open={open}
-              onOpenChange={setOpen}
-              title={create.title}
-              description={create.description}
-              footer={null}
-            >
-              {/*
-                Mounted only while open, so a form with its own queries does not
-                fetch behind a closed dialog — and, more usefully, so cancelling
-                and reopening starts from blank rather than from a half-typed
-                record somebody abandoned.
-              */}
-              {open &&
-                create.render(
-                  (newId) => void created(newId),
-                  () => setOpen(false),
-                )}
-            </Dialog>
-          </>
-        )}
+        {create && <CreateInDialog create={create} onCreated={onChange} />}
       </div>
     </Field>
   );

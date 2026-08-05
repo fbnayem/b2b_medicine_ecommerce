@@ -15,7 +15,6 @@ import {
   Input,
   PageHeader,
   Resource,
-  Select,
   Textarea,
   requireReason,
   toast,
@@ -23,6 +22,7 @@ import {
   type Column,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { MedicinePicker } from '../components/pickers';
 import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
 import { createActionKey, formatFinanceDate, formatFinanceDateTime } from '../lib/finance';
@@ -61,6 +61,8 @@ const WARNING_KEYS: Record<string, string> = {
 
 const EMPTY_RECEIPT = {
   medicineId: '',
+  /** What the picker showed, so the form can name it after the term moves on. */
+  medicineLabel: '',
   batchNumber: '',
   manufacturingDate: '',
   expiryDate: '',
@@ -79,10 +81,6 @@ export function InventoryDashboard() {
   const [receipt, setReceipt] = useState(EMPTY_RECEIPT);
   const [receiving, setReceiving] = useState(false);
 
-  const medicines = useApiCollection<Medicine>(
-    keys.medicines.picker(),
-    '/inventory/medicines?limit=100',
-  );
   const batches = useApiCollection<MedicineBatch>(
     keys.stock.batches(warning),
     `/inventory/batches${warning ? `?warning=${warning}` : ''}`,
@@ -157,8 +155,9 @@ export function InventoryDashboard() {
     }
     setReceiving(true);
     try {
+      const { medicineLabel: _label, ...body } = receipt;
       await apiClient.post('/inventory/batches/receive', {
-        ...receipt,
+        ...body,
         costPriceMinor: cost.minor,
         sellingPriceOverrideMinor: selling?.ok ? selling.minor : undefined,
         quantity: Number(receipt.quantity),
@@ -327,22 +326,18 @@ export function InventoryDashboard() {
         <Card>
           <h2 className="mb-2 text-lg font-semibold text-text">{t('inventory.receiveStock')}</h2>
           <form className="flex flex-col gap-3" onSubmit={(event) => void receive(event)}>
-            <Field label={t('inventory.medicine')} required>
-              <Select
-                required
-                value={receipt.medicineId}
-                onChange={(event) =>
-                  setReceipt((current) => ({ ...current, medicineId: event.target.value }))
-                }
-              >
-                <option value="">{t('inventory.selectMedicine')}</option>
-                {(medicines.data?.items ?? []).map((medicine) => (
-                  <option key={medicine._id} value={medicine._id}>
-                    {medicine.brandName} · {medicine.sku}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <MedicinePicker
+              label={t('inventory.medicine')}
+              required
+              chosenLabel={receipt.medicineLabel || undefined}
+              onChoose={(medicine) =>
+                setReceipt((current) => ({
+                  ...current,
+                  medicineId: medicine._id,
+                  medicineLabel: `${medicine.brandName ?? ''} ${medicine.strength ?? ''}`.trim(),
+                }))
+              }
+            />
 
             <div className="grid gap-3 sm:grid-cols-2">
               {(

@@ -13,6 +13,18 @@ vi.mock('../api/client', async () => {
 const get = vi.mocked(apiClient.get);
 const post = vi.mocked(apiClient.post);
 
+/**
+ * The customer picker searches rather than listing the first hundred, so a
+ * test chooses one the way a person does: type enough to narrow it, then click
+ * the result. A `fireEvent.change` on the box only sets the search term.
+ */
+async function chooseShop() {
+  fireEvent.change(await screen.findByRole('combobox', { name: /Which shop/ }), {
+    target: { value: 'Dhaka' },
+  });
+  fireEvent.click(await screen.findByRole('button', { name: /Dhaka Pharmacy/ }));
+}
+
 describe('RecordPayment', () => {
   beforeEach(() => {
     get.mockReset();
@@ -51,8 +63,7 @@ describe('RecordPayment', () => {
         <RecordPayment />
       </MemoryRouter>,
     );
-    const shopSelect = await screen.findByLabelText(/Which shop/);
-    fireEvent.change(shopSelect, { target: { value: 'shop-1' } });
+    await chooseShop();
     const invoiceSelect = await screen.findByLabelText(/Against which invoice/);
     await waitFor(() =>
       expect(screen.getByRole('option', { name: /INV-2026-000001/ })).toBeTruthy(),
@@ -74,8 +85,7 @@ describe('RecordPayment', () => {
         <RecordPayment />
       </MemoryRouter>,
     );
-    const shopSelect = await screen.findByLabelText(/Which shop/);
-    fireEvent.change(shopSelect, { target: { value: 'shop-1' } });
+    await chooseShop();
     fireEvent.change(screen.getByLabelText(/How much/), { target: { value: '10.001' } });
     fireEvent.click(screen.getByRole('button', { name: 'Record it' }));
     expect(

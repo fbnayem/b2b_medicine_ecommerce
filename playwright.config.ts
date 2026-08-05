@@ -112,7 +112,7 @@ export default defineConfig({
        * than that a page renders.
        */
       name: 'manage',
-      testMatch: /(catalogue|people)\.spec\.ts/,
+      testMatch: /(catalogue|people|pickers)\.spec\.ts/,
       use: { baseURL: `http://127.0.0.1:${PREVIEW_PORT}` },
     },
   ],

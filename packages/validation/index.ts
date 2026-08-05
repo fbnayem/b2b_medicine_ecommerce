@@ -66,6 +66,18 @@ export function patchSchemaOf<Shape extends z.ZodRawShape>(schema: z.ZodObject<S
 }
 
 export const AddressSchema = z.object({
+  /**
+   * The identity of an address that already exists.
+   *
+   * `deliveryAddresses` is patched as a whole array — that is the shape
+   * `PATCH /shops/:id` takes — so adding one means sending the existing ones
+   * back with it. Without this the schema would strip their ids, Mongoose
+   * would mint new ones, and a picker holding the old id would be pointing at
+   * nothing the moment somebody added an address beside it.
+   *
+   * Optional because a creation has none yet.
+   */
+  _id: z.string().optional(),
   label: z.string().min(1),
   line1: z.string().min(5),
   line2: z.string().optional(),

@@ -11,11 +11,11 @@ import {
   Input,
   LinkButton,
   PageHeader,
-  Resource,
   Select,
   Textarea,
 } from '../components/ui';
 import { useApiCollection } from '../lib/query';
+import { CustomerPicker } from '../components/pickers';
 import { keys } from '../lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
@@ -25,7 +25,6 @@ import {
   type ApiFailure,
   type FinanceInvoiceSummary,
   type FinancePayment,
-  type FinanceShopSummary,
 } from './financeTypes';
 
 interface AttachmentPayload {
@@ -57,12 +56,16 @@ export function RecordPayment() {
   const { t, language } = useLanguage();
   const queryClient = useQueryClient();
 
-  const shops = useApiCollection<FinanceShopSummary>(
-    keys.shops.picker('active'),
-    '/shops?status=ACTIVE&limit=100',
-  );
-
   const [shopId, setShopId] = useState(searchParams.get('shopId') ?? '');
+  /*
+   * The chosen customer's name, kept beside the id.
+   *
+   * The picker searches now rather than listing the first hundred active
+   * shops, so once the term moves on there is no list to find the name in.
+   * Arriving with `?shopId=` from a ledger leaves this blank, which is
+   * correct — the ledger already said whose it is.
+   */
+  const [shopLabel, setShopLabel] = useState('');
   const [invoiceId, setInvoiceId] = useState(searchParams.get('invoiceId') ?? '');
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
@@ -179,176 +182,163 @@ export function RecordPayment() {
         actions={<LinkButton to="/payments">{t('finance.allPayments')}</LinkButton>}
       />
 
-      <Resource
-        query={shops}
-        loadingLabel={t('finance.loadingForm')}
-        errorMessageFallback={t('finance.couldNotLoadShops')}
-      >
-        {(page) => (
-          <Card className="max-w-2xl">
-            <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
-              {failure && (
-                <div className="flex flex-col items-start gap-2">
-                  <ErrorState message={failure.message} reference={failure.reference} />
-                  {created && (
-                    <LinkButton to={`/payments/${created._id}`}>
-                      {t('finance.openPending')}
-                    </LinkButton>
-                  )}
-                </div>
+      {/*
+        No `Resource` gate any more. It wrapped the whole form to wait for a
+        list of shops that no longer loads up front — the picker fetches its own
+        answer when somebody types, and a form that will not render until every
+        customer has arrived is a slower form for no benefit.
+      */}
+      <Card className="max-w-2xl">
+        <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
+          {failure && (
+            <div className="flex flex-col items-start gap-2">
+              <ErrorState message={failure.message} reference={failure.reference} />
+              {created && (
+                <LinkButton to={`/payments/${created._id}`}>{t('finance.openPending')}</LinkButton>
               )}
+            </div>
+          )}
 
-              <Field label={t('finance.whichShop')} required>
-                <Select
-                  required
-                  value={shopId}
-                  onChange={(event) => {
-                    changed();
-                    setShopId(event.target.value);
-                    setInvoiceId('');
-                  }}
-                >
-                  <option value="">{t('finance.selectShop')}</option>
-                  {page.items.map((shop) => (
-                    <option key={shop._id} value={shop._id}>
-                      {shop.reference} · {shop.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
+          <CustomerPicker
+            label={t('finance.whichShop')}
+            required
+            activeOnly
+            chosenLabel={shopLabel || undefined}
+            onChoose={(shop) => {
+              changed();
+              setShopId(shop._id);
+              setShopLabel(shop.name ?? '');
+              // Invoices belong to a customer, so a different customer
+              // means the one already chosen is somebody else's.
+              setInvoiceId('');
+            }}
+          />
 
-              <Field label={t('finance.againstInvoice')}>
-                <Select
-                  value={invoiceId}
-                  disabled={!shopId || invoices.isFetching}
-                  onChange={(event) => chooseInvoice(event.target.value)}
-                >
-                  <option value="">
-                    {invoices.isFetching ? t('finance.loadingInvoices') : t('finance.noInvoice')}
-                  </option>
-                  {(invoices.data?.items ?? []).map((invoice) => (
-                    <option key={invoice._id} value={invoice._id}>
-                      {invoice.reference} ·{' '}
-                      {t('finance.dueOn', { amount: formatMinor(invoiceDue(invoice)) })}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
+          <Field label={t('finance.againstInvoice')}>
+            <Select
+              value={invoiceId}
+              disabled={!shopId || invoices.isFetching}
+              onChange={(event) => chooseInvoice(event.target.value)}
+            >
+              <option value="">
+                {invoices.isFetching ? t('finance.loadingInvoices') : t('finance.noInvoice')}
+              </option>
+              {(invoices.data?.items ?? []).map((invoice) => (
+                <option key={invoice._id} value={invoice._id}>
+                  {invoice.reference} ·{' '}
+                  {t('finance.dueOn', { amount: formatMinor(invoiceDue(invoice)) })}
+                </option>
+              ))}
+            </Select>
+          </Field>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label={t('finance.amount')} hint={t('finance.amountHint')} required>
-                  <Input
-                    required
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={amount}
-                    onChange={(event) => {
-                      changed();
-                      setAmount(event.target.value);
-                    }}
-                  />
-                </Field>
-                <Field label={t('finance.method')}>
-                  <Select
-                    value={method}
-                    onChange={(event) => {
-                      changed();
-                      setMethod(event.target.value as PaymentMethod);
-                    }}
-                  >
-                    {/* Not `CREDIT`: recording a payment "on account" would be
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={t('finance.amount')} hint={t('finance.amountHint')} required>
+              <Input
+                required
+                inputMode="decimal"
+                placeholder="0.00"
+                value={amount}
+                onChange={(event) => {
+                  changed();
+                  setAmount(event.target.value);
+                }}
+              />
+            </Field>
+            <Field label={t('finance.method')}>
+              <Select
+                value={method}
+                onChange={(event) => {
+                  changed();
+                  setMethod(event.target.value as PaymentMethod);
+                }}
+              >
+                {/* Not `CREDIT`: recording a payment "on account" would be
                         recording money that has not been paid. */}
-                    {Object.values(PaymentMethod)
-                      .filter((value) => value !== PaymentMethod.CREDIT)
-                      .map((value) => (
-                        <option key={value} value={value}>
-                          {t(`paymentMethod.${value}`)}
-                        </option>
-                      ))}
-                  </Select>
-                </Field>
-                <Field label={t('finance.whenCollected')} required>
-                  <Input
-                    required
-                    type="datetime-local"
-                    value={collectionTime}
-                    onChange={(event) => {
-                      changed();
-                      setCollectionTime(event.target.value);
-                    }}
-                  />
-                </Field>
-                <Field label={t('finance.theirReference')} hint={t('finance.theirReferenceHint')}>
-                  <Input
-                    maxLength={120}
-                    value={transactionReference}
-                    onChange={(event) => {
-                      changed();
-                      setTransactionReference(event.target.value);
-                    }}
-                  />
-                </Field>
-              </div>
+                {Object.values(PaymentMethod)
+                  .filter((value) => value !== PaymentMethod.CREDIT)
+                  .map((value) => (
+                    <option key={value} value={value}>
+                      {t(`paymentMethod.${value}`)}
+                    </option>
+                  ))}
+              </Select>
+            </Field>
+            <Field label={t('finance.whenCollected')} required>
+              <Input
+                required
+                type="datetime-local"
+                value={collectionTime}
+                onChange={(event) => {
+                  changed();
+                  setCollectionTime(event.target.value);
+                }}
+              />
+            </Field>
+            <Field label={t('finance.theirReference')} hint={t('finance.theirReferenceHint')}>
+              <Input
+                maxLength={120}
+                value={transactionReference}
+                onChange={(event) => {
+                  changed();
+                  setTransactionReference(event.target.value);
+                }}
+              />
+            </Field>
+          </div>
 
-              <Field label={t('finance.proofLabel')} hint={t('finance.proofHint')}>
-                <Input
-                  type="file"
-                  accept="image/jpeg,image/png,application/pdf"
-                  onChange={(event) => {
-                    changed();
-                    setFile(event.target.files?.[0]);
-                  }}
-                />
-              </Field>
+          <Field label={t('finance.proofLabel')} hint={t('finance.proofHint')}>
+            <Input
+              type="file"
+              accept="image/jpeg,image/png,application/pdf"
+              onChange={(event) => {
+                changed();
+                setFile(event.target.files?.[0]);
+              }}
+            />
+          </Field>
 
-              <Field label={t('fields.notes')}>
-                <Textarea
-                  maxLength={1000}
-                  value={notes}
-                  onChange={(event) => {
-                    changed();
-                    setNotes(event.target.value);
-                  }}
-                />
-              </Field>
+          <Field label={t('fields.notes')}>
+            <Textarea
+              maxLength={1000}
+              value={notes}
+              onChange={(event) => {
+                changed();
+                setNotes(event.target.value);
+              }}
+            />
+          </Field>
 
-              <label className="flex min-h-11 items-center gap-2 text-text">
-                <input
-                  type="checkbox"
-                  checked={postImmediately}
-                  onChange={(event) => {
-                    changed();
-                    setPostImmediately(event.target.checked);
-                  }}
-                />
-                {t('finance.postImmediately')}
-              </label>
-              <label className="flex min-h-11 items-center gap-2 text-text">
-                <input
-                  type="checkbox"
-                  checked={allowAdvance}
-                  onChange={(event) => {
-                    changed();
-                    setAllowAdvance(event.target.checked);
-                  }}
-                />
-                {t('finance.allowAdvance')}
-              </label>
+          <label className="flex min-h-11 items-center gap-2 text-text">
+            <input
+              type="checkbox"
+              checked={postImmediately}
+              onChange={(event) => {
+                changed();
+                setPostImmediately(event.target.checked);
+              }}
+            />
+            {t('finance.postImmediately')}
+          </label>
+          <label className="flex min-h-11 items-center gap-2 text-text">
+            <input
+              type="checkbox"
+              checked={allowAdvance}
+              onChange={(event) => {
+                changed();
+                setAllowAdvance(event.target.checked);
+              }}
+            />
+            {t('finance.allowAdvance')}
+          </label>
 
-              <div className="flex justify-end">
-                <Button
-                  type="submit"
-                  variant="primary"
-                  busy={submitting}
-                  disabled={Boolean(created)}
-                >
-                  {submitting ? t('finance.saving') : t('finance.saveRecord')}
-                </Button>
-              </div>
-            </form>
-          </Card>
-        )}
-      </Resource>
+          <div className="flex justify-end">
+            <Button type="submit" variant="primary" busy={submitting} disabled={Boolean(created)}>
+              {submitting ? t('finance.saving') : t('finance.saveRecord')}
+            </Button>
+          </div>
+        </form>
+      </Card>
     </>
   );
 }

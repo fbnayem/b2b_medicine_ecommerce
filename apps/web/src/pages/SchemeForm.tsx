@@ -12,12 +12,12 @@ import {
   LinkButton,
   LoadingState,
   PageHeader,
-  SearchPicker,
   Select,
   Textarea,
   toast,
 } from '../components/ui';
 import { useApiCollection, useApiResource } from '../lib/query';
+import { MedicinePicker } from '../components/pickers';
 import { keys } from '../lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
@@ -43,20 +43,6 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
   const queryClient = useQueryClient();
   const editing = mode === 'edit';
 
-  /*
-   * A search, not the first hundred.
-   *
-   * This picker was `?limit=100` in a plain `<select>`, so a catalogue past a
-   * hundred lines could not be fully chosen from — the list simply ended, with
-   * nothing on the screen saying so. The term goes to the server, so the answer
-   * is not filtered from a page that was already cut short.
-   */
-  const [term, setTerm] = useState('');
-  const medicines = useApiCollection<Medicine>(
-    keys.medicines.search(term),
-    `/inventory/medicines?limit=25&search=${encodeURIComponent(term)}`,
-    { enabled: term.trim().length > 1 },
-  );
   const shops = useApiCollection<Shop>(keys.shops.picker('all'), '/shops?limit=100');
   const existing = useApiResource<SchemeRecord>(
     keys.schemes.one(params.id!),
@@ -168,27 +154,16 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
                 onChange={(event) => setForm({ ...form, name: event.target.value })}
               />
             </Field>
-            <SearchPicker
+            <MedicinePicker
               label={t('schemes.medicine')}
               required
-              placeholder={t('schemes.chooseMedicine')}
               hint={t('schemes.medicineHint')}
-              term={term}
-              onTermChange={setTerm}
-              emptyLabel={t('catalogue.none')}
-              options={(medicines.data?.items ?? []).map((medicine) => ({
-                value: medicine._id,
-                label: `${medicine.brandName} ${medicine.strength ?? ''}`.trim(),
-                note: medicine.sku,
-              }))}
-              onChoose={(value) => setForm({ ...form, medicineId: value })}
-              chosen={
+              chosenLabel={
                 chosen.data
-                  ? t('schemes.chosenMedicine', {
-                      name: `${chosen.data.brandName} ${chosen.data.strength ?? ''}`.trim(),
-                    })
+                  ? `${chosen.data.brandName} ${chosen.data.strength ?? ''}`.trim()
                   : undefined
               }
+              onChoose={(medicine) => setForm({ ...form, medicineId: medicine._id })}
             />
             <Field label={t('schemes.buyQuantity')} hint={t('schemes.buyQuantityHint')} required>
               <Input

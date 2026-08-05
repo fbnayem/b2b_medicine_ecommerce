@@ -1240,22 +1240,42 @@ ships its first caller.
 
 ### Test results
 
-Web 276 (34 files). Browser 113 — 44 smoke/accessibility/navigation on the built
-bundle, 10 smoke on the dev server, 9 journey, 42 screens, 8 manage. API 170
+Web 276 (34 files). Browser 116 — 44 smoke/accessibility/navigation on the built
+bundle, 10 smoke on the dev server, 9 journey, 42 screens, 11 manage. API 170
 unit, 194 integration, 5 reconciliation. Mobile 93.
 Typecheck, lint and build clean apart from the seven pre-existing fast-refresh
 warnings in files not touched here.
 
+### Every picker converted
+
+`SearchPicker` and `PickOrCreate` now cover every site named in the plan.
+Medicine — `PriceListForm`, `PurchaseOrderForm`, `SchemeForm`,
+`InventoryDashboard`. Supplier — `PurchaseOrderForm`. Customer — `OrderEntry`,
+`RecordPayment`. Delivery address — `OrderEntry`. Rider — `TripForm`,
+`DeliveryDetail`. Each searches the server rather than reading one unpaged page,
+and each hosts its creation form in a dialog.
+
+`GET /purchasing/suppliers` gained a `search` parameter to make that possible;
+it had none, so the picker over it could only ever see the first fifty.
+
+`AddressSchema` gained an optional `_id`. Delivery addresses are patched as a
+whole array — that is the shape `PATCH /shops/:id` takes — so adding one means
+sending the existing ones back, and without this the schema stripped their ids
+and Mongoose minted new ones.
+
 ### Known limitations
 
-- `SearchPicker` is adopted by the offers form only. The medicine pickers in
-  `PriceListForm`, `PurchaseOrderForm` and `InventoryDashboard`, and the supplier
-  and shop pickers, still read one unpaged page — 100, 50 or 25 records — and
-  still say nothing when the list is cut short. The primitive and the pattern
-  are in place; the remaining four are mechanical.
-- `PickOrCreate` is adopted by the rider pickers only. The medicine, supplier,
-  customer, delivery-address and warehouse cases named in the phase plan are not
-  wired.
+- **The stocktake and goods-receipt forms keep a free-text `warehouseLocation`,
+  and no warehouse picker exists.** That field is matched by the server as a
+  _string_ against `MedicineBatch.warehouseLocation`; it is not a reference to
+  the `Warehouse` model. A picker there would send an id the server matched
+  against nothing, producing a stocktake that silently covers zero batches.
+  Linking the two is a data change, not a UI one, and is not attempted here.
+- **The price list field on `ShopForm` links out rather than opening a dialog.**
+  A price list is a repeating line editor, which is more than a dialog should
+  hold, and the field is optional so leaving costs less. Its cap is raised to a
+  hundred and it now says so when the list is cut short — the silence was the
+  defect, not the cap.
 - **No SALES user is seeded**, in `e2e/fixtures.ts` or `seed.ts`, so the sales
   variant of the medicine page is covered by the page test rather than in the
   browser.
@@ -1267,6 +1287,7 @@ warnings in files not touched here.
 
 ### Next phase dependencies
 
-None. The two adoption gaps above are the natural first slice of whatever comes
-next. Go-live items remain as listed in Phase 24: SMS provider procurement, an
+None. Linking `Warehouse` to `MedicineBatch.warehouseLocation` is the one piece
+of unfinished business, and it is a data change rather than a screen. Go-live
+items remain as listed in Phase 24: SMS provider procurement, an
 `ERROR_REPORTING_DSN` adapter, and a scheduled backup.

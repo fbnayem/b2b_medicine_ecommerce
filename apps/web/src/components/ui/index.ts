@@ -29,6 +29,7 @@ export {
   type FormProblem,
 } from './Feedback';
 export { ConfirmDialog, Dialog, type ConfirmDialogProps, type DialogProps } from './Dialog';
+export { CreateInDialog, type CreateSpec } from './CreateInDialog';
 export {
   Badge,
   Card,

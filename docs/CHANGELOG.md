@@ -78,6 +78,27 @@ a manager's job, so making the person who drives it has to be too. The
 storekeeper half is wider than the rider case needs and is written down as such
 in `ASSUMPTIONS.md`, along with the limit that makes it safe.
 
+### Every picker searches, and every picker can create
+
+Suppliers stopped at fifty, price lists at twenty-five, medicines and shops at a
+hundred — each a plain `<select>` over one unpaged page with nothing on screen
+saying there was more. Past those counts a record simply could not be chosen
+from any form that picks one.
+
+All of them search the server now, and all of them can make the record that is
+missing without leaving: medicine on four forms, supplier on the purchase order,
+customer on order entry and record-a-payment, delivery address on order entry,
+rider on both delivery screens.
+
+`GET /purchasing/suppliers` had no `search` parameter at all — it gained one.
+
+**A shop's delivery addresses could not be added by any screen.** They came from
+the seed script, and a customer with no address cannot order at all, so a shop
+registered through the product was unable to buy anything. Adding one patches the
+whole array, which is the shape the endpoint takes — and `AddressSchema` gained
+an optional `_id`, because without it the existing addresses came back stripped
+of their identity and Mongoose minted new ones.
+
 ### Gates
 
 Two new ones, each proved by planting the defect it claims to catch: every query

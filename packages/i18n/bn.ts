@@ -666,6 +666,8 @@ export const bn: Catalogue = {
     priceList: 'মূল্যতালিকা',
     priceListHint: 'এই গ্রাহকের দাম কোন তালিকা থেকে নেওয়া হবে।',
     priceListDefault: 'ডিফল্ট তালিকা',
+    priceListTruncated:
+      '{{total}}টির মধ্যে {{shown}}টি দামের তালিকা দেখানো হচ্ছে। বাকিগুলো দেখতে দামের তালিকার পর্দা খুলুন।',
     title: 'দোকান',
     subtitle: 'আমরা যেসব ফার্মেসিতে সরবরাহ করি, আর প্রত্যেকের ক্রেডিট কত।',
     add: 'নতুন দোকান যোগ করুন',
@@ -2430,6 +2432,31 @@ export const bn: Catalogue = {
     administration: 'প্রশাসন',
     account: 'আমার অ্যাকাউন্ট',
   } as Record<string, string>,
+
+  addresses: {
+    add: 'এই ঠিকানা যোগ করুন',
+    added: '{{label}} যোগ করা হয়েছে।',
+    addFailed: 'ঠিকানাটি যোগ করা যায়নি।',
+    addTitle: 'ডেলিভারির ঠিকানা যোগ করুন',
+    addBody: 'ঠিকানাটি দোকানের নামেই থাকবে, তাই পরের সব অর্ডারেও পাওয়া যাবে।',
+    addButton: 'ঠিকানা যোগ করুন',
+    label: 'কী নামে ডাকবেন',
+    labelHint: 'ডেলিভারিকর্মী যেভাবে চিনবেন — "দোকানের সামনে", "পিছনের গুদাম"।',
+    line1: 'রাস্তার ঠিকানা',
+    line2: 'এলাকা বা পরিচিত কোনও জায়গা',
+    city: 'শহর',
+    district: 'জেলা',
+    postalCode: 'পোস্ট কোড',
+    line1Hint: 'অন্তত পাঁচটি অক্ষর — ডেলিভারিকর্মী যেন খুঁজে পান।',
+  },
+
+  pickers: {
+    medicinePlaceholder: 'ব্র্যান্ডের নাম বা স্টক কোড লিখুন',
+    supplierPlaceholder: 'সরবরাহকারীর নাম লিখুন',
+    customerPlaceholder: 'দোকানের নাম, ফোন বা রেফারেন্স লিখুন',
+    chosen: 'বেছে নেওয়া হয়েছে: {{name}}',
+    medicineCreated: 'সংরক্ষণ করলেই এটি সরাসরি এই ফর্মে চলে আসবে।',
+  },
 
   classification: {
     PRESCRIPTION: 'ব্যবস্থাপত্রে',

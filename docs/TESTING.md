@@ -40,14 +40,14 @@ reconciles every `e2e/*.spec.ts` against the `testMatch` patterns in
 
 ### Tiers
 
-| Tier                     | Files                                 | Contract                                                                                                                                                                                    |
-| ------------------------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 — domain workflows     | `journey.spec.ts`                     | **Must survive the redesign untouched.** Navigates by URL and asserts on text a person reads, never on a class name.                                                                        |
-| 2 — page-level state     | `smoke.spec.ts`                       | Signs in as each role and asserts the page mounted. Stable across restyling.                                                                                                                |
-| 3 — navigation and shell | `navigation.spec.ts`                  | The sidebar, search, account menu, breadcrumbs and dark mode. Rewritten when the shell landed, as budgeted.                                                                                 |
-| 4 — every screen         | `screens.spec.ts`                     | Opens **every** `NAV_ITEMS` destination as a role permitted to open it: no error card, no refused request, no broken image.                                                                 |
-| — accessibility          | `accessibility.spec.ts`               | Axe at strict zero across seventeen screens.                                                                                                                                                |
-| 5 — changing things      | `catalogue.spec.ts`, `people.spec.ts` | Writes to the seeded database, so it runs one test after another and each undoes what it did. This is the tier that proves an endpoint has a caller at all rather than that a page renders. |
+| Tier                     | Files                                                    | Contract                                                                                                                                                                                    |
+| ------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — domain workflows     | `journey.spec.ts`                                        | **Must survive the redesign untouched.** Navigates by URL and asserts on text a person reads, never on a class name.                                                                        |
+| 2 — page-level state     | `smoke.spec.ts`                                          | Signs in as each role and asserts the page mounted. Stable across restyling.                                                                                                                |
+| 3 — navigation and shell | `navigation.spec.ts`                                     | The sidebar, search, account menu, breadcrumbs and dark mode. Rewritten when the shell landed, as budgeted.                                                                                 |
+| 4 — every screen         | `screens.spec.ts`                                        | Opens **every** `NAV_ITEMS` destination as a role permitted to open it: no error card, no refused request, no broken image.                                                                 |
+| — accessibility          | `accessibility.spec.ts`                                  | Axe at strict zero across seventeen screens.                                                                                                                                                |
+| 5 — changing things      | `catalogue.spec.ts`, `people.spec.ts`, `pickers.spec.ts` | Writes to the seeded database, so it runs one test after another and each undoes what it did. This is the tier that proves an endpoint has a caller at all rather than that a page renders. |
 
 ### Why tier 4 exists
 

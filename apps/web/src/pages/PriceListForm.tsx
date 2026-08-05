@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { parseMoney, toDateInputValue, toMoneyInputValue } from '@medsupply/utilities';
-import type { Medicine, PriceListRecord } from '@medsupply/shared-types';
+import type { PriceListRecord } from '@medsupply/shared-types';
 import { apiClient, errorMessage, failureReference } from '../api/client';
 import {
   Button,
@@ -16,7 +16,8 @@ import {
   Textarea,
   toast,
 } from '../components/ui';
-import { useApiCollection, useApiResource } from '../lib/query';
+import { useApiResource } from '../lib/query';
+import { MedicinePicker } from '../components/pickers';
 import { keys } from '../lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
@@ -36,6 +37,13 @@ import { formatMinor } from '../lib/finance';
 interface Line {
   key: number;
   medicineId: string;
+  /**
+   * What the picker showed when it was chosen.
+   *
+   * `listPriceLists` denormalises the brand name onto each line for exactly
+   * this reason, so an existing sheet fills in without a request per row.
+   */
+  medicineLabel: string;
   unitPrice: string;
   discountPercent: string;
 }
@@ -44,6 +52,7 @@ let nextKey = 1;
 const emptyLine = (): Line => ({
   key: nextKey++,
   medicineId: '',
+  medicineLabel: '',
   unitPrice: '',
   discountPercent: '0',
 });
@@ -67,10 +76,6 @@ export function PriceListForm({ mode = 'create' }: { mode?: 'create' | 'edit' })
   const queryClient = useQueryClient();
   const editing = mode === 'edit';
 
-  const medicines = useApiCollection<Medicine>(
-    keys.medicines.picker(),
-    '/inventory/medicines?limit=100',
-  );
   const existing = useApiResource<PriceListRecord>(
     keys.priceLists.one(params.id!),
     `/pricing/price-lists/${params.id}`,
@@ -112,6 +117,7 @@ export function PriceListForm({ mode = 'create' }: { mode?: 'create' | 'edit' })
         ? record.lines.map((line) => ({
             key: nextKey++,
             medicineId: line.medicineId,
+            medicineLabel: line.medicineBrandName ?? '',
             unitPrice: toMoneyInputValue(line.unitPriceMinor),
             discountPercent: String(line.discountPercent ?? 0),
           }))
@@ -238,19 +244,17 @@ export function PriceListForm({ mode = 'create' }: { mode?: 'create' | 'edit' })
             <h2 className="text-lg font-semibold text-text">{t('priceLists.lines')}</h2>
             {lines.map((line) => (
               <div key={line.key} className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr_auto]">
-                <Field label={t('priceLists.medicine')}>
-                  <Select
-                    value={line.medicineId}
-                    onChange={(event) => patch(line.key, { medicineId: event.target.value })}
-                  >
-                    <option value="">{t('priceLists.chooseMedicine')}</option>
-                    {(medicines.data?.items ?? []).map((medicine) => (
-                      <option key={medicine._id} value={medicine._id}>
-                        {medicine.brandName} · {medicine.strength}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
+                <MedicinePicker
+                  label={t('priceLists.medicine')}
+                  chosenLabel={line.medicineLabel || undefined}
+                  onChoose={(medicine) =>
+                    patch(line.key, {
+                      medicineId: medicine._id,
+                      medicineLabel:
+                        `${medicine.brandName ?? ''} ${medicine.strength ?? ''}`.trim(),
+                    })
+                  }
+                />
                 <Field label={t('priceLists.unitPrice')}>
                   <Input
                     inputMode="decimal"
