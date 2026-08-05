@@ -1682,6 +1682,13 @@ export const en = {
     saving: 'Saving…',
     saveFailed: 'This medicine could not be saved.',
     badAmount: 'Enter an amount like 12.50.',
+    editTitle: 'Edit this medicine',
+    editSubtitle:
+      'Changing these changes what every future order sees. Past orders keep what they were charged.',
+    saveChanges: 'Save changes',
+    loading: 'Loading this medicine…',
+    couldNotLoad: 'This medicine could not be loaded, so there is nothing to edit yet.',
+    saved: '{{name}} has been saved.',
   },
 
   /**
@@ -2615,6 +2622,7 @@ export const en = {
     medicines: 'Medicines',
     'medicine-detail': 'Medicine',
     'medicine-new': 'Add a medicine',
+    'medicine-edit': 'Edit this medicine',
     warehouses: 'Warehouses',
     'warehouse-new': 'Add a warehouse',
     inventory: 'Stock',

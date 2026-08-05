@@ -1593,6 +1593,13 @@ export const bn: Catalogue = {
     saving: 'সংরক্ষণ হচ্ছে…',
     saveFailed: 'ওষুধটি সংরক্ষণ করা যায়নি।',
     badAmount: '12.50-এর মতো করে টাকার অঙ্ক লিখুন।',
+    editTitle: 'এই ওষুধটি সম্পাদনা করুন',
+    editSubtitle:
+      'এখানে বদলালে পরের সব অর্ডারে সেটাই দেখা যাবে। আগের অর্ডারে যা নেওয়া হয়েছে তা বদলাবে না।',
+    saveChanges: 'পরিবর্তন সংরক্ষণ করুন',
+    loading: 'ওষুধটি আসছে…',
+    couldNotLoad: 'ওষুধটি আনা যায়নি, তাই এখন সম্পাদনা করার কিছু নেই।',
+    saved: '{{name}} সংরক্ষণ হয়েছে।',
   },
 
   /*
@@ -2414,6 +2421,7 @@ export const bn: Catalogue = {
     medicines: 'ওষুধ',
     'medicine-detail': 'ওষুধ',
     'medicine-new': 'ওষুধ যোগ করুন',
+    'medicine-edit': 'এই ওষুধটি সম্পাদনা করুন',
     warehouses: 'গুদাম',
     'warehouse-new': 'গুদাম যোগ করুন',
     inventory: 'স্টক',

@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { MedicineClassification, ProductType } from '@medsupply/shared-types';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { MedicineClassification, ProductType, type Medicine } from '@medsupply/shared-types';
 import { MedicineFieldsSchema } from '@medsupply/validation';
-import { parseMoney } from '@medsupply/utilities';
+import { parseMoney, toMoneyInputValue } from '@medsupply/utilities';
 import { z } from 'zod';
 import { apiClient, errorMessage, failureReference } from '../api/client';
 import {
@@ -12,11 +12,14 @@ import {
   Field,
   HelpTip,
   Input,
+  LoadingState,
   PageHeader,
   Select,
   Textarea,
+  toast,
 } from '../components/ui';
 import { useZodForm } from '../lib/form';
+import { useApiResource } from '../lib/query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '../lib/useLanguage';
 import { keys } from '../lib/queryKeys';
@@ -45,6 +48,33 @@ const optionalMoney = z.string().refine((value) => value === '' || parseMoney(va
   message: 'Enter an amount like 12.50, or leave it blank.',
 });
 
+/**
+ * An untouched optional field is **absent**, not an empty string.
+ *
+ * The server's optional fields are optional *or well-formed*: a barcode is at
+ * least six characters, a picture is an address. An `<input>` nobody has typed
+ * into holds `''`, which is neither — so the form refused to save and pointed
+ * at a field the person had deliberately left alone. Blanking a value somebody
+ * had previously set goes the same way: it must clear the field, not fail.
+ *
+ * The inner rule is unwrapped from the shared schema rather than restated, so a
+ * change to what a barcode looks like still reaches this form.
+ */
+const blankIsAbsent = <T extends z.ZodType<string, string>>(field: z.ZodOptional<T>) =>
+  z.union([z.literal(''), field.unwrap()]).transform((value) => (value === '' ? undefined : value));
+
+/**
+ * The same for a number box, where "empty" arrives as `NaN`.
+ *
+ * `valueAsNumber` on a cleared field gives `NaN`, and `z.number()` refuses it —
+ * so "no maximum", which is the ordinary answer for almost every line in the
+ * catalogue, could not be expressed.
+ */
+const blankIsNoLimit = <T extends z.ZodType<number, number>>(field: z.ZodOptional<T>) =>
+  z
+    .union([z.nan(), field.unwrap()])
+    .transform((value) => (Number.isNaN(value) ? undefined : (value as number)));
+
 /*
  * `productImageUrl` stays in.
  *
@@ -65,6 +95,18 @@ const MedicineFormSchema = MedicineFieldsSchema.omit({
     costPrice: money,
     sellingPrice: money,
     mrp: optionalMoney,
+    /*
+     * Every optional field the form draws a control for. Each of these was
+     * unsubmittable while blank, which is the state a create form opens in and
+     * the state an edit form loads into for any line that never had one.
+     */
+    barcode: blankIsAbsent(MedicineFieldsSchema.shape.barcode),
+    genericName: blankIsAbsent(MedicineFieldsSchema.shape.genericName),
+    strength: blankIsAbsent(MedicineFieldsSchema.shape.strength),
+    dosageForm: blankIsAbsent(MedicineFieldsSchema.shape.dosageForm),
+    description: blankIsAbsent(MedicineFieldsSchema.shape.description),
+    productImageUrl: blankIsAbsent(MedicineFieldsSchema.shape.productImageUrl),
+    maximumOrderQuantity: blankIsNoLimit(MedicineFieldsSchema.shape.maximumOrderQuantity),
   })
   .superRefine((value, context) => {
     /*
@@ -143,11 +185,43 @@ const OPTIONAL = new Set(['barcode', 'maximumOrderQuantity', 'mrp']);
  */
 const CLINICAL = new Set(['genericName', 'strength', 'dosageForm']);
 
-export function MedicineForm() {
+/**
+ * Adding a medicine, and — for the first time in this product — changing one.
+ *
+ * `PATCH /inventory/medicines/:id` has been mounted, documented and tested
+ * since the catalogue was built, and until now nothing called it. A typo in a
+ * stock code, an MRP nobody recorded, a line that should be withdrawn: none of
+ * them could be corrected from inside the application at all.
+ *
+ * The same nineteen fields either way. Editing one field at a time on the
+ * detail page would mean nineteen separate patches, nineteen error surfaces,
+ * and a rule spanning two fields — the trade price may not exceed the MRP —
+ * that can be broken from whichever of the pair you are *not* editing. The
+ * pricing card gets a one-field price change of its own precisely because that
+ * is the change people make weekly; everything else belongs on a form.
+ *
+ * **No `version` field, deliberately.** `PriceList` and `Scheme` carry one, and
+ * copying that here would be a migration wearing a one-line diff: a Mongoose
+ * `default: 0` does not backfill documents that already exist, so `undefined`
+ * would fail the equality check and every first edit of every existing medicine
+ * would be refused as a conflict. The blast radius differs too — a price list is
+ * replaced as a whole sheet, so a lost update destroys somebody's prices,
+ * whereas a medicine is patched field-wise and two managers editing different
+ * fields both land.
+ */
+export function MedicineForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
   const { t, language } = useLanguage();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const params = useParams();
+  const editing = mode === 'edit';
   const [failure, setFailure] = useState<{ message: string; reference?: string }>();
+
+  const existing = useApiResource<Medicine>(
+    keys.medicines.one(params.id!),
+    `/inventory/medicines/${params.id}`,
+    { enabled: editing },
+  );
 
   const form = useZodForm<MedicineValues, MedicineOutput>(MedicineFormSchema, {
     defaultValues: {
@@ -172,6 +246,47 @@ export function MedicineForm() {
     } as MedicineValues,
   });
 
+  /*
+   * The record, poured back into the controls somebody types into.
+   *
+   * Money is the only conversion with a trap in it: the model holds integer
+   * minor units and the field holds what a person would have typed, and the
+   * obvious `minor / 100` is a float divide on a value that is only exact as an
+   * integer. `toMoneyInputValue` does it as string surgery, so the amount
+   * round-trips back through `parseMoney` unchanged.
+   *
+   * Keyed on `updatedAt` rather than on the object, so somebody's half-finished
+   * edits are not wiped by a background refetch that returned the same record —
+   * a refetch produces a new object identity every time.
+   */
+  useEffect(() => {
+    const record = existing.data;
+    if (!record) return;
+    form.reset({
+      sku: record.sku,
+      barcode: record.barcode ?? '',
+      brandName: record.brandName,
+      genericName: record.genericName ?? '',
+      manufacturer: record.manufacturer,
+      strength: record.strength ?? '',
+      dosageForm: record.dosageForm ?? '',
+      packSize: record.packSize,
+      unit: record.unit,
+      category: record.category,
+      description: record.description ?? '',
+      productImageUrl: record.productImageUrl ?? '',
+      costPrice: toMoneyInputValue(record.costPriceMinor),
+      sellingPrice: toMoneyInputValue(record.defaultSellingPriceMinor),
+      mrp: toMoneyInputValue(record.mrpMinor),
+      minimumOrderQuantity: record.minimumOrderQuantity,
+      maximumOrderQuantity: record.maximumOrderQuantity,
+      productType: record.productType ?? ProductType.MEDICINE,
+      classification: record.classification,
+      coldChain: record.coldChain,
+    } as MedicineValues);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existing.data?.updatedAt, existing.data?._id]);
+
   const submit = form.handleSubmit(async (values) => {
     const { costPrice, sellingPrice, mrp, ...rest } = values;
     const cost = parseMoney(costPrice);
@@ -180,19 +295,34 @@ export function MedicineForm() {
     // returns no answer without an MRP, which is different from a margin of nil.
     const printed = parseMoney(mrp);
     if (!cost.ok || !selling.ok) return;
+    const body = {
+      ...rest,
+      barcode: rest.barcode || undefined,
+      // Blank means "no picture", which is a value the server stores as
+      // absent rather than as an empty string that fails its own URL rule.
+      productImageUrl: rest.productImageUrl || undefined,
+      costPriceMinor: cost.minor,
+      defaultSellingPriceMinor: selling.minor,
+      mrpMinor: printed.ok ? printed.minor : undefined,
+    };
     try {
-      const response = await apiClient.post('/inventory/medicines', {
-        ...rest,
-        barcode: rest.barcode || undefined,
-        // Blank means "no picture", which is a value the server stores as
-        // absent rather than as an empty string that fails its own URL rule.
-        productImageUrl: rest.productImageUrl || undefined,
-        costPriceMinor: cost.minor,
-        defaultSellingPriceMinor: selling.minor,
-        mrpMinor: printed.ok ? printed.minor : undefined,
-      });
+      /*
+       * The whole object on a patch, not the fields that changed.
+       *
+       * `UpdateMedicineSchema` re-runs `validateMedicine` on the merged result,
+       * and the rule it enforces is conditional: switching a line to
+       * `PRESCRIPTION` makes generic name, strength and form required. Sending
+       * a difference would let that rule read half of a record.
+       */
+      const response = editing
+        ? await apiClient.patch(`/inventory/medicines/${params.id}`, body)
+        : await apiClient.post('/inventory/medicines', body);
       queryClient.invalidateQueries({ queryKey: keys.medicines.all });
-      navigate(`/medicines/${response.data.data._id}`);
+      // The catalogue list, the search, this medicine and its batches all sit
+      // under that one prefix, which is the whole reason the keys are shaped
+      // that way — a price changed here shows on the list without a reload.
+      if (editing) toast.success(t('medicineForm.saved', { name: rest.brandName }));
+      navigate(`/medicines/${editing ? params.id : response.data.data._id}`);
     } catch (caught) {
       setFailure({
         message: errorMessage(caught, language, t('medicineForm.saveFailed')),
@@ -332,13 +462,45 @@ export function MedicineForm() {
     },
   ];
 
+  const header = (
+    <PageHeader
+      routeId={editing ? 'medicine-edit' : 'medicine-new'}
+      title={editing ? t('medicineForm.editTitle') : t('medicineForm.title')}
+      description={editing ? t('medicineForm.editSubtitle') : t('medicineForm.subtitle')}
+    />
+  );
+
+  /*
+   * An empty form is the wrong thing to show while the record is on its way:
+   * somebody would start typing into fields that are about to be overwritten by
+   * the reset above. The failure case is separate again — a form prefilled from
+   * nothing would save blanks over a medicine that loaded fine yesterday.
+   */
+  if (editing && existing.isLoading) {
+    return (
+      <>
+        {header}
+        <LoadingState label={t('medicineForm.loading')} />
+      </>
+    );
+  }
+
+  if (editing && existing.isError) {
+    return (
+      <>
+        {header}
+        <ErrorState
+          message={errorMessage(existing.error, language, t('medicineForm.couldNotLoad'))}
+          reference={failureReference(existing.error)}
+          onRetry={() => void existing.refetch()}
+        />
+      </>
+    );
+  }
+
   return (
     <>
-      <PageHeader
-        routeId="medicine-new"
-        title={t('medicineForm.title')}
-        description={t('medicineForm.subtitle')}
-      />
+      {header}
       <Card className="max-w-3xl">
         <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
           {failure && <ErrorState message={failure.message} reference={failure.reference} />}
@@ -450,7 +612,11 @@ export function MedicineForm() {
           <div className="flex flex-wrap justify-end gap-2">
             <Button onClick={() => navigate(-1)}>{t('common.cancel')}</Button>
             <Button type="submit" variant="primary" busy={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? t('medicineForm.saving') : t('medicineForm.save')}
+              {form.formState.isSubmitting
+                ? t('medicineForm.saving')
+                : editing
+                  ? t('medicineForm.saveChanges')
+                  : t('medicineForm.save')}
             </Button>
           </div>
         </form>

@@ -301,6 +301,27 @@ export const NAV_ITEMS: readonly NavItem[] = [
     hidden: true,
     parent: 'medicines',
   },
+  {
+    /*
+     * Changing a medicine, which nothing in this product could do.
+     *
+     * `PATCH /inventory/medicines/:id` has existed, been documented and been
+     * tested since the catalogue was built, and no screen has ever called it —
+     * so a typo in a stock code, a missing MRP or a line that should be
+     * withdrawn could only be fixed by somebody with database access.
+     *
+     * `MANAGEMENT`, matching the server's `catalogueManagers`. A storekeeper
+     * reads the catalogue and moves stock; the price on the pack is not theirs.
+     */
+    id: 'medicine-edit',
+    label: 'Edit this medicine',
+    path: '/medicines/:id/edit',
+    roles: MANAGEMENT,
+    group: 'catalogue',
+    icon: 'catalogue',
+    hidden: true,
+    parent: 'medicine-detail',
+  },
   /*
    * A rep reads the terms; a manager sets them.
    *

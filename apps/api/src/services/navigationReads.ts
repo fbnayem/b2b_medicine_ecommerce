@@ -39,6 +39,9 @@ export const SCREEN_READS: Readonly<Record<string, readonly string[]>> = {
   // ── Catalogue ─────────────────────────────────────────────────────────────
   medicines: ['GET /api/v1/inventory/medicines'],
   'medicine-detail': ['GET /api/v1/inventory/medicines/{id}'],
+  // The edit form loads the record it is about to change. A create form has
+  // nothing to read; this one cannot open without it.
+  'medicine-edit': ['GET /api/v1/inventory/medicines/{id}'],
   'price-lists': ['GET /api/v1/pricing/price-lists'],
   'price-list-new': ['GET /api/v1/inventory/medicines'],
   'price-list-detail': ['GET /api/v1/inventory/medicines', 'GET /api/v1/pricing/price-lists/{id}'],
@@ -53,6 +56,17 @@ export const SCREEN_READS: Readonly<Record<string, readonly string[]>> = {
   warehouses: ['GET /api/v1/inventory/warehouses'],
   stocktakes: ['GET /api/v1/stocktakes'],
   'stocktake-detail': ['GET /api/v1/stocktakes/{id}'],
+  /*
+   * Not a GET, and it belongs here anyway.
+   *
+   * The cart used to price itself from whole medicine objects kept in browser
+   * storage, which is why it was excused as reading nothing. It now asks the
+   * server what the basket costs — the same answer the order will be charged at
+   * — so a shop owner refused this endpoint would see a cart with no prices in
+   * it. That is precisely what this table exists to catch, and the rule reads
+   * the method rather than assuming one.
+   */
+  cart: ['POST /api/v1/orders/quote'],
   checkout: ['GET /api/v1/shops/my'],
 
   // ── Buying in ─────────────────────────────────────────────────────────────
@@ -106,7 +120,6 @@ export const SCREENS_WITHOUT_READS: Readonly<Record<string, string>> = {
   'warehouse-new': 'a create form; it posts and never reads',
   'stocktake-new': 'a create form; it posts and never reads',
   'supplier-new': 'a create form; it posts and never reads',
-  cart: 'held in client storage until checkout; the server is not asked anything',
   recall: 'searches on demand from a batch number nobody has typed yet',
   'shop-statement': 'renders the ledger already fetched by the screen that links to it',
   'change-password': 'a form; the only request it makes is the change itself',

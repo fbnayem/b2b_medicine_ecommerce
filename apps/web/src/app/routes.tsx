@@ -91,6 +91,15 @@ export const ROUTES: readonly RouteNode[] = [
     element: page(() => import('../pages/MedicineDetail'), 'MedicineDetail'),
   },
   { id: 'medicine-new', element: page(() => import('../pages/MedicineForm'), 'MedicineForm') },
+  {
+    id: 'medicine-edit',
+    element: page(() => import('../pages/MedicineForm'), 'MedicineForm'),
+    // The same nineteen fields, loaded rather than blank. Per-field inline
+    // editing would mean nineteen patches, nineteen error surfaces, and a
+    // cross-field rule — trade price at or under the MRP — that can be broken
+    // from a field which is not the one being edited.
+    props: { mode: 'edit' },
+  },
   { id: 'price-lists', element: page(() => import('../pages/PriceListList'), 'PriceListList') },
   { id: 'price-list-new', element: page(() => import('../pages/PriceListForm'), 'PriceListForm') },
   {
