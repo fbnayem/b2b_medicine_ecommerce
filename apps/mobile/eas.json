@@ -1,0 +1,117 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "base": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:5000/api/v1"
+      }
+    },
+
+    "development-shop": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "env": { "APP_VARIANT": "shop" },
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": true }
+    },
+    "development-staff": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "env": { "APP_VARIANT": "staff" },
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": true }
+    },
+    "development-rider": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "env": { "APP_VARIANT": "rider" },
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": true }
+    },
+
+    "preview-shop": {
+      "extends": "base",
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "APP_VARIANT": "shop",
+        "EXPO_PUBLIC_API_URL": "https://staging.medsupply.example/api/v1"
+      },
+      "android": { "buildType": "apk" }
+    },
+    "preview-staff": {
+      "extends": "base",
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "APP_VARIANT": "staff",
+        "EXPO_PUBLIC_API_URL": "https://staging.medsupply.example/api/v1"
+      },
+      "android": { "buildType": "apk" }
+    },
+    "preview-rider": {
+      "extends": "base",
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "APP_VARIANT": "rider",
+        "EXPO_PUBLIC_API_URL": "https://staging.medsupply.example/api/v1"
+      },
+      "android": { "buildType": "apk" }
+    },
+
+    "production-shop": {
+      "extends": "base",
+      "distribution": "store",
+      "channel": "production",
+      "env": {
+        "APP_VARIANT": "shop",
+        "EXPO_PUBLIC_API_URL": "https://api.medsupply.example/api/v1"
+      },
+      "android": { "buildType": "app-bundle" },
+      "autoIncrement": true
+    },
+    "production-staff": {
+      "extends": "base",
+      "distribution": "store",
+      "channel": "production",
+      "env": {
+        "APP_VARIANT": "staff",
+        "EXPO_PUBLIC_API_URL": "https://api.medsupply.example/api/v1"
+      },
+      "android": { "buildType": "app-bundle" },
+      "autoIncrement": true
+    },
+    "production-rider": {
+      "extends": "base",
+      "distribution": "store",
+      "channel": "production",
+      "env": {
+        "APP_VARIANT": "rider",
+        "EXPO_PUBLIC_API_URL": "https://api.medsupply.example/api/v1"
+      },
+      "android": { "buildType": "app-bundle" },
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production-shop": {
+      "android": { "track": "internal" }
+    },
+    "production-staff": {
+      "android": { "track": "internal" }
+    },
+    "production-rider": {
+      "android": { "track": "internal" }
+    }
+  }
+}

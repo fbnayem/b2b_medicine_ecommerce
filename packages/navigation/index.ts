@@ -901,3 +901,119 @@ export function breadcrumbFor(id: string): NavItem[] {
   }
   return trail;
 }
+
+// ── Three applications, one codebase ─────────────────────────────────────────
+
+/**
+ * Which of the three mobile applications a build is.
+ *
+ * Mobile has always been **one** application that changed shape after sign-in.
+ * That is defensible for a desktop browser, where the product is a URL and the
+ * person choosing it is at a keyboard. It is not what gets installed on a
+ * phone: a pharmacy owner should find the shop in a store listing that talks
+ * about ordering medicines, and a rider should open an icon that is about
+ * today's round and contains nothing else. One binary called "MedSupply B2B"
+ * serving all three means every store listing, every notification, every icon
+ * and every permission prompt is written for an audience of nobody in
+ * particular.
+ *
+ * So there are three, built from this one codebase and separated at build time
+ * by `APP_VARIANT`. What differs is identity — name, bundle identifier, icon,
+ * store listing — and **who may sign in**. What is shared is every screen, the
+ * navigation policy above, and the whole of `packages/`.
+ *
+ * The split is written here rather than in `apps/mobile` for the same reason
+ * `MOBILE_TABS` is: it is a statement about who sees what, and this is the file
+ * that is allowed to make those.
+ */
+export const AppVariant = {
+  /** For the pharmacy that buys. */
+  SHOP: 'shop',
+  /** For the distributor's own people — the office and the warehouse. */
+  STAFF: 'staff',
+  /** For the person carrying the boxes. */
+  RIDER: 'rider',
+} as const;
+
+export type AppVariant = (typeof AppVariant)[keyof typeof AppVariant];
+
+export const APP_VARIANTS: readonly AppVariant[] = Object.values(AppVariant);
+
+export function isAppVariant(value: unknown): value is AppVariant {
+  return typeof value === 'string' && (APP_VARIANTS as readonly string[]).includes(value);
+}
+
+/**
+ * Who may sign in to each application.
+ *
+ * **Every role appears exactly once**, and `navigationRules.test.ts` asserts
+ * it — a role in neither has an account that opens nothing, and a role in two
+ * makes "which app do I install?" unanswerable at the moment somebody is
+ * standing in a store listing trying to decide.
+ *
+ * The two judgement calls, stated rather than left to be inferred:
+ *
+ *   - **A storekeeper and a rep are staff, not their own apps.** Both work for
+ *     the distributor, both are salaried, and both are handed a phone by the
+ *     same person who hands one to a manager. Three apps was the ask; five
+ *     would be three store listings nobody asked for and two more icons on the
+ *     same warehouse handset.
+ *   - **A rider is separate even though a rider is also staff.** A round is the
+ *     whole job for eight hours, one-handed, outdoors, on a handset that is
+ *     often not the rider's own. That app should contain deliveries, returns
+ *     and proof capture — and being unable to reach an approvals queue is a
+ *     feature of it, not a limitation.
+ */
+export const VARIANT_ROLES: Record<AppVariant, readonly UserRole[]> = {
+  [AppVariant.SHOP]: [UserRole.SHOP_OWNER],
+  [AppVariant.STAFF]: [
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.STOREKEEPER,
+    UserRole.SALES,
+  ],
+  [AppVariant.RIDER]: [UserRole.DELIVERY_PERSON],
+};
+
+/**
+ * English names, resolved through the catalogue by each client.
+ *
+ * Same arrangement as `NAV_GROUP_LABEL` and for the same reason: Metro imports
+ * this package, so it cannot depend on `@medsupply/i18n`. These are the
+ * fallback, not the string a person reads.
+ */
+export const APP_VARIANT_NAME: Record<AppVariant, string> = {
+  [AppVariant.SHOP]: 'MedSupply Shop',
+  [AppVariant.STAFF]: 'MedSupply Manage',
+  [AppVariant.RIDER]: 'MedSupply Rider',
+};
+
+/** Which application a person with this role should be holding. */
+export function variantForRole(role: UserRole): AppVariant | undefined {
+  return APP_VARIANTS.find((variant) => VARIANT_ROLES[variant].includes(role));
+}
+
+export function rolesForVariant(variant: AppVariant): readonly UserRole[] {
+  return VARIANT_ROLES[variant];
+}
+
+export function isRoleInVariant(role: UserRole, variant: AppVariant): boolean {
+  return VARIANT_ROLES[variant].includes(role);
+}
+
+/**
+ * Every tab id any of this application's roles can be given, de-duplicated.
+ *
+ * This is the answer to "what is in the rider app?" — the sentence a store
+ * listing is written from, and what the build guide documents. It is
+ * deliberately **not** a router-level filter: Expo Router registers a route for
+ * every file present, and a file omitted from the tab layout's list is
+ * auto-registered into the bar with a default title, which is worse than
+ * `href: null`. Membership of the bar is decided by role, and roles partition
+ * across variants, so the two agree by construction — `navigationRules.test.ts`
+ * asserts that rather than trusting it.
+ */
+export function tabIdsForVariant(variant: AppVariant): readonly string[] {
+  return [...new Set(VARIANT_ROLES[variant].flatMap((role) => MOBILE_TABS[role]))];
+}

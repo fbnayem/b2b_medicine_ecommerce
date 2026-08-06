@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { UserRole } from '@medsupply/shared-types';
-import { MOBILE_TABS, NAV_ITEMS } from '@medsupply/navigation';
+import {
+  APP_VARIANTS,
+  MOBILE_TABS,
+  NAV_ITEMS,
+  VARIANT_ROLES,
+  tabIdsForVariant,
+  variantForRole,
+} from '@medsupply/navigation';
 import { routeKey, routeTable } from './routeTable';
 import { SCREENS_WITHOUT_READS, SCREEN_READS } from './navigationReads';
 
@@ -146,7 +153,85 @@ test('every mobile tab is a screen its role can open', () => {
   assert.deepEqual(wrong, [], `\n  ${wrong.join('\n  ')}`);
 });
 
+test('every role has exactly one of the three applications to install', () => {
+  /*
+   * The property the whole three-app split rests on. A role in none has an
+   * account that opens nothing we ship; a role in two makes "which one do I
+   * install?" a question with no answer, asked by somebody standing in a store
+   * listing. Both are silent until somebody is holding a phone.
+   */
+  const placement = Object.values(UserRole).map((role) => ({
+    role,
+    apps: APP_VARIANTS.filter((variant) => VARIANT_ROLES[variant].includes(role)),
+  }));
+
+  const homeless = placement.filter((entry) => entry.apps.length === 0).map((entry) => entry.role);
+  assert.deepEqual(
+    homeless.sort(),
+    [],
+    `These roles are in no application at all, so nobody can hand them a phone:\n  ${homeless.join('\n  ')}`,
+  );
+
+  const shared = placement
+    .filter((entry) => entry.apps.length > 1)
+    .map((entry) => `${entry.role} → ${entry.apps.join(', ')}`);
+  assert.deepEqual(
+    shared,
+    [],
+    `These roles are in more than one application:\n  ${shared.join('\n  ')}`,
+  );
+});
+
+test('no application is built for nobody', () => {
+  // A variant with no roles is three store listings where one is a dead icon.
+  for (const variant of APP_VARIANTS) {
+    assert.ok(VARIANT_ROLES[variant].length > 0, `the ${variant} application admits no role`);
+  }
+});
+
+test('every tab an application carries can be opened by one of its own roles', () => {
+  /*
+   * `tabIdsForVariant` is what the tab layout registers, so a stale id here is
+   * a screen the rider build carries and no rider can reach — the thing the
+   * split exists to prevent.
+   */
+  const wrong: string[] = [];
+  for (const variant of APP_VARIANTS) {
+    for (const id of tabIdsForVariant(variant)) {
+      const item = navById.get(id);
+      if (!item) {
+        wrong.push(`${variant}: "${id}" is not a navigation entry`);
+        continue;
+      }
+      if (!VARIANT_ROLES[variant].some((role) => item.roles.includes(role))) {
+        wrong.push(`${variant}: no role in this application may open "${id}"`);
+      }
+    }
+  }
+  assert.deepEqual(wrong, [], `\n  ${wrong.join('\n  ')}`);
+});
+
+test('an application registers every tab its own roles are given, and no more', () => {
+  for (const variant of APP_VARIANTS) {
+    const registered = [...tabIdsForVariant(variant)].sort();
+    const needed = [
+      ...new Set(VARIANT_ROLES[variant].flatMap((role) => MOBILE_TABS[role] as readonly string[])),
+    ].sort();
+    assert.deepEqual(registered, needed, `the ${variant} application`);
+  }
+
+  // And the split is real: the rider application must not carry the approvals
+  // queue, which is the screen the ask was most obviously not about.
+  assert.equal(tabIdsForVariant('rider').includes('approvals'), false);
+  assert.equal(tabIdsForVariant('shop').includes('inventory'), false);
+  assert.equal(tabIdsForVariant('staff').includes('cart'), false);
+});
+
 test('the rule detects what it claims to, so a clean run means something', () => {
+  assert.equal(variantForRole(UserRole.DELIVERY_PERSON), 'rider');
+  assert.equal(variantForRole(UserRole.SHOP_OWNER), 'shop');
+  assert.equal(variantForRole(UserRole.STOREKEEPER), 'staff');
+
   /*
    * The reconciliation is only as good as the route reflection underneath it.
    * If `routeTable()` ever returns nothing — a refactor of the mount order, a

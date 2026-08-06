@@ -1730,3 +1730,100 @@ Web 332 (43 files), API 174 unit / 194 integration / 5 route coverage, mobile 11
 ### Next phase dependencies
 
 None.
+
+## Phase 36: Three Applications, One Codebase
+
+**Status:** COMPLETED
+
+### Scope and completed work
+
+`apps/mobile` already contained all three products - thirty-nine screens and a
+per-role tab bar. What did not exist was three of anything a person can install:
+one binary called "MedSupply B2B", one icon, no bundle identifier at all, no
+`eas.json`, and one permission prompt serving a pharmacy owner and a delivery
+rider at once. Every shop owner was installing an application that asked for
+their location because one rider screen needs it.
+
+Three applications, chosen by `APP_VARIANT` at build time:
+
+|                  | Roles                                                     | Identifier             | Camera       | Location        |
+| ---------------- | --------------------------------------------------------- | ---------------------- | ------------ | --------------- |
+| MedSupply Shop   | `SHOP_OWNER`                                              | `com.medsupply.shop`   | -            | -               |
+| MedSupply Manage | `SUPER_ADMIN`, `ADMIN`, `MANAGER`, `STOREKEEPER`, `SALES` | `com.medsupply.manage` | barcodes     | -               |
+| MedSupply Rider  | `DELIVERY_PERSON`                                         | `com.medsupply.rider`  | proof photos | at confirmation |
+
+`VARIANT_ROLES` lives in `@medsupply/navigation`, beside `MOBILE_TABS`, because
+it is a statement about who sees what. `app.config.ts` replaces `app.json` and
+carries the identity; `eas.json` carries nine build profiles.
+`docs/MOBILE_BUILDS.md` is the build guide.
+
+Signing in to the wrong application names the right one - _"This is MedSupply
+Rider, and your account is not used here. Install MedSupply Manage and sign in
+there."_ The check runs before anything reaches `SecureStore`, and the session
+issued is revoked rather than left to expire.
+
+The sign-in screen was rewritten in the same commit: it displayed the literal
+string "MedSupply B2B", every word on it was hard-coded English, and it used
+bare `TextInput`s below the 44px tap-target floor.
+
+### The Metro defect this uncovered
+
+`metro.config.js` said it resolved the shared packages to their TypeScript
+source. It mapped each package name to its _directory_; Metro then read that
+directory's `package.json` and followed `main` to `dist/index.js`. So a phone
+ran whatever the API's `pretest` last compiled.
+
+Found by adding an export to `@medsupply/navigation` and looking for it in
+`packages/navigation/dist/index.js`, where it was absent. Nothing failed,
+because the stale build still contained everything mobile used before that edit.
+`resolveRequest` now maps the eight package names to `index.ts` directly.
+
+### Testing
+
+`appVariant.test.ts`, 20 tests over `app.config.ts` and `eas.json` - two files
+nothing else opened, and whose failures otherwise surface at the end of a cloud
+build or after a store review. The three applications must be installable side
+by side (no shared name, scheme or identifier); identifiers and schemes must
+match what the stores accept; a permission prompt must name the application
+asking; each application must declare what its own screens use **and nothing
+more**, checked against the screens' own imports; and a profile called
+`production-rider` must build the rider, distribute only from `production-*`,
+and never point at a laptop.
+
+`navigationRules.test.ts` gains four: every role in exactly one application, no
+application built for nobody, every tab carried openable by one of its own
+roles, and each application carrying exactly the tabs its roles are given.
+
+Both proved by planting: `STOREKEEPER` in two applications, a camera on the shop
+application, and `production-rider` pointed at the shop. Each named the exact
+offender.
+
+The three configurations were also evaluated through Expo's own resolver rather
+than through the test's table - `pnpm --filter @medsupply/mobile config:shop`
+shows no `android.permissions` key at all.
+
+Mobile 113 (was 93), API 174 unit (was 170), web 332, integration 194, browser
+128 with accessibility still at strict zero.
+
+### Known limitations
+
+- **All three applications share one icon file.** They are told apart by the
+  adaptive-icon background, which is enough on an Android home screen and not
+  enough for a store listing. Three icons are outstanding.
+- **`eas.json` points preview and production at `medsupply.example`.**
+  `.example` is a reserved TLD that can never resolve, so a build made before
+  somebody sets the real address fails loudly rather than quietly reaching a
+  stranger.
+- **No EAS project id or owner is committed**, because this repository has never
+  been linked to an Expo account. `docs/MOBILE_BUILDS.md` gives the commands.
+- **Nothing has been built into a binary.** Android can be built from this
+  workstation or on EAS; iOS needs macOS or an EAS cloud build plus an Apple
+  Developer account. Neither has been run.
+- **Every screen is still present in every build.** Expo Router registers a
+  route per file, and the roles that can reach each one are unchanged - which is
+  correct, because within an application the roles are the same roles. Trimming
+  the bundle per variant is a Metro exercise, not a permission one.
+
+### Next phase dependencies
+
+Three icons and three store listings, before any submission.

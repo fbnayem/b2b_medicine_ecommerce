@@ -1,53 +1,144 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
+import { router } from 'expo-router';
+import { APP_VARIANT_NAME } from '@medsupply/navigation';
+import { translatedOr } from '@medsupply/i18n';
 import { useAuthStore } from '../src/store/useAuth';
 import { apiClient } from '../src/api/client';
-import { router } from 'expo-router';
+import { APP_VARIANT, wrongAppMessage } from '../src/appVariant';
+import { useLanguage } from '../src/i18n/useLanguage';
+import { Button, Field, Input, Screen } from '../src/components';
+import { colour, layout } from '../src/theme';
 
-export default function LoginScreen() {
+/**
+ * Signing in, to whichever of the three applications this build is.
+ *
+ * Three things were wrong here and all three are the same mistake — the screen
+ * was written before there was anything to write it against:
+ *
+ *   - **The title was the literal string "MedSupply B2B".** That is no longer
+ *     the name of anything installed. A pharmacy owner opens *MedSupply Shop*
+ *     and the first screen has to agree with the icon they tapped.
+ *   - **Every word was hard-coded English** — "Email", "Password", "Login
+ *     failed" — on the one screen every person sees before they have had the
+ *     chance to switch language.
+ *   - **It used bare `TextInput`s** with hand-written styles, so the inputs
+ *     were below the 44px floor `layout.minTapTarget` exists to hold, and the
+ *     button could be pressed twice.
+ *
+ * ## Refusing an account that belongs in another application
+ *
+ * The check happens **before `setAuth`**, so nothing is written to
+ * `SecureStore`, and the session just issued is revoked on the way out rather
+ * than left to expire. Signing in successfully and then being told to install
+ * something else must not leave a usable credential on the handset.
+ */
+export default function SignInScreen() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { setAuth } = useAuthStore();
+  const [busy, setBusy] = useState(false);
+  const setAuth = useAuthStore((state) => state.setAuth);
 
-  const handleLogin = async () => {
+  const appName = translatedOr(t, `appVariant.${APP_VARIANT}`, APP_VARIANT_NAME[APP_VARIANT]);
+
+  const signIn = async () => {
+    setError('');
+    setBusy(true);
     try {
       const response = await apiClient.post('/auth/login', { email, password });
       const { user, accessToken, refreshToken } = response.data.data;
+
+      const refusal = wrongAppMessage(user.role, t);
+      if (refusal) {
+        // Best effort: the session is theirs and valid, it is simply not wanted
+        // here. A network failure on the way out must not hide the real reason.
+        try {
+          await apiClient.post(
+            '/auth/logout',
+            { refreshToken },
+            { headers: { Authorization: `Bearer ${accessToken}` } },
+          );
+        } catch {
+          /* Never stored on this device, so it expires unused either way. */
+        }
+        setError(refusal);
+        return;
+      }
+
       await setAuth(user, accessToken, refreshToken);
       router.replace('/(protected)/(tabs)/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'Login failed');
+    } catch (err) {
+      const message = (err as { response?: { data?: { error?: { message?: string } } } }).response
+        ?.data?.error?.message;
+      setError(message || t('auth.signInFailed'));
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>MedSupply B2B</Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+    <Screen style={{ justifyContent: 'center', gap: layout.space[4] }}>
+      <View style={{ gap: layout.space[1] }}>
+        <Text
+          accessibilityRole="header"
+          style={{
+            fontSize: layout.fontSize.xl,
+            fontWeight: layout.fontWeight.bold,
+            color: colour.text,
+            textAlign: 'center',
+          }}
+        >
+          {appName}
+        </Text>
+        <Text
+          style={{ fontSize: layout.fontSize.sm, color: colour.textMuted, textAlign: 'center' }}
+        >
+          {t('auth.signInTitle')}
+        </Text>
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
+      {error ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={{ color: colour.danger, fontSize: layout.fontSize.sm, textAlign: 'center' }}
+        >
+          {error}
+        </Text>
+      ) : null}
+
+      <Field label={t('auth.email')}>
+        <Input
+          label={t('auth.email')}
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          invalid={Boolean(error)}
+        />
+      </Field>
+
+      <Field label={t('auth.password')}>
+        <Input
+          label={t('auth.password')}
+          value={password}
+          onChangeText={setPassword}
+          autoCapitalize="none"
+          autoComplete="current-password"
+          secureTextEntry
+          onSubmitEditing={() => void signIn()}
+          invalid={Boolean(error)}
+        />
+      </Field>
+
+      <Button
+        label={t('auth.signInTitle')}
+        onPress={() => void signIn()}
+        busy={busy}
+        disabled={!email || !password}
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      <Button title="Login" onPress={handleLogin} />
-    </View>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20 },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  input: { borderWidth: 1, borderColor: '#ccc', padding: 10, marginBottom: 15, borderRadius: 5 },
-  error: { color: 'red', marginBottom: 10, textAlign: 'center' },
-});

@@ -21,9 +21,9 @@ import {
  * mobile carried around 70 of its own hex values, sixteen of them hand-copied
  * from the web app, including a second and a third brand green.
  *
- * Light only for now, deliberately. `app.json` pins `userInterfaceStyle` to
- * light and the screens are written against it; unpinning that and rendering a
- * dark theme correctly on every screen is real work rather than a re-export,
+ * Light only for now, deliberately. `app.config.ts` pins `userInterfaceStyle`
+ * to light and the screens are written against it; unpinning that and rendering
+ * a dark theme correctly on every screen is real work rather than a re-export,
  * and doing it badly would leave a rider with white text on white.
  */
 export const colour = {

@@ -1,5 +1,102 @@
 # Changelog
 
+## Phase 36 — three applications, one codebase
+
+Asked for: a customer app, a manager/owner app and a delivery rider app.
+
+### They already existed; they were wearing one coat
+
+`apps/mobile` has thirty-nine screens and a per-role tab bar, so all three
+products were already built. What did not exist was three of anything a person
+can install: one binary called **MedSupply B2B**, one icon, one bundle
+identifier, one store listing — and one permission prompt that had to serve a
+pharmacy owner and a delivery rider at once.
+
+That last one is the clearest measure of the problem. **Every pharmacy owner was
+installing an application that asked for their location**, because one screen in
+the building — a rider's proof of delivery — needs it. The prompt could not say
+why, because for that person there was no why.
+
+### What shipped
+
+**Three applications**, chosen by `APP_VARIANT` at build time:
+
+|                      | Roles                                | Identifier             | Camera       | Location        |
+| -------------------- | ------------------------------------ | ---------------------- | ------------ | --------------- |
+| **MedSupply Shop**   | shop owners                          | `com.medsupply.shop`   | —            | —               |
+| **MedSupply Manage** | admins, managers, storekeepers, reps | `com.medsupply.manage` | barcodes     | —               |
+| **MedSupply Rider**  | delivery riders                      | `com.medsupply.rider`  | proof photos | at confirmation |
+
+Verified against Expo's own resolver rather than against the table: the shop
+application's resolved `android.permissions` is **absent entirely**.
+
+`VARIANT_ROLES` in `@medsupply/navigation` is where the split lives, so it sits
+beside `MOBILE_TABS` and the rest of the permission matrix rather than in a
+build file. Every role is in **exactly one** application, and a test fails if
+that stops being true.
+
+**Signing in to the wrong one is answered by name.** A manager who installs the
+rider application is told _"This is MedSupply Rider, and your account is not
+used here. Install MedSupply Manage and sign in there."_ Not "you do not have
+permission" — the account is fine and the download was wrong, and those have
+opposite next steps. The check runs **before** anything is written to
+`SecureStore`, and the session just issued is revoked on the way out.
+
+**`eas.json`, nine profiles** — development, preview and production for each —
+plus bundle identifiers, an Android package name and a URL scheme per
+application. None of that existed, so no installable binary could be produced at
+all.
+
+**The sign-in screen was rewritten.** It said the literal string "MedSupply
+B2B", which is now the name of nothing; every word on it was hard-coded English,
+on the one screen everybody sees before they can switch language; and it used
+bare `TextInput`s below the 44px tap-target floor.
+
+### Metro has been reading a stale build of every shared package
+
+Found by adding an export to `@medsupply/navigation` and looking for it in
+`packages/navigation/dist/index.js`, where it was not.
+
+`metro.config.js` says it resolves the shared packages to their TypeScript
+source. It maps each package name to its _directory_; Metro then reads that
+directory's `package.json` and follows `main`, which every one of them points at
+`dist/index.js`. So what a phone ran was whatever the API's `pretest` last
+compiled. Nothing failed, because the stale build still contained everything
+mobile used **before** the edit — which is exactly how this hides.
+
+`resolveRequest` now maps the eight package names to `index.ts` directly. The
+web app lost a day to the same shape of divergence, and that file's own comment
+is the record of it.
+
+### Gates
+
+`navigationRules.test.ts` gains four: every role is in exactly one application,
+no application is built for nobody, every tab an application carries can be
+opened by one of its own roles, and each application carries exactly the tabs
+its roles are given. Proved by putting `STOREKEEPER` in two applications —
+`STOREKEEPER → staff, rider`.
+
+`appVariant.test.ts` is new, 20 tests over the two files nothing else opens. It
+asserts the three applications can be installed side by side (no shared name,
+scheme or identifier), that identifiers and schemes match what the stores
+accept, that a permission prompt names the application asking, that each
+application declares what its own screens use **and nothing more**, and that an
+`eas.json` profile called `production-rider` actually builds the rider. Proved
+by giving the shop application a camera and by pointing `production-rider` at
+the shop.
+
+### Testing
+
+Mobile 113 (was 93), API 174 unit (was 170). Web 332, integration 194 and the
+browser suite unchanged.
+
+### Not done
+
+Three icons — all three share `assets/icon.png` today and are told apart only by
+the adaptive-icon background, which is enough for an Android home screen and not
+for a store listing. Store listings and a real API address are the other two.
+`docs/MOBILE_BUILDS.md` lists them.
+
 ## Phase 35 — a number on the home screen means what its words say
 
 Asked for: "the order page and approve page are not showing the same data".

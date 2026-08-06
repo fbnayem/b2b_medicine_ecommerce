@@ -52,10 +52,22 @@
     "test": "vitest run --configLoader runner",
     "test:components": "jest",
     "prestart": "pnpm --filter @medsupply/jurisdictions build && pnpm --filter @medsupply/shared-types build && pnpm --filter @medsupply/utilities build && pnpm --filter @medsupply/validation build",
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "start": "node scripts/variant.mjs staff start",
+    "start:shop": "node scripts/variant.mjs shop start",
+    "start:staff": "node scripts/variant.mjs staff start",
+    "start:rider": "node scripts/variant.mjs rider start",
+    "android": "node scripts/variant.mjs staff start --android",
+    "android:shop": "node scripts/variant.mjs shop start --android",
+    "android:staff": "node scripts/variant.mjs staff start --android",
+    "android:rider": "node scripts/variant.mjs rider start --android",
+    "ios": "node scripts/variant.mjs staff start --ios",
+    "ios:shop": "node scripts/variant.mjs shop start --ios",
+    "ios:staff": "node scripts/variant.mjs staff start --ios",
+    "ios:rider": "node scripts/variant.mjs rider start --ios",
+    "web": "node scripts/variant.mjs staff start --web",
+    "config:shop": "node scripts/variant.mjs shop config --type public",
+    "config:staff": "node scripts/variant.mjs staff config --type public",
+    "config:rider": "node scripts/variant.mjs rider config --type public"
   },
   "private": true
 }

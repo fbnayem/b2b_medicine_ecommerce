@@ -15,7 +15,7 @@ Docker Desktop on Windows requires firmware virtualization and the Windows Virtu
 3. Start backing services: `docker compose up -d`
 4. Copy `.env.example` to `.env` in the root and in `apps/api`.
 5. Run `pnpm dev` to start all applications (API, Web).
-6. To run the mobile app, navigate to `apps/mobile` and run `npm start` (or `npx expo start`).
+6. There are **three** mobile applications built from `apps/mobile` — Shop, Manage and Rider. Start one with `pnpm --filter @medsupply/mobile start:shop` (or `start:staff`, `start:rider`). `docs/MOBILE_BUILDS.md` explains which roles belong to which, and how each is built for a store.
 
 ## Phase 6 invoice configuration
 
@@ -29,7 +29,7 @@ Set `BUSINESS_NAME`, `BUSINESS_ADDRESS`, `BUSINESS_PHONE`, `BUSINESS_EMAIL`, `IN
 
 Set `DELIVERY_REQUIRED_PROOFS` to a comma-separated subset of `OTP,SIGNATURE,PHOTOGRAPH,GPS`; the default is `OTP`. The local OTP adapter writes the code to assigned Shop Owners' in-app notifications and must be replaced with an approved external channel for production.
 
-The Expo app uses SDK 57-compatible camera, location, AsyncStorage, SVG and view-capture packages. Camera and foreground-location purpose strings are in `apps/mobile/app.json`. Location is requested only from the proof screen after a visible consent notice.
+The Expo apps use SDK 57-compatible camera, location, AsyncStorage, SVG and view-capture packages. Camera and foreground-location purpose strings are in `apps/mobile/app.config.ts`, and each of the three applications declares only what its own screens use — the Shop application asks for neither. Location is requested only from the proof screen, in the Rider application, after a visible consent notice.
 
 ## Phase 8 finance configuration and upgrade
 

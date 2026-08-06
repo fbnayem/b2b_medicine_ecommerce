@@ -94,6 +94,28 @@ export const en = {
     changeButton: 'Change my password',
     restoringSession: 'Restoring your session',
     sessionEnded: 'This session has ended. Sign in again.',
+    /*
+     * Not "you are not allowed". The account is fine and the download was
+     * wrong, which are opposite problems with opposite next steps — so this
+     * names the application to install instead.
+     */
+    wrongApp:
+      'This is {{thisApp}}, and your account is not used here. Install {{theirApp}} and sign in there.',
+    noAppForRole:
+      'This account cannot be used in {{thisApp}}. Ask your manager which app to install.',
+  },
+
+  /**
+   * The three applications, by the name a person reads under the icon.
+   *
+   * The same in both languages on purpose: this is what is printed in the store
+   * listing and on the home screen, and telling somebody to install a name they
+   * cannot then find is worse than not translating.
+   */
+  appVariant: {
+    shop: 'MedSupply Shop',
+    staff: 'MedSupply Manage',
+    rider: 'MedSupply Rider',
   },
 
   /**

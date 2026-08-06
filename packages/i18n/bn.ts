@@ -96,6 +96,17 @@ export const bn: Catalogue = {
     changeButton: 'পাসওয়ার্ড বদলান',
     restoringSession: 'আপনার সেশন ফিরিয়ে আনা হচ্ছে',
     sessionEnded: 'এই সেশন শেষ হয়ে গেছে। আবার সাইন ইন করুন।',
+    wrongApp:
+      'এটি {{thisApp}}, এখানে আপনার অ্যাকাউন্ট ব্যবহার হয় না। {{theirApp}} ইনস্টল করে সেখানে সাইন ইন করুন।',
+    noAppForRole:
+      'এই অ্যাকাউন্ট {{thisApp}}-এ ব্যবহার করা যাবে না। কোন অ্যাপ ইনস্টল করবেন তা ম্যানেজারকে জিজ্ঞাসা করুন।',
+  },
+
+  // The names people look for in the store listing, so not translated.
+  appVariant: {
+    shop: 'MedSupply Shop',
+    staff: 'MedSupply Manage',
+    rider: 'MedSupply Rider',
   },
 
   dashboard: {

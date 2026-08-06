@@ -3,8 +3,8 @@
 - Real-time updates via Socket.IO will use standard authorization patterns (passing JWT token).
 - ~~Currency is strictly BDT, stored as integer minor units (poisha).~~ **Superseded in Phase 12.** Amounts are still integer minor units, but the _scale_ of a minor unit is now the configured currency's ISO 4217 exponent rather than a hard-coded hundred — yen has none and dinar has three, so assuming two was a hundredfold error in one direction and a tenfold one in the other. One currency per deployment, set by `PRIMARY_CURRENCY`; a multi-currency ledger is Phase 14.
 - Deliveries are internally handled by the system's own delivery persons, not third-party couriers.
-- A single mobile app will serve all roles via Expo Router role-based navigation.
-- The `packages/` monorepo configuration will heavily rely on simple TypeScript exports mapped via `package.json` `main` and `types`.
+- ~~A single mobile app will serve all roles via Expo Router role-based navigation.~~ **Superseded in Phase 36.** Role-based navigation is unchanged; there are now three applications - Shop, Manage and Rider - because one icon and one store listing cannot be written for a pharmacy owner and a delivery rider at once.
+- The `packages/` monorepo configuration will heavily rely on simple TypeScript exports mapped via `package.json` `main` and `types`. **Qualified in Phase 36:** this holds for Node, `tsc` and the API. Vite and Metro both resolve to source instead, because `main` points at a `dist/` that no client build produces.
 - Phase 3 uses a 90-day near-expiry threshold until the configurable settings module is delivered in Phase 10; API callers may supply a bounded override for operational views.
 - A batch number is unique within a medicine, because manufacturers may reuse the same batch identifier across unrelated products.
 - General availability shown to Shop Owners is deliberately qualitative; exact batch quantities, warehouse locations, and all cost prices remain internal.
@@ -704,3 +704,50 @@ reads a decision rather than guesses at an intention.
   anyone who prefers that view — but the number on the home screen and the list
   it links to must agree on the first render, which is where somebody actually
   reads them.
+
+## Phase 36 - three mobile applications
+
+- **The product ships as three applications: Shop, Manage and Rider.** This
+  supersedes _"A single mobile app will serve all roles via Expo Router
+  role-based navigation"_ at the top of this file. The role-based navigation is
+  unchanged and still does the work inside each one; what changed is that there
+  are now three things to install, with three names, three icons and three store
+  listings, because an icon and a store listing cannot be written for everybody
+  at once.
+- **Every role belongs to exactly one application**, and a test enforces it. A
+  role in none has an account that opens nothing; a role in two makes "which one
+  do I install?" unanswerable at the moment somebody is deciding.
+- **A storekeeper and a sales rep are staff, not their own applications.** Both
+  are salaried, both are handed a phone by the same person who hands one to a
+  manager. Three was the ask; five would be two more store listings nobody wants
+  and two more icons on the same warehouse handset.
+- **A rider is separate even though a rider is also staff.** A round is the whole
+  job for eight hours, one-handed, outdoors, often on a shared handset. Being
+  unable to reach an approvals queue from it is a property of that application,
+  not a limitation of it.
+- **Each application asks the operating system only for what its own screens
+  use.** The Shop application declares no camera and no location. This is not a
+  security boundary - the server decides what anybody may read or write - it is
+  that there was no honest sentence to put in a location prompt shown to a
+  pharmacy owner.
+- **Refusing an account that belongs elsewhere is a wrong-download message, not a
+  permission error**, and it names the application to install. The check runs
+  before anything reaches `SecureStore`, and the session is revoked rather than
+  left to expire.
+- **The three applications are one EAS project with three bundle identifiers**,
+  not three projects. Credentials are keyed by identifier, so one project holds
+  all three sets and there is one `eas init` rather than three accounts' worth of
+  bookkeeping.
+- **`app.config.ts` repeats the three variant names rather than importing
+  `@medsupply/navigation`.** Expo evaluates that file before any workspace
+  package is built - on a clean EAS worker there is no `dist/` - so the import
+  would fail at configuration time. `appVariant.test.ts` is the other half of
+  that trade.
+- **iOS binaries cannot be produced on this Windows workstation.** They need
+  macOS with Xcode or an EAS cloud build, plus an Apple Developer account.
+  Android can be built either way.
+- **Metro reads the shared packages' TypeScript source, enforced by
+  `resolveRequest`.** `extraNodeModules` alone points Metro at a package
+  _directory_, and Metro then follows its `package.json` `main` to
+  `dist/index.js` - a build produced by whichever unrelated npm script ran most
+  recently.

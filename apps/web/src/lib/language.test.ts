@@ -48,6 +48,15 @@ describe('the Bangla catalogue', () => {
 
     expect(untranslated, `these are still in English: ${untranslated.join(', ')}`).toEqual([
       'common.appName',
+      /*
+       * The names of the three installable applications — what is printed in
+       * the store listing and under the icon on a home screen. Telling somebody
+       * in Bangla to install a name they then cannot find in the store is worse
+       * than not translating it.
+       */
+      'appVariant.shop',
+      'appVariant.staff',
+      'appVariant.rider',
       // A worked example of a document reference. References are ASCII with
       // Western digits by rule — `AGENTS.md` fixes the `RET-2026-000001` shape
       // — so translating this placeholder would show somebody a pattern they
