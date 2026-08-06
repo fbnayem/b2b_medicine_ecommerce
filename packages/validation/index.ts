@@ -116,6 +116,31 @@ export const CreateShopSchema = z.object({
 
 export const UpdateShopSchema = patchSchemaOf(CreateShopSchema);
 
+/**
+ * A delivery address as the **shop itself** sends one.
+ *
+ * `AddressSchema` carries an optional `_id` because `PATCH /shops/{id}` takes
+ * the whole array and the ids have to survive the round trip. A shop owner
+ * working on one address at a time does not send an array, and the id they are
+ * acting on is in the path — so accepting one in the body here would be a way
+ * to name somebody else's address, which is why it is dropped rather than
+ * merely ignored.
+ */
+export const DeliveryAddressSchema = AddressSchema.omit({ _id: true });
+
+/**
+ * Changing one field of one address.
+ *
+ * The refinement is not decoration: `patchSchemaOf` makes every field optional,
+ * so an empty body parses cleanly and would reach the handler as "update this
+ * address to itself" — a write, an audit record and a 200 for a request that
+ * asked for nothing.
+ */
+export const UpdateDeliveryAddressSchema = patchSchemaOf(DeliveryAddressSchema).refine(
+  (value) => Object.values(value).some((field) => field !== undefined),
+  { message: 'Change at least one thing about the address' },
+);
+
 export const LoginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),

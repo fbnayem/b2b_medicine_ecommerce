@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import {
+  addMyAddress,
   createShop,
   getShop,
   listShops,
+  removeMyAddress,
+  updateMyAddress,
   updateShop,
   assignOwner,
   assignManager,
@@ -35,6 +38,22 @@ router.post('/', requireRole(adminRoles as UserRole[]), createShop);
 // `listShops` already returns only the signed-in owner's shop; this is the name
 // the shop-owner clients ask for.
 router.get('/my', requireRole([UserRole.SHOP_OWNER]), listShops);
+
+/*
+ * A shop maintains its own delivery addresses, and nothing else about itself.
+ *
+ * These sit under `/my` rather than opening `PATCH /:id` to owners, because
+ * that endpoint also carries the credit limit, the payment terms, the discount,
+ * the price list and the status — five things a customer must not be able to
+ * set for themselves. The path is the scope.
+ *
+ * Declared before `/:id` for readability only; the segment counts differ, so
+ * Express could not confuse them either way.
+ */
+const ownersOwn = [UserRole.SHOP_OWNER];
+router.post('/my/addresses', requireRole(ownersOwn as UserRole[]), addMyAddress);
+router.patch('/my/addresses/:addressId', requireRole(ownersOwn as UserRole[]), updateMyAddress);
+router.delete('/my/addresses/:addressId', requireRole(ownersOwn as UserRole[]), removeMyAddress);
 
 /*
  * And may open one of them.

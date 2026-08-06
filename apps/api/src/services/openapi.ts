@@ -17,6 +17,8 @@ import {
   CancellationDecisionSchema,
   CancellationRequestSchema,
   ChangePasswordSchema,
+  DeliveryAddressSchema,
+  UpdateDeliveryAddressSchema,
   AdminUserUpdateSchema,
   ApprovalSchema,
   CreateMedicineSchema,
@@ -1589,6 +1591,34 @@ export const OPERATIONS: Operation[] = [
     method: 'get',
     path: '/api/v1/shops/my',
     summary: 'The signed-in owner’s own shop',
+    tag: 'Shops',
+    roles: [UserRole.SHOP_OWNER],
+  },
+  /*
+   * The three writes a customer may make about themselves, and the whole list
+   * is the response to each. Exactly one address carries `isDefault` after any
+   * of them — the server decides that, not the request.
+   */
+  {
+    method: 'post',
+    path: '/api/v1/shops/my/addresses',
+    summary: 'Add a delivery address to the signed-in owner’s own shop',
+    tag: 'Shops',
+    roles: [UserRole.SHOP_OWNER],
+    body: DeliveryAddressSchema,
+  },
+  {
+    method: 'patch',
+    path: '/api/v1/shops/my/addresses/{addressId}',
+    summary: 'Change one of the signed-in owner’s delivery addresses',
+    tag: 'Shops',
+    roles: [UserRole.SHOP_OWNER],
+    body: UpdateDeliveryAddressSchema,
+  },
+  {
+    method: 'delete',
+    path: '/api/v1/shops/my/addresses/{addressId}',
+    summary: 'Remove one of the signed-in owner’s delivery addresses',
     tag: 'Shops',
     roles: [UserRole.SHOP_OWNER],
   },

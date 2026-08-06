@@ -66,6 +66,7 @@ export const bn: Catalogue = {
     active: 'চালু',
     inactive: 'বন্ধ',
     nothing: 'কিছু নেই',
+    edit: 'বদলান',
     between: '{{from}} থেকে {{to}}',
   },
 
@@ -91,6 +92,8 @@ export const bn: Catalogue = {
     otherSignedOut: 'আপনার আরও {{count}}টি ডিভাইস সাইন আউট হয়েছে।',
     oneOtherSignedOut: 'আপনার আরও একটি ডিভাইস সাইন আউট হয়েছে।',
     changeFailed: 'আপনার পাসওয়ার্ড বদলানো যায়নি।',
+    currentPasswordRequired: 'আগে আপনার বর্তমান পাসওয়ার্ড লিখুন।',
+    sameAsCurrent: 'এইমাত্র যেটি ব্যবহার করছিলেন, তার চেয়ে আলাদা একটি পাসওয়ার্ড বেছে নিন।',
     thatDidNotWork: 'এটি হয়নি',
     atLeast: 'অন্তত {{minimum}} অক্ষর।',
     changeButton: 'পাসওয়ার্ড বদলান',
@@ -840,6 +843,8 @@ export const bn: Catalogue = {
     deliveryAddress: 'কোথায় পাঠাতে হবে?',
     selectAddress: 'একটি ঠিকানা বেছে নিন',
     couldNotLoadAddresses: 'আপনার ডেলিভারি ঠিকানাগুলি লোড করা যায়নি।',
+    noAddress: 'ডেলিভারির ঠিকানা নেই',
+    noAddressBody: 'এই দোকানের ডেলিভারির ঠিকানা না থাকলে অর্ডার পাঠানো যাবে না।',
     paymentMethod: 'কীভাবে টাকা দেবেন',
     purchaseOrder: 'আপনার পারচেজ-অর্ডার নম্বর',
     purchaseOrderHint:
@@ -933,6 +938,12 @@ export const bn: Catalogue = {
     estimateBody: 'চূড়ান্ত ক্রেডিট আসলে যে মাল পাওয়া ও পরীক্ষা করা হয় তার ভিত্তিতে হিসাব হয়।',
     needQuantity: 'অন্তত একটি মালের পরিমাণ লিখুন।',
     tooMany: '{{brand}} সর্বোচ্চ {{maximum}}টি ফেরত দেওয়া যাবে।',
+    wholeUnitsOnly: '{{brand}} গোটা হিসেবে ফেরত পাঠান।',
+    upTo: 'সর্বোচ্চ {{maximum}}টি।',
+    raiseOne: 'কিছু ফেরত পাঠান',
+    raiseFromThis: 'এই চালান থেকে কিছু ফেরত পাঠান',
+    pickInvoiceFirst: 'কী কী ফেরত পাঠানো যাবে দেখতে একটি চালান বেছে নিন।',
+    estimateLabel: 'আনুমানিক ক্রেডিট',
     submit: 'অনুরোধটি পাঠান',
     submitting: 'পাঠানো হচ্ছে…',
     submitFailed: 'ফেরতের অনুরোধটি পাঠানো যায়নি।',
@@ -2818,6 +2829,14 @@ export const bn: Catalogue = {
     paymentTerms: 'পরিশোধের শর্ত',
     days: '{{count}} দিন',
     records: 'হিসাবের নথি',
+    invoicesBody: 'এই দোকানের নামে পাঠানো সব চালান, আর প্রতিটিতে কত বাকি আছে।',
+    paymentHistoryBody: 'আপনি কবে কত টাকা দিয়েছেন, আর তা কীভাবে লেখা হয়েছে।',
+    statementBody: 'দুই তারিখের মধ্যে যা যা ধরা হয়েছে ও যা দেওয়া হয়েছে, শেষে বাকির হিসাব।',
+    returnsBody: 'আপনি যা ফেরত পাঠিয়েছেন, আর প্রতিটি আবেদন কতদূর এগিয়েছে।',
+    settingsHeading: 'এই অ্যাকাউন্টের সেটিংস',
+    notificationsBody: 'কোন খবরগুলি এই ফোনে আসবে আর কোনগুলি আসবে না।',
+    securityBody:
+      'এই অ্যাকাউন্টে সাইন ইন করা প্রতিটি ডিভাইস। কোনওটি হারিয়ে গেলে সেটি সাইন আউট করুন।',
   },
 
   statement: {
@@ -2986,6 +3005,34 @@ export const bn: Catalogue = {
     district: 'জেলা',
     postalCode: 'পোস্ট কোড',
     line1Hint: 'অন্তত পাঁচটি অক্ষর — ডেলিভারিকর্মী যেন খুঁজে পান।',
+
+    title: 'ডেলিভারির ঠিকানা',
+    subtitle: 'আপনার অর্ডার কোথায় পৌঁছে দেওয়া হবে।',
+    whatFor:
+      'একটি ঠিকানা সবসময় প্রধান থাকে — অর্ডার সেটি দিয়েই শুরু হয়। যেকোনও অর্ডারে আপনি অন্য ঠিকানা বেছে নিতে পারেন।',
+    loading: 'আপনার ঠিকানাগুলি লোড হচ্ছে',
+    couldNotLoad: 'আপনার ঠিকানাগুলি লোড করা যায়নি।',
+    saved: 'ঠিকানাটি সংরক্ষণ করা হয়েছে।',
+    saveFailed: 'ঠিকানাটি সংরক্ষণ করা যায়নি।',
+    editTitle: 'এই ঠিকানা বদলান',
+    default: 'প্রধান',
+    makeDefault: 'এটিকে প্রধান করুন',
+    makeDefaultOne: '{{label}}-কে প্রধান ঠিকানা করুন',
+    nowDefault: '{{label}} এখন প্রধান ঠিকানা।',
+    editOne: '{{label}} বদলান',
+    remove: 'সরান',
+    removeOne: '{{label}} সরান',
+    removeTitle: 'এই ঠিকানা সরাবেন?',
+    removeBody:
+      'আগে দেওয়া অর্ডারগুলি যে ঠিকানায় পাঠানো হয়েছিল সেটিই থাকবে। নতুন অর্ডারে {{label}} আর দেখানো হবে না।',
+    removed: '{{label}} সরানো হয়েছে।',
+    removeFailed: 'ঠিকানাটি সরানো যায়নি।',
+    none: 'এখনও কোনও ডেলিভারির ঠিকানা নেই',
+    noneBody: 'ঠিকানা ছাড়া অর্ডার পাঠানো যায় না। ওষুধ যে ঠিকানায় আসবে সেটি যোগ করুন।',
+    labelRequired: 'এই ঠিকানার একটি নাম দিন।',
+    line1TooShort: 'অন্তত পাঁচটি অক্ষর লিখুন — ডেলিভারিকর্মী যেন খুঁজে পান।',
+    cityTooShort: 'শহরের নাম লিখুন।',
+    districtTooShort: 'জেলার নাম লিখুন।',
   },
 
   pickers: {
@@ -3109,6 +3156,9 @@ export const bn: Catalogue = {
     collectionReview: 'কালেকশন পর্যালোচনা',
     myCollections: 'আমার কালেকশন',
     paymentDetails: 'পেমেন্টের বিবরণ',
+    addresses: 'ডেলিভারির ঠিকানা',
+    changePassword: 'পাসওয়ার্ড বদলান',
+    raiseReturn: 'কিছু ফেরত পাঠান',
   },
 
   people: {

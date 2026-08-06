@@ -197,6 +197,21 @@ export default function InvoiceDetailScreen() {
         />
       </Card>
 
+      {/*
+        The one screen that already knows which invoice a return is against, so
+        the return form opens with the answer to its first question filled in.
+        Cancelled invoices are excluded: there is nothing to credit back.
+      */}
+      {invoice.status === 'CANCELLED' ? null : (
+        <Button
+          variant="secondary"
+          label={t('returns.raiseFromThis')}
+          onPress={() =>
+            router.push({ pathname: '/(protected)/return-new', params: { invoiceId: invoice._id } })
+          }
+        />
+      )}
+
       {outstanding ? (
         <Button
           variant="secondary"

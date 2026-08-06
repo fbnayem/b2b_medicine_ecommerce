@@ -9,6 +9,7 @@ import { getReturns, type ReturnSummary } from '../../../src/returns/api';
 import { useAuthStore } from '../../../src/store/useAuth';
 import { useLanguage } from '../../../src/i18n/useLanguage';
 import {
+  Button,
   CardLink,
   EmptyState,
   ErrorState,
@@ -80,6 +81,19 @@ export default function ReturnsScreen() {
           label: value ? t(`returnStatus.${value}`) : t('returns.allStatuses'),
         }))}
       />
+
+      {/*
+        The way in. `POST /returns` admits a shop owner and had no caller on
+        this client at all, so a pharmacy could read the returns they had
+        raised on a desktop and could not raise one from the phone they were
+        holding over the carton.
+      */}
+      {role === UserRole.SHOP_OWNER ? (
+        <Button
+          label={t('returns.raiseOne')}
+          onPress={() => router.push('/(protected)/return-new')}
+        />
+      ) : null}
 
       {loading ? (
         <LoadingState label={t('returns.loading')} />

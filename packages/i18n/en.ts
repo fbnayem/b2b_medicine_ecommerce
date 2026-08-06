@@ -64,6 +64,7 @@ export const en = {
     active: 'Active',
     inactive: 'Not in use',
     nothing: 'None',
+    edit: 'Edit',
     between: '{{from}} to {{to}}',
   },
 
@@ -89,6 +90,14 @@ export const en = {
     otherSignedOut: 'You were signed out of {{count}} other devices.',
     oneOtherSignedOut: 'You were signed out of one other device.',
     changeFailed: 'Your password could not be changed.',
+    /*
+     * The two the client checks for itself, so a phone connection is not spent
+     * being told something the form already knew. `sameAsCurrent` is worded to
+     * match the server's own `PASSWORD_UNCHANGED` message: two sentences for
+     * one refusal is how somebody decides one of them is a fault.
+     */
+    currentPasswordRequired: 'Type your current password first.',
+    sameAsCurrent: 'Choose a password you have not just been using.',
     thatDidNotWork: 'That did not work',
     atLeast: 'At least {{minimum}} characters.',
     changeButton: 'Change my password',
@@ -955,6 +964,13 @@ export const en = {
     deliveryAddress: 'Where should it go?',
     selectAddress: 'Choose an address',
     couldNotLoadAddresses: 'Your delivery addresses could not be loaded.',
+    /*
+     * Not a warning — a dead end with a way out of it. A shop with no address
+     * cannot submit an order at all, and this screen used to say nothing and
+     * simply leave the button greyed out.
+     */
+    noAddress: 'No delivery address',
+    noAddressBody: 'An order cannot be sent until this shop has an address to deliver to.',
     paymentMethod: 'How you plan to pay',
     purchaseOrder: 'Your purchase-order number',
     purchaseOrderHint:
@@ -1049,6 +1065,18 @@ export const en = {
     estimateBody: 'The final credit is worked out from the goods actually received and inspected.',
     needQuantity: 'Enter a quantity for at least one item.',
     tooMany: 'You can send back at most {{maximum}} of {{brand}}.',
+    /*
+     * Added when the form arrived on the phone. `wholeUnitsOnly` is checked on
+     * the client because `positiveQuantity` is an integer schema, so half a box
+     * comes back as the whole form rejected with a path like `lines.0.quantity`
+     * on it — which is a sentence nobody standing over a carton can act on.
+     */
+    wholeUnitsOnly: 'Send back whole units of {{brand}}.',
+    upTo: 'At most {{maximum}}.',
+    raiseOne: 'Send something back',
+    raiseFromThis: 'Send something back from this invoice',
+    pickInvoiceFirst: 'Choose an invoice to see what can be sent back.',
+    estimateLabel: 'Estimated credit',
     submit: 'Send this request',
     submitting: 'Sending…',
     submitFailed: 'This return request could not be sent.',
@@ -3050,6 +3078,20 @@ export const en = {
     paymentTerms: 'Payment terms',
     days: '{{count}} days',
     records: 'Account records',
+    /*
+     * A line under every destination in the account menu.
+     *
+     * A list of nine nouns is a list somebody taps through to find out what
+     * each one is — and this is the screen a shop opens when something has
+     * already gone wrong, which is the worst moment to be exploring.
+     */
+    invoicesBody: 'Every invoice sent to this shop, and what is still owing on each one.',
+    paymentHistoryBody: 'What you have paid, when, and how it was recorded.',
+    statementBody: 'Everything charged and paid between two dates, ending in a balance.',
+    returnsBody: 'Goods you have sent back, and how far each request has got.',
+    settingsHeading: 'Settings for this account',
+    notificationsBody: 'Which messages reach this phone, and which do not.',
+    securityBody: 'Every device signed in to this account. Sign one out if you have lost it.',
   },
 
   statement: {
@@ -3280,6 +3322,39 @@ export const en = {
     district: 'District',
     postalCode: 'Post code',
     line1Hint: 'At least five characters — enough for a rider to find it.',
+
+    /*
+     * The screen a shop maintains its own addresses on, which did not exist
+     * until this phase on either client. Everything above was written for the
+     * administrator's shop form; everything below is the customer's own.
+     */
+    title: 'Delivery addresses',
+    subtitle: 'Where your orders are delivered.',
+    whatFor:
+      'One address is always the default — that is the one an order starts with. You can pick a different one on any order.',
+    loading: 'Loading your addresses',
+    couldNotLoad: 'Your addresses could not be loaded.',
+    saved: 'The address has been saved.',
+    saveFailed: 'This address could not be saved.',
+    editTitle: 'Change this address',
+    default: 'Default',
+    makeDefault: 'Make this the default',
+    makeDefaultOne: 'Make {{label}} the default address',
+    nowDefault: '{{label}} is now the default.',
+    editOne: 'Change {{label}}',
+    remove: 'Remove',
+    removeOne: 'Remove {{label}}',
+    removeTitle: 'Remove this address?',
+    removeBody:
+      'Orders already placed keep the address they were sent to. {{label}} will not be offered on new ones.',
+    removed: '{{label}} has been removed.',
+    removeFailed: 'This address could not be removed.',
+    none: 'No delivery address yet',
+    noneBody: 'An order cannot be sent without one. Add the address the medicines should come to.',
+    labelRequired: 'Give this address a name.',
+    line1TooShort: 'Write at least five characters — enough for a rider to find it.',
+    cityTooShort: 'Write the city.',
+    districtTooShort: 'Write the district.',
   },
 
   pickers: {
@@ -3403,6 +3478,9 @@ export const en = {
     collectionReview: 'Collection review',
     myCollections: 'My collections',
     paymentDetails: 'Payment details',
+    addresses: 'Delivery addresses',
+    changePassword: 'Change your password',
+    raiseReturn: 'Send something back',
   },
 
   /**

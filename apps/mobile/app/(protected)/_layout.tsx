@@ -86,6 +86,8 @@ export default function ProtectedLayout() {
           name="notification-preferences"
           options={{ title: t('screens.notificationPreferences') }}
         />
+        {/* Every role has a password, so this one is not behind a guard. */}
+        <Stack.Screen name="change-password" options={{ title: t('screens.changePassword') }} />
 
         <Stack.Protected guard={isOwner}>
           <Stack.Screen name="invoices" options={{ title: t('screens.invoices') }} />
@@ -99,6 +101,13 @@ export default function ProtectedLayout() {
             behind them.
           */}
           <Stack.Screen name="delivery-track" options={{ title: t('screens.whereIsIt') }} />
+          {/*
+            Only a shop owner has delivery addresses to maintain. Staff reach
+            the same field through the customer record, which carries the credit
+            terms with it and is therefore a different screen for good reason.
+          */}
+          <Stack.Screen name="addresses" options={{ title: t('screens.addresses') }} />
+          <Stack.Screen name="return-new" options={{ title: t('screens.raiseReturn') }} />
         </Stack.Protected>
         <Stack.Protected guard={isManager}>
           <Stack.Screen name="overdue-shops" options={{ title: t('screens.overdueShops') }} />

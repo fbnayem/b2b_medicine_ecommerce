@@ -6,6 +6,7 @@ import type { Shop } from '@medsupply/shared-types';
 import { apiFailure, errorMessage } from '@medsupply/api-client';
 import { apiClient } from '../../src/api/client';
 import { useCart } from '../../src/store/useCart';
+import { defaultAddress } from '../../src/account/addresses';
 import { useQuote } from '../../src/orders/quote';
 import { formatMoneyMinor } from '../../src/finance/money';
 import { createFinancialIdempotencyKey } from '../../src/finance/idempotency';
@@ -107,7 +108,18 @@ export default function CheckoutScreen() {
       const response = await apiClient.get('/shops/my');
       const value = response.data.data[0];
       setShop(value);
-      setAddressId((value?.deliveryAddresses?.[0] as { _id?: string } | undefined)?._id ?? '');
+      /*
+       * The address the shop **marked**, not the one they typed first.
+       *
+       * This was `deliveryAddresses[0]`, which is document order — so a
+       * pharmacy whose default is their second branch was offered the first one
+       * on every single order and had to notice each time.
+       */
+      setAddressId(
+        defaultAddress(
+          (value?.deliveryAddresses ?? []) as Array<{ _id: string; isDefault: boolean }>,
+        )?._id ?? '',
+      );
     } catch (caught) {
       setError(errorMessage(caught, language, t('checkout.couldNotLoadAddresses')));
     } finally {
@@ -189,16 +201,33 @@ export default function CheckoutScreen() {
 
       <Card>
         <SectionTitle>{t('checkout.deliveryAddress')}</SectionTitle>
-        <View accessibilityRole="radiogroup" style={{ gap: layout.space[2] }}>
-          {addresses.map((address) => (
-            <Choice
-              key={address._id}
-              label={`${address.label}: ${address.line1}, ${address.city}`}
-              selected={addressId === address._id}
-              onPress={() => setAddressId(address._id)}
-            />
-          ))}
-        </View>
+        {addresses.length === 0 ? (
+          /*
+           * A shop with no address cannot order at all — `POST /orders/submit`
+           * requires a `deliveryAddressId`. This screen used to say nothing and
+           * leave the button greyed out, so somebody who had filled a basket
+           * met a dead end with no explanation and nothing to press.
+           */
+          <EmptyState
+            title={t('checkout.noAddress')}
+            description={t('checkout.noAddressBody')}
+            action={{
+              label: t('addresses.addButton'),
+              onPress: () => router.push('/(protected)/addresses'),
+            }}
+          />
+        ) : (
+          <View accessibilityRole="radiogroup" style={{ gap: layout.space[2] }}>
+            {addresses.map((address) => (
+              <Choice
+                key={address._id}
+                label={`${address.label}: ${address.line1}, ${address.city}`}
+                selected={addressId === address._id}
+                onPress={() => setAddressId(address._id)}
+              />
+            ))}
+          </View>
+        )}
       </Card>
 
       <Card>

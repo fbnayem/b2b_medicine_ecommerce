@@ -5,10 +5,10 @@ import { RealtimeEvent, UserRole, type UnreadNotificationSummary } from '@medsup
 import { NAV_GROUP_LABEL, navItemsFor } from '@medsupply/navigation';
 import { translatedOr } from '@medsupply/i18n';
 import { useAuthStore } from '../../../src/store/useAuth';
+import { leaveSession } from '../../../src/store/leave';
 import { getFinanceNavigation } from '../../../src/finance/navigation';
 import { fetchUnreadSummary } from '../../../src/notifications/api';
-import { disconnectRealtime, onRealtime } from '../../../src/notifications/realtime';
-import { unregisterCurrentDevice } from '../../../src/notifications/push';
+import { onRealtime } from '../../../src/notifications/realtime';
 import { TAB_ROUTE_FILE } from '../../../src/navigation/tabs';
 import { colour, layout } from '../../../src/theme';
 import { useLanguage } from '../../../src/i18n/useLanguage';
@@ -44,7 +44,7 @@ const GROUPS = [
  */
 export default function DashboardScreen() {
   const { t } = useLanguage();
-  const { user, logout } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
   const [unread, setUnread] = useState<UnreadNotificationSummary>(emptyUnread);
 
   const loadUnread = useCallback(async () => {
@@ -70,14 +70,6 @@ export default function DashboardScreen() {
     [],
   );
 
-  const handleLogout = async () => {
-    // Removes this device's push token before the credential is cleared.
-    await unregisterCurrentDevice();
-    disconnectRealtime();
-    await logout();
-    router.replace('/');
-  };
-
   const role = user?.role as UserRole | undefined;
   const destinations = role
     ? navItemsFor(role).filter((item) => item.id !== 'dashboard' && TAB_ROUTE_FILE[item.id])
@@ -95,8 +87,13 @@ export default function DashboardScreen() {
    * menu is still needed, so it is handed to `CustomerHome` and rendered under
    * the summary rather than replaced.
    *
-   * Only the Shop application ever takes this branch, because a build admits
+   * Only the Shop application ever takes that branch, because a build admits
    * one set of roles.
+   *
+   * **No sign-out in here any more.** It used to live at the bottom of this
+   * screen because there was nowhere else to put it; a shop owner now has an
+   * account menu, and two sign-out buttons two taps apart is a question about
+   * whether they do the same thing.
    */
   const menu = (
     <>
@@ -138,14 +135,6 @@ export default function DashboardScreen() {
           ))}
         </View>
       )}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('security.signOutThisTitle')}
-        style={styles.signOut}
-        onPress={handleLogout}
-      >
-        <Text style={styles.signOutText}>{t('common.signOut')}</Text>
-      </Pressable>
     </>
   );
 
@@ -184,52 +173,18 @@ export default function DashboardScreen() {
         </Text>
       </Pressable>
 
-      {groups.map(({ group, items }) => (
-        <View key={group} style={styles.group}>
-          <Text style={styles.groupHeading}>
-            {translatedOr(t, `navGroup.${group}`, NAV_GROUP_LABEL[group])}
-          </Text>
-          {items.map((item) => (
-            <Pressable
-              key={item.id}
-              accessibilityRole="button"
-              style={styles.secondaryAction}
-              onPress={() => router.push(`/(protected)/(tabs)/${TAB_ROUTE_FILE[item.id]}` as never)}
-            >
-              <Text style={styles.secondaryActionText}>
-                {translatedOr(t, `navItem.${item.id}`, item.label)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      ))}
-
-      {/* Finance destinations that live outside the tab group. */}
-      {financeLinks.length > 0 && (
-        <View style={styles.group}>
-          <Text style={styles.groupHeading}>
-            {translatedOr(t, 'navGroup.money', NAV_GROUP_LABEL.money)}
-          </Text>
-          {financeLinks.map((item) => (
-            <Pressable
-              key={item.route}
-              accessibilityRole="button"
-              style={styles.secondaryAction}
-              onPress={() => router.push(item.route)}
-            >
-              <Text style={styles.secondaryActionText}>
-                {translatedOr(t, item.labelKey, item.label)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
+      {/*
+        The same menu the Shop application renders under its summary. It was
+        written out twice in this file, so a destination added to one branch
+        was invisible to the other half of the roles.
+      */}
+      {menu}
 
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('security.signOutThisTitle')}
         style={styles.signOut}
-        onPress={handleLogout}
+        onPress={() => void leaveSession()}
       >
         <Text style={styles.signOutText}>{t('common.signOut')}</Text>
       </Pressable>
