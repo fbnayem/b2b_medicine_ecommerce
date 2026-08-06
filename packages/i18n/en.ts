@@ -130,6 +130,11 @@ export const en = {
     readyToHandOver: 'Packed, waiting for a rider',
     onTheRoad: 'Out for delivery now',
     youOwe: 'You owe',
+    howTradeIsGoing: 'How trade is going',
+    whoOwesUs: 'Who owes us, and for how long',
+    bestSellers: 'Selling most',
+    nothingOutstanding: 'Nothing is outstanding.',
+    nothingSoldYet: 'Nothing has sold in this period yet.',
   },
 
   /** What each section is *for*, in the words of the person who uses it. */

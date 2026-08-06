@@ -1422,3 +1422,63 @@ the next request recovers once the file has content.
 ### Next phase dependencies
 
 None.
+
+## Phase 31: The Redesign
+
+**Status:** COMPLETED
+
+### Scope and completed work
+
+Asked to redesign the interface, make it more modern and colourful, and put
+charts on the dashboard. Delivered through the token layer and the shared
+primitives, so all fifty-three screens change without a page component being
+touched for appearance.
+
+- **Tokens:** two-layer elevation in light and a flat treatment in dark; three
+  radii where every surface previously shared one.
+- **Type:** negative tracking on headings, where system UI faces open up above
+  about 20px; a `data-figure` treatment giving fixed-width digits and tighter
+  tracking to anything read as a number.
+- **Colour:** a hue per stage of work, carried from the home tile to the sidebar
+  group. Tiles paint the icon chip in the tone at full strength — the subtle
+  tints are made for small text in a badge and wash out at card size. The four
+  new `on-brand` over tone pairs are asserted at 4.5:1 in both themes.
+- **Charts:** sales over time, receivables ageing and best sellers, from the one
+  `/reports/overview` request the analytics screen already makes. Management
+  only, because that endpoint is.
+- **The directory** on the home screen is compact rows with icons rather than
+  twenty description cards.
+
+### Defect found and fixed
+
+**`purchasing` was missing from the home screen's group list**, and had been
+since the list was written — so suppliers, purchase orders, the recall trace and
+the controlled register were reachable from the sidebar and absent from the
+screen that claims to show everything you can do. `GROUP_ORDER` is typed
+`NavGroup[]`, and an array of a union need not contain all of it, so the
+omission was invisible. `dashboardGroups.test.ts` now counts them, and was
+proved by removing the entry again and watching it name the four screens.
+
+### Testing
+
+Web 301 (ten new: two for the group coverage, eight for the new contrast pairs),
+browser 128 with accessibility still at strict zero, API 170 unit / 194
+integration / 5 route coverage, mobile 93.
+
+### Known limitations
+
+- **The app shell was not restyled.** The sidebar, header and account menu keep
+  their existing treatment; the redesign stops at the content region and the
+  primitives inside it.
+- **No new typeface.** The system stack stays, because the Bangla catalogue
+  depends on `Noto Sans Bengali` being reachable and bundling a second family
+  for two scripts is a size decision rather than a design one.
+- **The charts show a flat line on a fresh seed**, because the seeded period has
+  no invoices in it. Honest rather than wrong, but a poor first impression of
+  the feature.
+- **A storekeeper, a rider and a sales rep get no charts**, because
+  `/reports/overview` is management-only.
+
+### Next phase dependencies
+
+None.

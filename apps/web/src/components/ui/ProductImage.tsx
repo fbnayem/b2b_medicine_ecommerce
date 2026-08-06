@@ -38,14 +38,25 @@ export function ProductImage({ path, className }: ProductImageProps) {
   useEffect(() => setBroken(false), [source]);
 
   const box = clsx(
-    'flex w-full items-center justify-center rounded-md bg-surface-sunken',
+    'flex w-full items-center justify-center rounded-control bg-surface-sunken',
     className ?? 'h-32',
   );
 
   if (!source || broken) {
+    /*
+     * Tinted rather than grey, and the icon in the brand rather than in a
+     * washed-out neutral.
+     *
+     * Nothing in this catalogue has a photograph yet, so in practice every card
+     * carries this box — a dozen identical grey rectangles down the page, each
+     * the largest thing on its card and each saying nothing. It cannot become
+     * smaller without the cards in a row losing their shared height, so instead
+     * it stops looking like a failure and starts looking like part of the
+     * product's own tile.
+     */
     return (
-      <div className={box} aria-hidden="true">
-        <Pill className="text-text-muted opacity-40" size={32} />
+      <div className={clsx(box, 'bg-brand-subtle')} aria-hidden="true">
+        <Pill className="text-brand opacity-50" size={28} strokeWidth={1.5} />
       </div>
     );
   }

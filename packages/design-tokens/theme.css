@@ -59,6 +59,20 @@
   --chart-4: #7a3f6d;
   --chart-5: #0f6f78;
   --chart-6: #485349;
+
+  /*
+   * Elevation, as two layers rather than one.
+   *
+   * A single `shadow-sm` gives a card one soft edge and nothing else, which is
+   * why every surface in this application sat at exactly the same depth. A
+   * contact shadow plus a diffuse one is what makes a card look placed on the
+   * page instead of drawn on it. Tinted with the neutral rather than pure
+   * black, so it belongs to this palette.
+   */
+  --shadow-card:
+    0 1px 2px -1px rgb(22 27 24 / 0.08), 0 2px 6px -2px rgb(22 27 24 / 0.06);
+  --shadow-lifted:
+    0 2px 4px -2px rgb(22 27 24 / 0.1), 0 10px 20px -6px rgb(22 27 24 / 0.12);
 }
 
 /* ─── Semantic tokens, dark ────────────────────────────────────────────── */
@@ -110,11 +124,35 @@
   --chart-4: #d9a8cc;
   --chart-5: #7fc9d1;
   --chart-6: #b3bdb7;
+
+  /*
+   * Shadows barely exist on a dark ground — a black blur on near-black reads as
+   * nothing. Depth in dark comes from the surface steps and the border; these
+   * stay only to keep the two themes declaring the same names, and to give a
+   * lifted element a soft anchor rather than a hard cut.
+   */
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.45);
+  --shadow-lifted: 0 10px 28px -8px rgb(0 0 0 / 0.7);
 }
 
 /* ─── Exposed to Tailwind ──────────────────────────────────────────────── */
 
 @theme inline {
+  /*
+   * Shape and depth, exposed as utilities so a card cannot drift from a dialog.
+   *
+   * `rounded-lg` was on every surface in the product — cards, dialogs, buttons,
+   * inputs, badges — which is the shape equivalent of one type size: nothing
+   * reads as more or less substantial than anything else. Three steps now, and
+   * they mean something: `panel` is a surface you read, `control` is something
+   * you press, `pill` is a label.
+   */
+  --radius-panel: 0.875rem;
+  --radius-control: 0.5rem;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-lifted: var(--shadow-lifted);
+
   --color-canvas: var(--color-canvas);
   --color-surface: var(--color-surface);
   --color-surface-raised: var(--color-surface-raised);

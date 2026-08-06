@@ -140,6 +140,16 @@ describe('the palette meets the contrast it claims', () => {
     ['info on its own subtle', 'color-info', 'color-info-subtle'],
     ['progress on its own subtle', 'color-progress', 'color-progress-subtle'],
     ['transit on its own subtle', 'color-transit', 'color-transit-subtle'],
+    /*
+     * The home screen paints an icon chip in a tone at full strength and puts
+     * `on-brand` on top of it. Only the brand pairing had ever been asserted,
+     * because only the brand had ever been used that way — same reasoning as
+     * the badge pairs above, and the same floor.
+     */
+    ['on-brand over info', 'color-on-brand', 'color-info'],
+    ['on-brand over progress', 'color-on-brand', 'color-progress'],
+    ['on-brand over warning', 'color-on-brand', 'color-warning'],
+    ['on-brand over transit', 'color-on-brand', 'color-transit'],
   ];
 
   for (const [label, foreground, background] of PAIRS) {

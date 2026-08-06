@@ -116,6 +116,11 @@ export const bn: Catalogue = {
     readyToHandOver: 'প্যাক হয়ে গেছে, ডেলিভারি কর্মীর অপেক্ষায়',
     onTheRoad: 'এখন ডেলিভারিতে আছে',
     youOwe: 'আপনার বাকি',
+    howTradeIsGoing: 'ব্যবসা কেমন চলছে',
+    whoOwesUs: 'কার কাছে কত বাকি, আর কত দিনের',
+    bestSellers: 'সবচেয়ে বেশি বিক্রি',
+    nothingOutstanding: 'কোনো বকেয়া নেই।',
+    nothingSoldYet: 'এই সময়ে এখনো কিছু বিক্রি হয়নি।',
   },
 
   purpose: {

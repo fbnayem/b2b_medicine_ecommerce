@@ -1,5 +1,53 @@
 # Changelog
 
+## Phase 31 — the redesign
+
+Asked for a redesign: more modern, more colourful, and charts on the dashboard.
+
+The leverage is that fifty-three screens already read their colour, shape and
+depth from one place. So this changes the tokens and the shared primitives, and
+**not one page component was touched for appearance**.
+
+**Shape and depth.** `rounded-lg` was on every surface in the product — cards,
+dialogs, buttons, inputs, badges — which is the shape equivalent of having one
+type size. Three radii now, and they mean something: a surface you read, a
+control you press, a label. Elevation is two layers in light, because a contact
+shadow plus a diffuse one is what makes a card look placed on the page rather
+than drawn on it; in dark it is nearly nothing, because a black blur on
+near-black reads as nothing and depth there comes from the surface steps.
+
+**Colour, assigned by stage of work rather than by taste.** A queue keeps its
+hue from the home tile through to the sidebar group: waiting on a person is
+blue, being picked is teal, packed is amber, gone is plum. These are the tones
+the badge palette already used, so the contrast test already held them — the
+redesign spends a palette that was proved rather than inventing one.
+
+The tiles paint their icon chip in the tone at **full strength**. The first
+attempt tinted the card, the icon and the number in the same subtle shade and it
+read as one pale smear: those tints are built to carry small text inside a
+badge, a few percent off white. The four new `on-brand` over tone pairs are
+asserted at 4.5:1 in both themes like every other pairing this product renders.
+
+**Charts.** Sales over time, who owes us and for how long, and what is selling
+most — from the single `/reports/overview` request the analytics screen already
+makes, under the key it already uses. The whole section disappears if it fails,
+because this is the first screen of somebody's day and the figures above it come
+from different requests. A chart's figures table is collapsible here and never
+optional: the SVG is `aria-hidden`, so a chart without its table does not exist
+for anybody using a screen reader.
+
+**The directory** below is compact rows with icons now, not twenty description
+cards restating the sidebar in a larger font.
+
+### `purchasing` had never been on the home screen
+
+Found while giving each group a colour. `GROUP_ORDER` listed six of the seven
+navigation groups, so suppliers, purchase orders, the recall trace and the
+controlled register were reachable from the sidebar and absent from the screen
+that claims to show everything you can do. It is typed `NavGroup[]`, and an
+array of a union does not have to contain all of it — the omission was not a
+type error, just a shorter array. A test counts them now.
+
 ## Phase 30 — the blank page had a cause, and it was a half-written file
 
 Phase 28 made a failed load say something instead of painting white. This is

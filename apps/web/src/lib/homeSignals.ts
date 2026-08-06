@@ -31,6 +31,24 @@ import { keys } from './queryKeys';
  * screen somebody sees each day would be worse than no card.
  */
 
+/**
+ * The hue a kind of work keeps, everywhere it appears.
+ *
+ * These are the tones the badge palette already uses and the contrast test
+ * already holds to 4.5:1 against their own tints in both themes, so spending
+ * them here costs nothing and buys the thing colour is actually for: a
+ * storekeeper learns that teal means picking, and then recognises the teal tile
+ * before reading a word of it.
+ *
+ * Not one hue per tile chosen to look pretty — one hue per *stage of an order*,
+ * in the order an order passes through them: waiting on a person, being picked,
+ * packed, gone.
+ */
+export type SignalTone = 'info' | 'progress' | 'warning' | 'transit' | 'brand';
+
+/** The icon each tile carries, named from the shared navigation icon set. */
+export type SignalIcon = 'approvals' | 'warehouse' | 'orders' | 'delivery' | 'money';
+
 export interface HomeSignal {
   /** Stable id, used for the test id and as the React key. */
   id: string;
@@ -43,6 +61,8 @@ export interface HomeSignal {
   /** Catalogue key for the words under the number. */
   labelKey: string;
   path: string;
+  tone: SignalTone;
+  icon: SignalIcon;
 }
 
 /**
@@ -61,6 +81,8 @@ const SIGNALS: readonly HomeSignal[] = [
     url: '/approvals/queue',
     labelKey: 'home.awaitingDecision',
     path: '/approvals',
+    tone: 'info',
+    icon: 'approvals',
   },
   {
     id: 'picking',
@@ -69,6 +91,8 @@ const SIGNALS: readonly HomeSignal[] = [
     url: '/fulfilment/queue',
     labelKey: 'home.toPick',
     path: '/fulfilment',
+    tone: 'progress',
+    icon: 'warehouse',
   },
   {
     id: 'ready',
@@ -77,6 +101,8 @@ const SIGNALS: readonly HomeSignal[] = [
     url: '/fulfilment/ready',
     labelKey: 'home.readyToHandOver',
     path: '/fulfilment/ready',
+    tone: 'warning',
+    icon: 'orders',
   },
   {
     id: 'on-the-road',
@@ -90,6 +116,8 @@ const SIGNALS: readonly HomeSignal[] = [
     url: `/deliveries?status=${DeliveryStatus.OUT_FOR_DELIVERY}`,
     labelKey: 'home.onTheRoad',
     path: '/deliveries',
+    tone: 'transit',
+    icon: 'delivery',
   },
 ];
 
@@ -101,6 +129,8 @@ export const OWN_ACCOUNT: HomeSignal = {
   url: '/finance/my/summary',
   labelKey: 'home.youOwe',
   path: '/account',
+  tone: 'brand',
+  icon: 'money',
 };
 
 /**
@@ -118,4 +148,16 @@ export function signalsFor(role: UserRole): HomeSignal[] {
 /** Whether this role is shown what they owe instead of a set of queues. */
 export function showsOwnAccount(role: UserRole): boolean {
   return navItemsFor(role).some((item) => item.id === OWN_ACCOUNT.navId);
+}
+
+/**
+ * Whether this role is shown the charts under the figures.
+ *
+ * `GET /reports/overview` is management-only on the server, and the analytics
+ * navigation entry carries exactly that set — so asking the manifest is asking
+ * the same question the server will answer, rather than keeping a second copy
+ * of it here and waiting for the two to drift.
+ */
+export function showsTrade(role: UserRole): boolean {
+  return navItemsFor(role).some((item) => item.id === 'analytics');
 }

@@ -14,11 +14,21 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label?: string;
 }
 
+/**
+ * `shadow-card` on the two solid variants only.
+ *
+ * A filled button is the one control on a screen that should look pressable,
+ * and every surface in this application used to carry exactly the same
+ * elevation — so nothing did. `secondary` stays flat against its card on
+ * purpose: two raised things side by side is two primary actions.
+ */
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-brand text-on-brand hover:bg-brand-strong border border-transparent',
-  secondary: 'bg-surface text-text border border-border hover:bg-surface-hover',
+  primary:
+    'bg-brand text-on-brand hover:bg-brand-strong active:bg-brand-strong border border-transparent shadow-card',
+  secondary:
+    'bg-surface text-text border border-border hover:bg-surface-hover hover:border-border-strong',
   ghost: 'bg-transparent text-text border border-transparent hover:bg-surface-hover',
-  danger: 'bg-danger text-on-brand hover:brightness-90 border border-transparent',
+  danger: 'bg-danger text-on-brand hover:brightness-90 border border-transparent shadow-card',
 };
 
 /**
@@ -37,7 +47,7 @@ const SIZES: Record<ButtonSize, string> = {
 
 function buttonClass(variant: ButtonVariant, size: ButtonSize, className?: string): string {
   return clsx(
-    'inline-flex items-center justify-center rounded-md font-medium',
+    'inline-flex items-center justify-center rounded-control font-medium',
     'transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
     VARIANTS[variant],
     SIZES[size],

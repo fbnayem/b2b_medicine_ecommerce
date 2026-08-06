@@ -55,6 +55,23 @@
     text-wrap: balance;
     line-height: 1.25;
     font-weight: 600;
+    /*
+     * System UI faces are drawn for interface text at small sizes, so they open
+     * up noticeably above about 20px and a page title starts to look loose
+     * beside the body copy under it. A touch of negative tracking on headings
+     * only — body text keeps its default, where tightening costs legibility.
+     */
+    letter-spacing: -0.011em;
+  }
+
+  /*
+   * A figure is read, not spelled. Anything marked as data gets fixed-width
+   * digits so a column of them lines up, and slightly tighter tracking so a
+   * long amount does not sprawl.
+   */
+  [data-figure] {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.015em;
   }
 
   /*

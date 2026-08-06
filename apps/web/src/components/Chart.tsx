@@ -36,6 +36,20 @@ interface ChartProps {
   money?: boolean;
   height?: number;
   emptyMessage?: string;
+  /**
+   * Where the figures table sits.
+   *
+   * `open` on the analytics screens, where the table *is* the report and the
+   * chart is the summary of it. `collapsed` on the home screen, where three
+   * charts each trailing a full table would bury everything under them — the
+   * numbers are still there, still in the accessibility tree, still findable by
+   * Ctrl-F, behind a disclosure the reader opens.
+   *
+   * There is deliberately no option to omit it. The SVG is `aria-hidden`, so a
+   * chart with no table is a chart that does not exist for anybody using a
+   * screen reader.
+   */
+  figures?: 'open' | 'collapsed';
 }
 
 /**
@@ -75,6 +89,28 @@ function tickIndexes(count: number) {
 }
 
 function ChartFigures({
+  title,
+  labels,
+  series,
+  money,
+  figures,
+}: Required<Pick<ChartProps, 'title' | 'labels' | 'series'>> & {
+  money: boolean;
+  figures: 'open' | 'collapsed';
+}) {
+  const { t } = useLanguage();
+  const table = <ChartFiguresTable title={title} labels={labels} series={series} money={money} />;
+
+  if (figures === 'open') return table;
+  return (
+    <details className="mt-3">
+      <summary className="cursor-pointer text-sm text-text-muted">{t('charts.figures')}</summary>
+      {table}
+    </details>
+  );
+}
+
+function ChartFiguresTable({
   title,
   labels,
   series,
@@ -138,6 +174,7 @@ export function LineChart({
   money = false,
   height = 220,
   emptyMessage,
+  figures = 'open',
 }: ChartProps) {
   const { t } = useLanguage();
   const gradientId = useId();
@@ -218,12 +255,19 @@ export function LineChart({
           <span key={labels[index]}>{labels[index]}</span>
         ))}
       </figcaption>
-      <ChartFigures title={title} labels={labels} series={series} money={money} />
+      <ChartFigures title={title} labels={labels} series={series} money={money} figures={figures} />
     </figure>
   );
 }
 
-export function BarChart({ title, labels, series, money = false, emptyMessage }: ChartProps) {
+export function BarChart({
+  title,
+  labels,
+  series,
+  money = false,
+  emptyMessage,
+  figures = 'open',
+}: ChartProps) {
   const { t } = useLanguage();
   if (!labels.length || !series.length) {
     return <EmptyState title={emptyMessage ?? t('charts.noData')} />;
@@ -257,7 +301,7 @@ export function BarChart({ title, labels, series, money = false, emptyMessage }:
         ))}
       </div>
       <Legend series={series} />
-      <ChartFigures title={title} labels={labels} series={series} money={money} />
+      <ChartFigures title={title} labels={labels} series={series} money={money} figures={figures} />
     </figure>
   );
 }
@@ -273,16 +317,31 @@ export function ShareBars({
   slices,
   money = false,
   emptyMessage,
+  compact = false,
 }: {
   title: string;
   slices: ShareSlice[];
   money?: boolean;
   emptyMessage?: string;
+  /**
+   * A sentence instead of an empty state.
+   *
+   * `EmptyState` is sized for a screen that has nothing on it — a heading, a
+   * dashed frame, room to breathe. Dropped into a dashboard card beside two
+   * others it becomes the largest thing on the page, so "nothing is
+   * outstanding" ends up shouting louder than the sales figures next to it.
+   */
+  compact?: boolean;
 }) {
   const { t } = useLanguage();
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
   if (!slices.length || total === 0) {
-    return <EmptyState title={emptyMessage ?? t('charts.nothingToBreakDown')} />;
+    const message = emptyMessage ?? t('charts.nothingToBreakDown');
+    return compact ? (
+      <p className="m-0 text-sm text-text-muted">{message}</p>
+    ) : (
+      <EmptyState title={message} />
+    );
   }
   return (
     <ul aria-label={title} className="flex list-none flex-col gap-2 p-0">

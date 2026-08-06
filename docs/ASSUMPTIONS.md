@@ -605,3 +605,34 @@ reads a decision rather than guesses at an intention.
   acting on a truncate, the plugin stops anything else opening the same hole.
 - **Neither applies to the production build**, which reads files git has
   finished writing.
+
+## Phase 31 — the redesign
+
+- **The redesign is delivered through the tokens and the primitives, not
+  through the pages.** Fifty-three screens already read their colour, shape and
+  depth from one place, so changing `Card`, `Button` and the token file changes
+  all of them. Not one page component was touched for appearance.
+- **Three radii, and they mean something.** `rounded-lg` was on every surface —
+  cards, dialogs, buttons, inputs, badges — which is the shape equivalent of one
+  type size. `panel` is a surface you read, `control` is something you press.
+- **Elevation is two layers in light and nearly none in dark.** A contact shadow
+  plus a diffuse one is what makes a card look placed on the page; on a dark
+  ground a black blur on near-black reads as nothing, so depth there comes from
+  the surface steps and the border instead.
+- **Colour is assigned by stage of work, not by taste.** A queue keeps its hue
+  from the home tile to the sidebar group: waiting on a person is blue, being
+  picked is teal, packed is amber, gone is plum. The tones are the ones the
+  badge palette already used, so the contrast test already held them.
+- **A tile paints its icon chip in the tone at full strength.** The subtle tints
+  are built to carry small text inside a badge, a few percent off white — a
+  card, an icon and a number all painted in them read as one pale smear. The
+  four new `on-brand` over tone pairs are asserted like every other rendered
+  pair.
+- **A zero tile drops its tint as well as its weight**, so a row reads as three
+  quiet and one live rather than four equally urgent squares.
+- **The home charts come from one request the analytics screen already makes**,
+  under the key it already uses, and the whole section disappears if it fails.
+  The figures above it come from different requests and are unaffected.
+- **A chart's figures table is never optional, only collapsible.** The SVG is
+  `aria-hidden`, so a chart without its table does not exist for anybody using a
+  screen reader.

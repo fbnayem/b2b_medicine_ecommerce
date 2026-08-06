@@ -16,7 +16,7 @@ import { useLanguage } from '../../lib/useLanguage';
 export function Card({ className, children, ...rest }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={clsx('rounded-lg border border-border bg-surface p-4 shadow-sm', className)}
+      className={clsx('rounded-panel border border-border bg-surface p-4 shadow-card', className)}
       {...rest}
     >
       {children}
