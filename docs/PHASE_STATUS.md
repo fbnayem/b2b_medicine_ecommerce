@@ -1386,3 +1386,39 @@ targets), API 170 unit / 194 integration / 5 route coverage, mobile 93.
 ### Next phase dependencies
 
 None.
+
+## Phase 30: The Blank Page Had a Cause
+
+**Status:** COMPLETED
+
+### Scope and completed work
+
+The boot screen added in Phase 28 named the second occurrence: the dev server
+was serving 159 bytes for `packages/i18n/en.ts` — a transform of an empty read,
+cached and then served indefinitely. Any tool that truncates before it writes
+opens that window, which is why restarting the server appeared to fix it twice.
+
+- `apps/web/viteEmptySource.ts` reads workspace source in a `serve`-only plugin,
+  retries an empty read, and throws on a genuinely empty file rather than
+  caching an empty success.
+- `server.watch.awaitWriteFinish` stops the watcher reporting the truncate.
+
+### Testing
+
+Web 291 (five for the guard, with the reader injected so they need no
+filesystem), browser 128, API 170 unit / 194 integration / 5 route coverage,
+mobile 93. Verified against a live dev server both ways: without the guard an
+empty `en.ts` is served as 200 with 159 bytes; with it, 500 naming the file, and
+the next request recovers once the file has content.
+
+### Known limitations
+
+- **The guard covers `packages/**` only**, which is where the aliases point. A
+  file under `apps/web/src` truncated at the wrong moment would still produce a
+  cached empty module — untested, and not seen.
+- **`awaitWriteFinish` adds 250ms** before hot reload reacts to a save. That is
+  the cost of not reading a file mid-write.
+
+### Next phase dependencies
+
+None.

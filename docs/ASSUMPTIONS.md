@@ -590,3 +590,18 @@ reads a decision rather than guesses at an intention.
 - **A badge is for the exception.** "Available to order" was on every card in
   the catalogue, so it distinguished nothing and was read as decoration. It now
   appears only when a medicine is delisted.
+
+## Phase 30 — half-written files
+
+- **The dev server reads workspace source through a plugin rather than letting
+  Vite read it.** `packages/**/*.ts` is served straight to the browser by the
+  aliases, so a read that lands mid-write becomes a cached empty module and a
+  blank page. The plugin retries an empty read and throws on a genuinely empty
+  file, because Vite caches a successful transform and does not cache an error
+  — the difference between a server that poisons itself until restarted and one
+  that says what is wrong.
+- **`awaitWriteFinish` is set on the dev server's watcher.** It narrows the same
+  window at the source. Both are kept: the watcher option stops the server
+  acting on a truncate, the plugin stops anything else opening the same hole.
+- **Neither applies to the production build**, which reads files git has
+  finished writing.

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { neverServeAnEmptySource } from './viteEmptySource.ts';
 
 const workspacePackage = (name: string) =>
   fileURLToPath(new URL(`../../packages/${name}/index.ts`, import.meta.url));
@@ -22,7 +23,22 @@ export default defineConfig({
    * `?raw` ones, which made the token parity test read an empty string and
    * report agreement between a file and nothing.
    */
-  plugins: [...(process.env.VITEST ? [] : [tailwindcss()]), react()],
+  plugins: [neverServeAnEmptySource(), ...(process.env.VITEST ? [] : [tailwindcss()]), react()],
+
+  server: {
+    watch: {
+      /**
+       * Wait for a file to stop changing before reacting to it.
+       *
+       * A tool that truncates and then writes produces two events, and the
+       * first one describes an empty file. Without this the dev server acts on
+       * that first event — see `neverServeAnEmptySource` above for what acting
+       * on it costs. Chokidar holds the event until the size has been stable
+       * for the threshold, so the empty state is never reported at all.
+       */
+      awaitWriteFinish: { stabilityThreshold: 250, pollInterval: 50 },
+    },
+  },
 
   /**
    * `css: true` so a `?raw` stylesheet import returns the stylesheet.

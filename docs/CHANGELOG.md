@@ -1,5 +1,39 @@
 # Changelog
 
+## Phase 30 — the blank page had a cause, and it was a half-written file
+
+Phase 28 made a failed load say something instead of painting white. This is
+what it said, the second time it happened:
+
+> The requested module '/@fs/D:/b2b_medicine/packages/i18n/en.ts' does not
+> provide an export named 'en'
+
+The dev server was answering that request with **159 bytes**: a sourcemap whose
+`sourcesContent` is `[""]`. It had read `en.ts` while the file was zero bytes,
+transformed nothing into nothing, cached the result, and served it from then on.
+The file on disk was correct the whole time. The build was clean, every test was
+green, and the application would not start.
+
+Any tool that truncates before it writes opens that window — Prettier on commit,
+a formatter on save, a script doing `open(path, 'w')`. It is a race, so it bites
+occasionally rather than every time, and once it has bitten the only cure is
+restarting the server: the file never changes again, so nothing ever invalidates
+the empty transform. That is why "restart it" worked twice and fixed nothing.
+
+Two changes, one narrowing the window and one closing it.
+
+`server.watch.awaitWriteFinish` holds a change event until the file has stopped
+changing, so the dev server does not act on the truncate.
+
+`viteEmptySource.ts` reads workspace source itself. An empty read is retried for
+half a second; a file that is genuinely empty **throws**, naming it. That
+distinction is the whole fix: Vite caches a successful transform and does not
+cache an error, so returning `""` once poisons the server until it restarts,
+while throwing is survivable and says what happened. Proved both ways against a
+live dev server — without the guard, an empty `en.ts` is served as 200 and 159
+bytes; with it, 500 and the file's name, and the next request after the file is
+written recovers on its own.
+
 ## Phase 29 — a home screen that knows something
 
 Asked whether I could learn some design skills. The component craft in this
