@@ -3,6 +3,7 @@ import { Text, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { RealtimeEvent, UserRole, type UnreadNotificationSummary } from '@medsupply/shared-types';
 import { NAV_GROUP_LABEL, navItemsFor } from '@medsupply/navigation';
+import { translatedOr } from '@medsupply/i18n';
 import { useAuthStore } from '../../../src/store/useAuth';
 import { getFinanceNavigation } from '../../../src/finance/navigation';
 import { fetchUnreadSummary } from '../../../src/notifications/api';
@@ -11,6 +12,7 @@ import { unregisterCurrentDevice } from '../../../src/notifications/push';
 import { TAB_ROUTE_FILE } from '../../../src/navigation/tabs';
 import { colour, layout } from '../../../src/theme';
 import { useLanguage } from '../../../src/i18n/useLanguage';
+import { CustomerHome } from '../../../src/home/CustomerHome';
 
 const emptyUnread: UnreadNotificationSummary = {
   total: 0,
@@ -87,10 +89,74 @@ export default function DashboardScreen() {
     items: destinations.filter((item) => item.group === group),
   })).filter((entry) => entry.items.length > 0);
 
+  /*
+   * A shop owner opens this to ask three questions — what do I owe, what is
+   * coming, and can I have that again — and got a list of buttons instead. The
+   * menu is still needed, so it is handed to `CustomerHome` and rendered under
+   * the summary rather than replaced.
+   *
+   * Only the Shop application ever takes this branch, because a build admits
+   * one set of roles.
+   */
+  const menu = (
+    <>
+      {groups.map(({ group, items }) => (
+        <View key={group} style={styles.group}>
+          <Text style={styles.groupHeading}>
+            {translatedOr(t, `navGroup.${group}`, NAV_GROUP_LABEL[group])}
+          </Text>
+          {items.map((item) => (
+            <Pressable
+              key={item.id}
+              accessibilityRole="button"
+              style={styles.secondaryAction}
+              onPress={() => router.push(`/(protected)/(tabs)/${TAB_ROUTE_FILE[item.id]}` as never)}
+            >
+              <Text style={styles.secondaryActionText}>
+                {translatedOr(t, `navItem.${item.id}`, item.label)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ))}
+      {financeLinks.length > 0 && (
+        <View style={styles.group}>
+          <Text style={styles.groupHeading}>
+            {translatedOr(t, 'navGroup.money', NAV_GROUP_LABEL.money)}
+          </Text>
+          {financeLinks.map((item) => (
+            <Pressable
+              key={item.route}
+              accessibilityRole="button"
+              style={styles.secondaryAction}
+              onPress={() => router.push(item.route)}
+            >
+              <Text style={styles.secondaryActionText}>
+                {translatedOr(t, item.labelKey, item.label)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('security.signOutThisTitle')}
+        style={styles.signOut}
+        onPress={handleLogout}
+      >
+        <Text style={styles.signOutText}>{t('common.signOut')}</Text>
+      </Pressable>
+    </>
+  );
+
+  if (role === UserRole.SHOP_OWNER) return <CustomerHome menu={menu} />;
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.greeting}>Welcome, {user?.firstName}</Text>
+        <Text style={styles.greeting}>
+          {t('dashboard.welcome', { name: user?.firstName ?? '' })}
+        </Text>
         {/*
           Was a second English `Record<UserRole, string>` in this file. The
           catalogue's is the same shape in both languages, so a new role is a
@@ -105,18 +171,24 @@ export default function DashboardScreen() {
         style={styles.action}
         accessibilityRole="button"
         accessibilityLabel={
-          unread.total ? `Notifications, ${unread.total} unread` : 'Notifications, none unread'
+          unread.total
+            ? t('home.notificationsUnread', { count: unread.total })
+            : t('home.notificationsNoneUnread')
         }
         onPress={() => router.push('/(protected)/(tabs)/notifications')}
       >
         <Text style={styles.actionText}>
-          Notifications{unread.total ? ` (${unread.total})` : ''}
+          {unread.total
+            ? t('home.notificationsUnread', { count: unread.total })
+            : translatedOr(t, 'navItem.notifications', 'Notifications')}
         </Text>
       </Pressable>
 
       {groups.map(({ group, items }) => (
         <View key={group} style={styles.group}>
-          <Text style={styles.groupHeading}>{NAV_GROUP_LABEL[group]}</Text>
+          <Text style={styles.groupHeading}>
+            {translatedOr(t, `navGroup.${group}`, NAV_GROUP_LABEL[group])}
+          </Text>
           {items.map((item) => (
             <Pressable
               key={item.id}
@@ -124,7 +196,9 @@ export default function DashboardScreen() {
               style={styles.secondaryAction}
               onPress={() => router.push(`/(protected)/(tabs)/${TAB_ROUTE_FILE[item.id]}` as never)}
             >
-              <Text style={styles.secondaryActionText}>{item.label}</Text>
+              <Text style={styles.secondaryActionText}>
+                {translatedOr(t, `navItem.${item.id}`, item.label)}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -133,7 +207,9 @@ export default function DashboardScreen() {
       {/* Finance destinations that live outside the tab group. */}
       {financeLinks.length > 0 && (
         <View style={styles.group}>
-          <Text style={styles.groupHeading}>Money</Text>
+          <Text style={styles.groupHeading}>
+            {translatedOr(t, 'navGroup.money', NAV_GROUP_LABEL.money)}
+          </Text>
           {financeLinks.map((item) => (
             <Pressable
               key={item.route}
@@ -141,7 +217,9 @@ export default function DashboardScreen() {
               style={styles.secondaryAction}
               onPress={() => router.push(item.route)}
             >
-              <Text style={styles.secondaryActionText}>{item.label}</Text>
+              <Text style={styles.secondaryActionText}>
+                {translatedOr(t, item.labelKey, item.label)}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -149,11 +227,11 @@ export default function DashboardScreen() {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Sign out of this device"
+        accessibilityLabel={t('security.signOutThisTitle')}
         style={styles.signOut}
         onPress={handleLogout}
       >
-        <Text style={styles.signOutText}>Sign out</Text>
+        <Text style={styles.signOutText}>{t('common.signOut')}</Text>
       </Pressable>
     </ScrollView>
   );

@@ -147,6 +147,13 @@ export const en = {
    * than as a heading nobody needed.
    */
   home: {
+    loading: 'Opening your account',
+    onItsWay: 'On its way',
+    nothingComing: 'Nothing is on its way to you right now.',
+    orderAgain: 'Order it again',
+    orderAgainBody: 'Your last delivered order, {{reference}} — {{count}} things on it.',
+    notificationsUnread: 'Notifications ({{count}} unread)',
+    notificationsNoneUnread: 'Notifications, none unread',
     waitingForYou: 'Waiting for you',
     awaitingDecision: 'Orders waiting for your decision',
     toPick: 'Orders to pick',
@@ -1676,6 +1683,7 @@ export const en = {
   },
 
   finance: {
+    dueAndCollections: 'Due and collections',
     ledgerTitle: 'Customer account',
     ledgerSubtitle: 'Every charge, payment, credit and reversal, in the order they happened.',
     shop: 'The shop',

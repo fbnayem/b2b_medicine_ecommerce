@@ -11,25 +11,45 @@ export type FinanceRoute =
   | '/(protected)/collections';
 
 export type FinanceNavigationItem = {
+  /**
+   * The catalogue key. These were English string literals rendered straight
+   * onto the home screen, so four of the six destinations a shop owner has
+   * stayed in English when the language was switched — the same defect
+   * `navigation/tabs.ts` records for the tab bar, one screen along.
+   */
+  labelKey: string;
+  /** What to show if the catalogue has no such key. */
   label: string;
   route: FinanceRoute;
 };
 
 const ownerItems: FinanceNavigationItem[] = [
-  { label: 'Account and credit', route: '/(protected)/(tabs)/account' },
-  { label: 'Invoices', route: '/(protected)/invoices' },
-  { label: 'Payment history', route: '/(protected)/payments' },
-  { label: 'Account statement', route: '/(protected)/statement' },
+  { labelKey: 'account.title', label: 'Your account', route: '/(protected)/(tabs)/account' },
+  { labelKey: 'screens.invoices', label: 'Invoices', route: '/(protected)/invoices' },
+  { labelKey: 'screens.paymentHistory', label: 'Payment history', route: '/(protected)/payments' },
+  {
+    labelKey: 'screens.accountStatement',
+    label: 'Account statement',
+    route: '/(protected)/statement',
+  },
 ];
 
 const managerItems: FinanceNavigationItem[] = [
-  { label: 'Due and collections', route: '/(protected)/(tabs)/finance-dashboard' },
-  { label: 'Overdue shops', route: '/(protected)/overdue-shops' },
-  { label: 'Collection review', route: '/(protected)/collection-review' },
+  {
+    labelKey: 'finance.dueAndCollections',
+    label: 'Due and collections',
+    route: '/(protected)/(tabs)/finance-dashboard',
+  },
+  { labelKey: 'screens.overdueShops', label: 'Overdue shops', route: '/(protected)/overdue-shops' },
+  {
+    labelKey: 'screens.collectionReview',
+    label: 'Collection review',
+    route: '/(protected)/collection-review',
+  },
 ];
 
 const deliveryItems: FinanceNavigationItem[] = [
-  { label: 'My collections', route: '/(protected)/collections' },
+  { labelKey: 'screens.myCollections', label: 'My collections', route: '/(protected)/collections' },
 ];
 
 export function getFinanceNavigation(role?: UserRole): FinanceNavigationItem[] {

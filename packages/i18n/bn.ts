@@ -122,6 +122,13 @@ export const bn: Catalogue = {
   },
 
   home: {
+    loading: 'আপনার হিসাব খোলা হচ্ছে',
+    onItsWay: 'পথে আছে',
+    nothingComing: 'এই মুহূর্তে আপনার কাছে কিছু আসছে না।',
+    orderAgain: 'আবার অর্ডার করুন',
+    orderAgainBody: 'আপনার শেষ পাওয়া অর্ডার {{reference}} — তাতে {{count}}টি জিনিস।',
+    notificationsUnread: 'বিজ্ঞপ্তি ({{count}}টি অপঠিত)',
+    notificationsNoneUnread: 'বিজ্ঞপ্তি, অপঠিত কিছু নেই',
     waitingForYou: 'আপনার জন্য অপেক্ষা করছে',
     awaitingDecision: 'আপনার সিদ্ধান্তের অপেক্ষায় থাকা অর্ডার',
     toPick: 'যে অর্ডারগুলি তুলতে হবে',
@@ -1537,6 +1544,7 @@ export const bn: Catalogue = {
   },
 
   finance: {
+    dueAndCollections: 'দেনা ও আদায়',
     ledgerTitle: 'ক্রেতার হিসাব',
     ledgerSubtitle: 'প্রতিটি চার্জ, জমা, ক্রেডিট ও বাতিল — যে ক্রমে ঘটেছে সেই ক্রমে।',
     shop: 'দোকান',
