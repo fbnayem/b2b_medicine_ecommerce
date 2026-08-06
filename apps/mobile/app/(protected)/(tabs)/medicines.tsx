@@ -22,6 +22,25 @@ import {
 } from '../../../src/components';
 import { colour, layout } from '../../../src/theme';
 
+/** What the server sends back with a page of the catalogue. */
+const PAGE_SIZE = 30;
+
+/**
+ * The catalogue, **all of it**.
+ *
+ * This asked for `limit: 100` and stopped there. `listMedicines` caps a page at
+ * 100 too, so a catalogue larger than that simply ended — with nothing on
+ * screen saying so, and no way to reach the rest except by guessing a search
+ * term. A pharmacy scrolling to the bottom had no reason to think they had seen
+ * anything other than everything.
+ *
+ * **No category filter yet, deliberately.** `category` is free text on
+ * `Medicine` with no enum and no endpoint that lists the ones in use, so a
+ * filter here could only offer the categories present in the page already
+ * loaded — which would quietly hide every category that happens to sort later
+ * in the alphabet. That needs `GET /inventory/medicines/categories`, and a
+ * filter that lies is worse than a filter that is missing.
+ */
 export default function MedicinesScreen() {
   const { t } = useLanguage();
   const add = useCart((state) => state.add);
@@ -30,27 +49,34 @@ export default function MedicinesScreen() {
 
   const [items, setItems] = useState<Medicine[]>([]);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(
-    async (refresh = false) => {
-      if (refresh) setRefreshing(true);
+    async (wanted = 1, mode: 'first' | 'more' | 'refresh' = 'first') => {
+      if (mode === 'refresh') setRefreshing(true);
+      else if (mode === 'more') setLoadingMore(true);
       else setLoading(true);
       setError('');
       try {
-        setItems(
-          (
-            await apiClient.get('/inventory/medicines', {
-              params: { search: search.trim(), limit: 100 },
-            })
-          ).data.data,
-        );
+        const response = await apiClient.get('/inventory/medicines', {
+          params: { search: search.trim(), page: wanted, limit: PAGE_SIZE },
+        });
+        const batch: Medicine[] = response.data.data;
+        // Appended for a further page, replaced otherwise — so a new search
+        // cannot leave the previous one's rows underneath it.
+        setItems((current) => (mode === 'more' ? current.concat(batch) : batch));
+        setPage(response.data.meta?.page ?? wanted);
+        setPages(response.data.meta?.pages ?? 1);
       } catch {
         setError(t('catalogue.couldNotLoad'));
       } finally {
         setLoading(false);
+        setLoadingMore(false);
         setRefreshing(false);
       }
     },
@@ -58,7 +84,7 @@ export default function MedicinesScreen() {
   );
 
   useEffect(() => {
-    const timer = setTimeout(() => void load(), 300);
+    const timer = setTimeout(() => void load(1), 300);
     return () => clearTimeout(timer);
   }, [load]);
 
@@ -83,7 +109,34 @@ export default function MedicinesScreen() {
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ gap: layout.space[3], paddingBottom: layout.space[6] }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />
+            <RefreshControl refreshing={refreshing} onRefresh={() => void load(1, 'refresh')} />
+          }
+          /*
+           * Half a screen before the end, so the next page is usually already
+           * there by the time somebody scrolls to it.
+           */
+          onEndReachedThreshold={0.5}
+          onEndReached={() => {
+            if (loadingMore || page >= pages) return;
+            void load(page + 1, 'more');
+          }}
+          ListFooterComponent={
+            loadingMore ? (
+              <LoadingState label={t('catalogue.loadingMore')} />
+            ) : page >= pages && items.length > 0 ? (
+              // Says the list has ended, rather than merely stopping — which is
+              // what the old fixed limit of 100 did.
+              <Text
+                style={{
+                  color: colour.textMuted,
+                  fontSize: layout.fontSize.sm,
+                  textAlign: 'center',
+                  paddingVertical: layout.space[3],
+                }}
+              >
+                {t('catalogue.thatIsEverything', { count: items.length })}
+              </Text>
+            ) : null
           }
           ListEmptyComponent={
             <EmptyState title={t('catalogue.none')} description={t('catalogue.noneBody')} />

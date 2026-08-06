@@ -806,6 +806,8 @@ export const en = {
     addMedicine: 'Add a medicine',
     stock: 'Stock',
     loading: 'Loading medicines',
+    loadingMore: 'Loading more',
+    thatIsEverything: 'That is all {{count}} of them.',
     couldNotLoad: 'The catalogue could not be loaded.',
     none: 'No medicines matched',
     noneBody: 'Try a shorter search — a brand name on its own usually finds it.',

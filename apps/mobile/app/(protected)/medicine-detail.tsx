@@ -1,23 +1,30 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Text } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { UserRole } from '@medsupply/shared-types';
 import type { Medicine } from '@medsupply/shared-types';
 import { apiClient } from '../../src/api/client';
+import { useCart } from '../../src/store/useCart';
+import { useAuthStore } from '../../src/store/useAuth';
 import { formatMoneyMinor } from '../../src/finance/money';
 import { useLanguage } from '../../src/i18n/useLanguage';
 import {
+  Button,
   Card,
   ErrorState,
   ListRow,
   LoadingState,
   Screen,
   SectionTitle,
+  toast,
 } from '../../src/components';
 import { colour, layout } from '../../src/theme';
 
 export default function MedicineDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useLanguage();
+  const add = useCart((state) => state.add);
+  const isOwner = useAuthStore((state) => state.user?.role) === UserRole.SHOP_OWNER;
   const [item, setItem] = useState<Medicine>();
   const [error, setError] = useState('');
 
@@ -89,6 +96,23 @@ export default function MedicineDetailScreen() {
 
       {item.description ? (
         <Text style={{ color: colour.text, lineHeight: 22 }}>{item.description}</Text>
+      ) : null}
+
+      {/*
+        This screen had no way to add anything. Reading about a medicine meant
+        going back to the list and finding it again — which is the one thing
+        somebody is certain to want after reading about it.
+      */}
+      {isOwner ? (
+        <Button
+          label={t('catalogue.addToOrder')}
+          disabled={(item.totalAvailable ?? 0) === 0}
+          onPress={() => {
+            add(item);
+            toast.success(t('cart.addedToOrder', { brand: item.brandName }));
+            router.back();
+          }}
+        />
       ) : null}
     </Screen>
   );

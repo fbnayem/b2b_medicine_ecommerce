@@ -713,6 +713,8 @@ export const bn: Catalogue = {
     addMedicine: 'নতুন ওষুধ যোগ করুন',
     stock: 'স্টক',
     loading: 'ওষুধের তালিকা লোড হচ্ছে',
+    loadingMore: 'আরও আসছে',
+    thatIsEverything: 'এই {{count}}টিই সব।',
     couldNotLoad: 'ওষুধের তালিকা লোড করা যায়নি।',
     none: 'কোনও ওষুধ মেলেনি',
     noneBody: 'একটু ছোট করে খুঁজে দেখুন — সাধারণত শুধু ব্র্যান্ডের নামেই পাওয়া যায়।',
