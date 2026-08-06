@@ -657,6 +657,27 @@ test('the quote a rep sees is the order the customer gets', async () => {
 
   assert.equal(await Order.countDocuments({ shopId: inTerritory._id, status: 'DRAFT' }), 0);
 
+  /*
+   * And the quote is **not** what a screen would have worked out for itself.
+   *
+   * Everything below asserts that the quote and the order agree, which they did
+   * on the day this was written and would still do if `defaultSellingPriceMinor`
+   * happened to be every customer's price — in which case a client multiplying
+   * it by the quantity would look correct, and the mobile basket that did
+   * exactly that shipped for months. This is the missing half: the fixture has
+   * an arrangement, so the two figures genuinely differ, and a change that
+   * flattened pricing back to one price for everybody fails here rather than
+   * silently making a client's local arithmetic right again.
+   */
+  const priced = await Medicine.findById(medicineId);
+  const naiveTotalMinor = priced!.defaultSellingPriceMinor * 20;
+  assert.notEqual(
+    quote.estimatedTotalMinor,
+    naiveTotalMinor,
+    'list price × quantity happens to equal this customer’s total, so nothing here ' +
+      'would notice a client that computed its own',
+  );
+
   const placed = await submitQuantity(medicineId, 20, 'commercial-quote-1');
   assert.equal(placed.status, 201, JSON.stringify(placed.body));
   const order = await Order.findOne({ submissionIdempotencyKey: 'commercial-quote-1' });

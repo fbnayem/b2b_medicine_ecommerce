@@ -924,6 +924,10 @@ export const en = {
     total: 'Estimated total',
     freeGoods: '{{count}} free with this',
     pricing: 'Checking your prices',
+    loading: 'Opening your order',
+    deliveryCharge: 'Delivery',
+    estimateNote:
+      'This is what you would pay today. A manager confirms it when they approve the order.',
     couldNotPrice: 'Your prices could not be checked just now.',
     saveDraft: 'Save for later',
     draftSaved: 'Saved. You can come back to this order later.',
@@ -949,6 +953,7 @@ export const en = {
     deliveryNotes: 'Anything the rider should know',
     submit: 'Send this order',
     submitting: 'Sending…',
+    whatYouWillPay: 'What you will pay',
     failed: 'Your order could not be sent.',
   },
 

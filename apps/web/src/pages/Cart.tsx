@@ -29,6 +29,7 @@ interface Quote {
   items: QuoteLine[];
   estimatedSubtotalMinor: number;
   estimatedDiscountMinor: number;
+  estimatedDeliveryChargeMinor: number;
   estimatedTotalMinor: number;
 }
 
@@ -235,6 +236,21 @@ export function Cart() {
                       <span className="text-text-muted">{t('cart.discount')}</span>
                       <span className="tabular-nums text-success">
                         −{formatMinor(priced.estimatedDiscountMinor)}
+                      </span>
+                    </div>
+                  )}
+                  {/*
+                    The quote has always returned a delivery charge and this
+                    card never showed it, so subtotal minus discount did not
+                    equal the total whenever one applied — three numbers on one
+                    card that do not add up, which reads as the arithmetic being
+                    broken rather than as a line being missing.
+                  */}
+                  {priced.estimatedDeliveryChargeMinor > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-text-muted">{t('cart.deliveryCharge')}</span>
+                      <span className="tabular-nums text-text">
+                        {formatMinor(priced.estimatedDeliveryChargeMinor)}
                       </span>
                     </div>
                   )}

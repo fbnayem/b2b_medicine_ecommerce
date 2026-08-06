@@ -810,6 +810,9 @@ export const bn: Catalogue = {
     total: 'আনুমানিক মোট',
     freeGoods: 'এর সঙ্গে {{count}}টি ফ্রি',
     pricing: 'আপনার দাম দেখা হচ্ছে',
+    loading: 'আপনার অর্ডার খোলা হচ্ছে',
+    deliveryCharge: 'ডেলিভারি',
+    estimateNote: 'আজ আপনি এই টাকাই দেবেন। অর্ডার অনুমোদনের সময় ম্যানেজার এটি নিশ্চিত করবেন।',
     couldNotPrice: 'এই মুহূর্তে আপনার দাম যাচাই করা যায়নি।',
     saveDraft: 'পরে শেষ করবেন',
     draftSaved: 'সংরক্ষণ হয়েছে। পরে এসে অর্ডারটি শেষ করতে পারবেন।',
@@ -835,6 +838,7 @@ export const bn: Catalogue = {
     deliveryNotes: 'ডেলিভারি কর্মীর জানা দরকার এমন কিছু',
     submit: 'অর্ডারটি পাঠান',
     submitting: 'পাঠানো হচ্ছে…',
+    whatYouWillPay: 'আপনি যত দেবেন',
     failed: 'অর্ডারটি পাঠানো যায়নি।',
   },
 

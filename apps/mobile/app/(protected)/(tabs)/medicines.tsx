@@ -15,6 +15,7 @@ import {
   ErrorState,
   Field,
   Input,
+  ListRow,
   LoadingState,
   Screen,
   toast,
@@ -141,17 +142,21 @@ export default function MedicinesScreen() {
                   <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>
                     {item.manufacturer} · {item.packSize}
                   </Text>
-                  <Text
-                    style={{
-                      marginTop: layout.space[1],
-                      fontSize: layout.fontSize.lg,
-                      fontWeight: '600',
-                      color: colour.brand,
-                      fontVariant: ['tabular-nums'],
-                    }}
-                  >
-                    {formatMoneyMinor(item.defaultSellingPriceMinor)}
-                  </Text>
+                  {/*
+                   * Labelled, because it is **not** what this shop pays.
+                   *
+                   * A bare figure under a medicine reads as the price, and this
+                   * one is the catalogue's — before the shop's own discount,
+                   * their price list and any offer running on the line. Their
+                   * real price is worked out by the server the moment the
+                   * medicine reaches the basket. An unlabelled number here was
+                   * the same defect as the basket's, one screen earlier.
+                   */}
+                  <ListRow
+                    label={t('catalogue.listPrice')}
+                    value={formatMoneyMinor(item.defaultSellingPriceMinor)}
+                    numeric
+                  />
                 </Pressable>
 
                 {isOwner ? (

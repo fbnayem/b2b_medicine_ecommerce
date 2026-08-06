@@ -600,8 +600,15 @@ export default function OrderEntryScreen() {
               <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>
                 {item.genericName} · {item.packSize}
               </Text>
+              {/*
+                The catalogue's price, before this customer's own arrangement —
+                so it is labelled as such. The line's real price arrives from
+                `POST /orders/quote` the moment the medicine is added, and is
+                shown below. Calling this one "unit price" put two different
+                numbers under the same words on one screen.
+              */}
               <ListRow
-                label={t('orderEntry.unitPrice')}
+                label={t('catalogue.listPrice')}
                 value={formatMoneyMinor(item.defaultSellingPriceMinor)}
                 numeric
               />

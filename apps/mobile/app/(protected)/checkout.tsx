@@ -6,6 +6,8 @@ import type { Shop } from '@medsupply/shared-types';
 import { apiFailure, errorMessage } from '@medsupply/api-client';
 import { apiClient } from '../../src/api/client';
 import { useCart } from '../../src/store/useCart';
+import { useQuote } from '../../src/orders/quote';
+import { formatMoneyMinor } from '../../src/finance/money';
 import { createFinancialIdempotencyKey } from '../../src/finance/idempotency';
 import { useLanguage } from '../../src/i18n/useLanguage';
 import {
@@ -15,6 +17,7 @@ import {
   ErrorState,
   Field,
   Input,
+  ListRow,
   LoadingState,
   Screen,
   SectionTitle,
@@ -58,6 +61,20 @@ function Choice({
 export default function CheckoutScreen() {
   const { t, language } = useLanguage();
   const { items, draftId, clear } = useCart();
+  /*
+   * Quoted again here rather than carried across from the basket.
+   *
+   * The last figure somebody reads before committing money has to be one the
+   * server has just confirmed. A price list or a scheme can change between the
+   * two taps, and the submission would reprice correctly and silently.
+   */
+  const {
+    quote,
+    failed: quoteFailed,
+    retry: retryQuote,
+  } = useQuote(
+    items.map((item) => ({ medicineId: item.medicineId, requestedQuantity: item.quantity })),
+  );
   const [shop, setShop] = useState<Shop>();
   const [addressId, setAddressId] = useState('');
   const [payment, setPayment] = useState<(typeof PaymentMethod)[keyof typeof PaymentMethod]>(
@@ -112,7 +129,7 @@ export default function CheckoutScreen() {
         draftId ? `/orders/drafts/${draftId}/submit` : '/orders/submit',
         {
           items: items.map((item) => ({
-            medicineId: item.medicine._id,
+            medicineId: item.medicineId,
             requestedQuantity: item.quantity,
           })),
           deliveryAddressId: addressId,
@@ -208,10 +225,49 @@ export default function CheckoutScreen() {
         />
       </Field>
 
+      {quoteFailed ? (
+        <ErrorState message={t('cart.couldNotPrice')} onRetry={retryQuote} />
+      ) : quote ? (
+        <Card>
+          <SectionTitle>{t('checkout.whatYouWillPay')}</SectionTitle>
+          <ListRow
+            label={t('cart.subtotal')}
+            value={formatMoneyMinor(quote.estimatedSubtotalMinor)}
+            numeric
+          />
+          {quote.estimatedDiscountMinor > 0 ? (
+            <ListRow
+              label={t('cart.discount')}
+              value={`− ${formatMoneyMinor(quote.estimatedDiscountMinor)}`}
+              numeric
+            />
+          ) : null}
+          {quote.estimatedDeliveryChargeMinor > 0 ? (
+            <ListRow
+              label={t('cart.deliveryCharge')}
+              value={formatMoneyMinor(quote.estimatedDeliveryChargeMinor)}
+              numeric
+            />
+          ) : null}
+          <ListRow
+            label={t('cart.total')}
+            value={formatMoneyMinor(quote.estimatedTotalMinor)}
+            numeric
+          />
+          <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>
+            {t('cart.estimateNote')}
+          </Text>
+        </Card>
+      ) : (
+        <LoadingState label={t('cart.pricing')} />
+      )}
+
       <Button
         label={submitting ? t('checkout.submitting') : t('checkout.submit')}
         busy={submitting}
-        disabled={!addressId}
+        // No address is no delivery; no quote is no confirmed price. Neither
+        // may be committed against.
+        disabled={!addressId || !quote}
         onPress={() => void submit()}
       />
     </Screen>
