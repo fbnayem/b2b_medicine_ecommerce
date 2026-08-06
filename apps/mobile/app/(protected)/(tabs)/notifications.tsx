@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { RealtimeEvent, type NotificationRecord } from '@medsupply/shared-types';
 import { errorMessage } from '@medsupply/api-client';
 import {
+  archiveNotifications,
   fetchNotifications,
   markAllNotificationsRead,
   markNotificationsRead,
@@ -85,6 +86,27 @@ export default function NotificationsScreen() {
       toast.success(t('notifications.markedRead'));
     } catch (caught) {
       toast.error(errorMessage(caught, language, t('notifications.updateFailed')));
+    }
+  };
+
+  /*
+   * The only thing that takes anything off this list.
+   *
+   * Marking as read changes a dot. Without archiving, an inbox on a shop's
+   * phone grows for as long as the account does, and the notification that
+   * matters this morning sits under three hundred that mattered last year. The
+   * row disappears immediately rather than waiting for a reload — the server
+   * has already been told, and a list that redraws a second later reads as a
+   * button that did nothing.
+   */
+  const archive = async (notification: NotificationRecord) => {
+    setItems((current) => current.filter((entry) => entry._id !== notification._id));
+    try {
+      await archiveNotifications([notification._id]);
+      toast.success(t('notifications.archived'));
+    } catch (caught) {
+      toast.error(errorMessage(caught, language, t('notifications.updateFailed')));
+      await load(true);
     }
   };
 
@@ -181,6 +203,14 @@ export default function NotificationsScreen() {
                   {t(`notificationCategory.${item.category}`)} ·{' '}
                   {formatFinanceDateTime(item.createdAt)}
                 </Text>
+                <Button
+                  variant="secondary"
+                  label={t('notifications.archive')}
+                  // Named, because "Archive" repeated down a list tells a screen
+                  // reader nothing about which one it would remove.
+                  accessibilityLabel={`${t('notifications.archive')}: ${item.title}`}
+                  onPress={() => void archive(item)}
+                />
               </CardLink>
             )}
           />

@@ -28,4 +28,17 @@ interface ImportMeta {
     pattern: string | string[],
     options: { query: '?raw'; import: 'default'; eager: true },
   ): Record<string, string>;
+  /**
+   * The same, for binary assets, which arrive as `data:` URIs.
+   *
+   * Added for `appVariant.test.ts`, which reads the PNG headers of the launcher
+   * icons to check that `app.config.ts` names files that exist, at the sizes
+   * both stores accept. `?raw` cannot serve that: a PNG decoded as text has
+   * already lost the bytes the header is made of, so every file would look
+   * equally valid and equally broken.
+   */
+  glob(
+    pattern: string | string[],
+    options: { query: '?inline'; import: 'default'; eager: true },
+  ): Record<string, string>;
 }

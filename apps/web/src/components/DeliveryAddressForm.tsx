@@ -14,10 +14,18 @@ import { useLanguage } from '../lib/useLanguage';
  * order at all** — order entry and checkout both require one — so a shop
  * registered through the product was, until now, unable to buy anything.
  *
- * The write is `PATCH /shops/:id` with the whole array, because that is the
- * shape the endpoint takes. That means reading the current list first and
- * sending it back with one more on the end: a difference would be interpreted
- * as a replacement, and the shop would lose every address it had.
+ * The write **was** `PATCH /shops/:id` with the whole array read back and sent
+ * again with one more on the end — and that endpoint admits administrators
+ * only. A manager or a sales representative, which is to say every role that
+ * actually takes orders, was shown this form and got a 403 on submitting it.
+ * The browser test covering the button signs in as an administrator, so nothing
+ * caught it for four phases.
+ *
+ * It is now `POST /shops/:id/addresses`, which adds one address and touches
+ * nothing else. That matters beyond the permission: sending the whole array
+ * back meant a concurrent change by anybody else was silently overwritten, and
+ * a request that lost a single element removed an address from a shop while
+ * looking like it added one.
  */
 
 export interface DeliveryAddressFormProps {
@@ -45,32 +53,22 @@ export function DeliveryAddressForm({ shop, onCreated, onCancel }: DeliveryAddre
     setFailure(undefined);
     setSaving(true);
     try {
-      const existing = (shop.deliveryAddresses ?? []) as unknown as Array<Record<string, unknown>>;
-      const response = await apiClient.patch(`/shops/${shop._id}`, {
-        // The whole list, existing entries included. Sending only the new one
-        // would replace the array and lose every address the shop had.
-        deliveryAddresses: [
-          // `_id` and all, so the ones that already exist keep their identity
-          // and a picker holding one does not end up pointing at nothing.
-          ...existing,
-          {
-            label: form.label,
-            line1: form.line1,
-            line2: form.line2 || undefined,
-            city: form.city,
-            district: form.district,
-            postalCode: form.postalCode || undefined,
-          },
-        ],
+      const response = await apiClient.post(`/shops/${shop._id}/addresses`, {
+        label: form.label,
+        line1: form.line1,
+        line2: form.line2 || undefined,
+        city: form.city,
+        district: form.district,
+        postalCode: form.postalCode || undefined,
       });
       await queryClient.invalidateQueries({ queryKey: keys.shops.all });
       /*
-       * The id is minted by the server, so it is read back off the saved
-       * record rather than guessed. The new address is the last one, which is
-       * the order it was appended in.
+       * The id is minted by the server, so it is read back off the answer
+       * rather than guessed. The endpoint replies with the whole list — which
+       * is what the picker needs to redraw — and the new address is last,
+       * because that is the order it was appended in.
        */
-      const saved = response.data.data as Shop;
-      const addresses = (saved.deliveryAddresses ?? []) as unknown as Array<{ _id: string }>;
+      const addresses = (response.data.data ?? []) as Array<{ _id: string }>;
       toast.success(t('addresses.added', { label: form.label }));
       onCreated(addresses[addresses.length - 1]?._id ?? '');
     } catch (caught) {

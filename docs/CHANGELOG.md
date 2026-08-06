@@ -1,5 +1,112 @@
 # Changelog
 
+## Phase 38 — The documents, and the endpoints nothing reached
+
+Asked for: complete the full task — the endpoint gaps left over from Phase 37,
+the defect found and left with the staff screen, the icons and the store
+listings, and the coverage measurement for the other two applications.
+
+### The measurement, corrected
+
+Phase 37 finished at 45 of 58 endpoints a `SHOP_OWNER` may call. Re-running the
+sweep across **both** clients with the same matcher reported 84 endpoints
+reached by nothing at all — and that figure was wrong. The matcher requires the
+HTTP method beside the path literal, and most call sites build the path from a
+variable: `` `/approvals/${id}/${action}` ``. Sixty of the eighty-four were
+artefacts.
+
+A segment-aware pass gives **22**, four of them infrastructure and one a false
+negative. The seventeen that remain are staff and administrator endpoints, and
+they are written down in `PHASE_STATUS.md` rather than quietly dropped.
+
+The correction is the point. A gate that over-reports is not conservative; it is
+a gate nobody reads, and the first thing anybody does with sixty false alarms is
+stop believing the four real ones.
+
+### Four things a pharmacy could see and could not have
+
+Each of these was rendered on a screen and unobtainable:
+
+|                           |                                                                                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The invoice**           | Read line by line since Phase 37, with no way to keep it, print it, or send it to whoever pays the bills                                                |
+| **The credit note**       | Its reference printed on the return. The document proving the money came back was reachable only from a desktop — and, see below, not from there either |
+| **The proof of delivery** | "Signed for by" was a name typed into a field. The photograph and the signature behind it had **no caller on either client**                            |
+| **The payment slip**      | Rendered as the word "Attachment", with nothing behind it                                                                                               |
+
+All four answer with bytes rather than JSON, which is why no screen had ever
+used them: there is nothing to render. A phone has no blob URL and no new tab,
+so the file is fetched through the ordinary client — interceptor and all — and
+written into the cache directory for the share sheet. The proof photograph is
+shown in place instead, because the question is _who signed for this_.
+
+The file name is sanitised, because it is a server-supplied reference joined
+onto a directory path.
+
+### The credit note did not work on the desktop either
+
+`requireAuth` reads a bearer header and nothing else — no cookie, no query
+parameter. The return screen linked at `/api/v1/returns/credit-notes/…` with an
+anchor, so **every click opened a tab containing
+`{"error":{"code":"UNAUTHORIZED","message":"No token provided"}}`**, on the one
+document that proves a customer was credited.
+
+Nothing failed. The anchor rendered, the tab opened, and the error was on the
+far side of a click no test performs. Two other screens had each written their
+own fetch-and-open helper; there is now one, and `apiPaths.test.ts` fails on any
+API address built into a page.
+
+### The 403 that Phase 37 found and left
+
+Order entry's "add an address" wrote through `PATCH /shops/{id}` — administrators
+only — so every manager and every sales representative filling that form in got
+a 403. The browser test covering the button signed in as an administrator. **The
+button worked for exactly the one role that never uses it, and the test proved
+it.**
+
+It is now `POST /shops/{id}/addresses`, which adds one address and touches
+nothing else. Deliberately not a widening of the patch: that endpoint also
+carries the credit limit, the payment terms, the discount, the price list and
+the status. A rep who may set a credit limit is a different product. The new
+route applies the same territory rule the customer list and the customer detail
+apply, and the e2e test now signs in as a manager.
+
+Sending the whole array back also went away with it — a concurrent change by
+anybody else was previously overwritten, and a request that lost one element
+removed an address while looking like it added one.
+
+### Emptying a basket
+
+There was no way to. Lines came out one at a time, and the saved draft was
+removed by nothing, so a pharmacy that saved an order and then changed its mind
+left a draft in the distributor's system for a basket that no longer exists —
+which the next person to open that customer reads as a pending order.
+
+### Three icons that were one icon
+
+All three applications shipped the Expo template's mark, told apart by a
+background colour. That is not enough: an operator can have two installed, they
+choose at 48 pixels on a home screen in daylight, and choosing wrong means
+taking an order in the rider's application. Each now has a **different
+silhouette** — a carton, a clipboard, a pin — which survives greyscale, colour
+blindness and Android's monochrome themed-icon treatment. A background colour
+survives none of those.
+
+Generated by `scripts/icons.mjs`, sixteen files, committed. Two rounds of
+correction that only appeared on inspection: the pin's triangle drawn flush to
+its circle grew wings, and a slot across the clipboard's clip left a sliver that
+read as a rendering fault.
+
+`docs/STORE_LISTINGS.md` carries all three listings in full. Two items in it are
+decisions rather than copy, and both are flagged for a human: the data-deletion
+route, and keeping Manage and Rider off public tracks.
+
+### Numbers
+
+API 182 unit and 231 integration + 5 coverage, from 182 and 225. Mobile 235
+logic tests and 33 render, from 211 and 33. Web 334, from 333. Typecheck clean
+across 14 packages, lint zero errors.
+
 ## Phase 37 — MedSupply Shop, the customer application
 
 Asked for: a plan for the Shop app, and then all of it.

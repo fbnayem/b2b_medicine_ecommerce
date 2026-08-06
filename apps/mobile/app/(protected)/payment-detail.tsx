@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { errorMessage } from '@medsupply/api-client';
+import { authorisedFileSource, savePaymentAttachment } from '../../src/documents/files';
+import { useSaveDocument } from '../../src/documents/useSaveDocument';
 import { getPayment, getPaymentReceipt } from '../../src/finance/api';
 import { formatFinanceDate } from '../../src/finance/date';
 import { formatMoneyMinor } from '../../src/finance/money';
@@ -32,7 +34,9 @@ export default function PaymentDetailScreen() {
   const [receipt, setReceipt] = useState<Receipt>();
   const [loading, setLoading] = useState(true);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [pictureFailed, setPictureFailed] = useState(false);
   const [error, setError] = useState('');
+  const document = useSaveDocument();
 
   const load = useCallback(async () => {
     try {
@@ -131,8 +135,47 @@ export default function PaymentDetailScreen() {
           value={<Badge>{t(`handoverStatus.${payment.handoverStatus ?? 'NOT_REQUIRED'}`)}</Badge>}
         />
 
+        {/*
+          The slip itself, not the news that one exists.
+
+          This line used to render the words "Attachment" and stop — a label
+          with nothing behind it, which reads as a broken link rather than as
+          information. `GET /payments/{id}/attachment` holds the deposit slip or
+          transfer screenshot that proves the payment, and it is exactly what
+          somebody queries a balance with.
+        */}
         {payment.attachmentFileId ? (
-          <Text style={{ color: colour.textMuted }}>{t('finance.attachment')}</Text>
+          <View style={{ gap: layout.space[2] }}>
+            <Text style={{ color: colour.textMuted }}>{t('documents.attachment')}</Text>
+            {pictureFailed ? null : (
+              <Image
+                accessibilityLabel={t('documents.attachment')}
+                source={authorisedFileSource(`/payments/${payment._id}/attachment`)}
+                onError={() => setPictureFailed(true)}
+                resizeMode="contain"
+                style={{
+                  width: '100%',
+                  height: 220,
+                  borderRadius: layout.radius.md,
+                  backgroundColor: colour.canvas,
+                }}
+              />
+            )}
+            <Button
+              variant="secondary"
+              busy={document.busy}
+              label={document.busy ? t('documents.preparing') : t('documents.saveAttachment')}
+              onPress={() =>
+                void document.save(() =>
+                  savePaymentAttachment(
+                    payment._id,
+                    payment.reference,
+                    t('documents.attachmentTitle', { reference: payment.reference }),
+                  ),
+                )
+              }
+            />
+          </View>
         ) : null}
         {payment.reversalReference ? (
           <Text style={{ color: colour.danger }}>

@@ -22,6 +22,7 @@ import {
   useAsk,
   type Column,
 } from '../components/ui';
+import { openDocument } from '../lib/openDocument';
 import { useApiResource } from '../lib/query';
 import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
@@ -112,6 +113,12 @@ export function ReturnDetail() {
   const [reviewNotes, setReviewNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [busy, setBusy] = useState('');
+
+  async function openCreditNote(creditNoteId: string) {
+    if (!(await openDocument(`/returns/credit-notes/${creditNoteId}`, { format: 'pdf' }))) {
+      toast.error(t('returnDetail.creditNoteFailed'));
+    }
+  }
 
   // The editable quantities are seeded from the server's answer and then owned
   // locally, so a background revalidation cannot overwrite figures a reviewer
@@ -388,14 +395,25 @@ export function ReturnDetail() {
                   <p className="text-text">
                     {t('returnDetail.creditNote')}:{' '}
                     {data.creditNote ? (
-                      <a
+                      /*
+                       * A button, not a link.
+                       *
+                       * This was an `<a href="/api/v1/returns/credit-notes/…">`,
+                       * and `requireAuth` accepts a bearer header and nothing
+                       * else — no cookie, no query parameter. So it opened a
+                       * tab reading `{"error":{"code":"UNAUTHORIZED"}}` every
+                       * single time, on the one document that proves a customer
+                       * was credited. Nothing failed anywhere: the anchor
+                       * rendered, the tab opened, and the error was on the far
+                       * side of a click no test performs.
+                       */
+                      <button
+                        type="button"
                         className="text-brand underline"
-                        href={`/api/v1/returns/credit-notes/${data.creditNote._id}?format=pdf`}
-                        target="_blank"
-                        rel="noreferrer"
+                        onClick={() => void openCreditNote(data.creditNote!._id)}
                       >
                         {data.creditNote.reference}
-                      </a>
+                      </button>
                     ) : (
                       t('returnDetail.notIssued')
                     )}

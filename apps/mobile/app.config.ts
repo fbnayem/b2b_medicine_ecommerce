@@ -151,7 +151,18 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     scheme: identity.scheme,
     version: '1.0.0',
     orientation: 'portrait',
-    icon: './assets/icon.png',
+    /*
+     * One icon per application, not one icon with three background colours.
+     *
+     * All three shipped with the Expo template's mark, told apart only by
+     * `accent` below — and an operator can have two of these installed at once.
+     * Picking the wrong one on a home screen means taking an order in the
+     * rider's application. Each now has a **different silhouette** — a carton,
+     * a clipboard, a pin — because that is what survives 48 pixels, greyscale,
+     * colour blindness, and Android's monochrome themed-icon treatment, none of
+     * which a background colour survives. `scripts/icons.mjs` draws them.
+     */
+    icon: `./assets/icon-${variant}.png`,
     /*
      * Pinned, and this is the file `theme.ts` refers to when it says the
      * palette is light only. Every screen is written against `semanticLight`,
@@ -168,9 +179,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       package: identity.bundleId,
       adaptiveIcon: {
         backgroundColor: identity.accent,
-        foregroundImage: './assets/android-icon-foreground.png',
-        backgroundImage: './assets/android-icon-background.png',
-        monochromeImage: './assets/android-icon-monochrome.png',
+        foregroundImage: `./assets/android-icon-foreground-${variant}.png`,
+        backgroundImage: `./assets/android-icon-background-${variant}.png`,
+        monochromeImage: `./assets/android-icon-monochrome-${variant}.png`,
       },
       /*
        * Left off. The predictive back gesture animates away from a screen

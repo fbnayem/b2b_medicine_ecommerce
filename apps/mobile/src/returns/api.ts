@@ -38,6 +38,15 @@ export interface ReturnSummary {
 }
 
 export interface ReturnDetailView extends ReturnSummary {
+  /**
+   * The issued credit note, once there is one.
+   *
+   * `creditNoteReference` above is the string printed on the return; **this**
+   * carries the identifier the document itself is fetched by. The endpoint has
+   * always sent it — this client simply never declared it, so the reference was
+   * shown as text a pharmacy could read and not obtain.
+   */
+  creditNote?: { _id: string; reference: string; totalMinor: number; issuedAt: string };
   lines: ReturnLineView[];
   approvedSubtotalMinor: number;
   approvedTaxMinor: number;

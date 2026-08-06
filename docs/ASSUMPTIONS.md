@@ -864,3 +864,105 @@ answer. The design is what makes it defensible:
   `SHOP_OWNER`-only by design and do not help; the fix is a staff-side route or
   a widening of the existing one, and it belongs with the order-entry screen
   rather than with the customer application.
+
+## Phase 38 — The documents, and the endpoints nothing reached
+
+### What the audit actually measured
+
+The endpoint coverage figure quoted in Phase 37 was produced by the same
+matcher `callers.test.ts` uses, which requires the HTTP method to sit
+immediately before the path literal. Re-run over both clients it reported **84
+endpoints with no caller anywhere**, and that number was wrong: most call sites
+build the path from a variable — `` `/approvals/${id}/${action}` `` — and a
+matcher that cannot see through an interpolation invents gaps.
+
+A segment-aware pass — where `{}` on either side matches one segment, and a read
+is satisfied wherever its path appears because both clients fetch through hooks
+that hide the verb — gives **22**, of which four are infrastructure (`/health/*`,
+`/metrics`, `/docs/openapi.json`) and one is a false negative (`/auth/refresh`,
+built from a base-URL variable). The remaining seventeen are staff and
+administrator endpoints, listed in `PHASE_STATUS.md`.
+
+**The looser rule is for auditing, not for gating.** `callers.test.ts` keeps the
+strict method check, because the near-miss it was built for — `GET /returns`
+satisfying `POST /returns` — is exactly what the loose rule would let through.
+
+### Files, which are not screens
+
+- **Four endpoints answer with bytes rather than JSON**: the invoice PDF, the
+  credit note, a proof-of-delivery photograph, and the deposit slip behind a
+  payment. On a desktop a browser opens a blob in a tab; a phone has neither, so
+  the file is written into the **cache** directory and handed to the share
+  sheet. Cache rather than documents: the server holds the original, the person
+  has already been offered the chance to keep it, and a pharmacy's phone should
+  not fill up with every invoice it has glanced at.
+- **The download goes through `apiClient`, not `File.downloadFileAsync`.** The
+  Expo helper is fewer lines and carries no interceptor, so an expired access
+  token would fail with no refresh and no retry — on the one screen where
+  somebody is trying to _obtain_ a document rather than read one. `expo-file-
+system` and `expo-sharing` were added for this; neither declares a permission,
+  and the Shop application still asks the operating system for nothing.
+- **A proof photograph is rendered in place, not downloaded.** The question is
+  "who signed for this", and answering it should not need a share sheet and a
+  gallery. `Image` takes request headers, which is the only way to authenticate
+  a fetch made inside the native image loader — and it means **no refresh-and-
+  retry for the picture**. Acceptable only because the screen has already loaded
+  its data through `apiClient` moments before.
+- **The file name is sanitised, because it comes from the server.** A document
+  reference is joined onto a directory path, and a reference of `../../x` would
+  write outside the directory this application is allowed to use. Not a
+  realistic answer from our own API; one mistaken deployment away, and the check
+  costs a line.
+- **Each document names its own request.** A shared fetcher taking a path
+  parameter would be tidier and would make all four invisible to
+  `callers.test.ts`, which reads the method immediately before a literal. The
+  gate is worth more than the tidiness.
+
+### Two defects that looked like working features
+
+- **Web linked straight at the API for the credit note.** `requireAuth` reads a
+  bearer header and nothing else — no cookie, no query parameter — so
+  `<a href="/api/v1/returns/credit-notes/…">` opened a tab containing
+  `{"error":{"code":"UNAUTHORIZED"}}`. It rendered, the tab opened, and the
+  failure was on the far side of a click no test performs. Now `openDocument`,
+  shared with the two screens that had each written their own copy, and
+  `apiPaths.test.ts` fails on any `/api/v1` in a page.
+- **Order entry's "add an address" wrote through `PATCH /shops/{id}`**, which
+  admits administrators only, so every manager and every sales representative
+  got a 403 — while the browser test covering the button signed in as an
+  administrator. Fixed with `POST /shops/{id}/addresses`, which adds one address
+  and touches nothing else, **deliberately not by widening the patch**: that
+  endpoint also carries the credit limit, the payment terms, the discount, the
+  price list and the status, and a rep who may set a credit limit is a different
+  product. The route applies the same territory rule the list and the detail do,
+  because scoping a read and not the write beside it is scoping that only looks
+  like scoping. The e2e test now signs in as a manager.
+
+### Emptying a basket
+
+There was no way to empty one — lines came out singly — and the saved draft was
+never removed by anything, so a pharmacy that saved an order and changed its
+mind left a draft in the distributor's system for a basket that no longer
+exists. `DELETE /orders/drafts/{id}` had no caller on either client. A 404 from
+it is treated as success: the customer's intent is that the draft should not
+exist, and a 404 means it does not.
+
+### The icons
+
+All three applications shipped with the Expo template's mark, told apart by a
+background colour. An operator can have two installed, they choose at 48 pixels
+on a home screen, and choosing wrong means taking an order in the rider's
+application — so each now has a **different silhouette**, which survives
+greyscale, colour blindness and Android's monochrome themed-icon treatment.
+They are generated by `scripts/icons.mjs` rather than drawn, because the output
+is rectangles and circles and nine exported files drift the first time somebody
+re-exports one. The output is committed; no build depends on the script running.
+
+### Store listings
+
+`docs/STORE_LISTINGS.md` holds all three, complete. Two things in it are
+**decisions rather than copy**, and both need a human before submission: the
+data-deletion route, because a distributor holding a trade customer's purchase
+records has record-keeping duties a delete button cannot override; and keeping
+Manage and Rider on private or internal tracks, because a public listing for
+either invites installs from people who then cannot sign in.

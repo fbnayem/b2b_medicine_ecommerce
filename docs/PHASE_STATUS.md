@@ -1886,3 +1886,67 @@ nothing to fail.
 
 `GET /inventory/medicines/categories`, if the catalogue is to have a filter that
 does not lie. Three icons and three store listings, before any submission.
+
+## Phase 38: The Documents, And The Endpoints Nothing Reached
+
+**Asked for:** complete the full task — the endpoint gaps Phase 37 left, the
+defect it found and left with the staff screen, the icons and store listings
+outstanding since Phase 36, and the coverage measurement for Manage and Rider.
+
+### Shipped
+
+|                                        |                                                                                                                                                                                 |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Four documents a pharmacy can keep** | The invoice PDF, the credit note, the proof-of-delivery photograph and the payment slip. All four answer with bytes rather than JSON, which is why no screen had ever used one. |
+| **The credit note works on the web**   | It linked at `/api/v1/…` with an anchor, and `requireAuth` reads a bearer header and nothing else — so every click opened a tab containing `UNAUTHORIZED`.                      |
+| **Order entry's address button**       | Wrote through an administrators-only endpoint. Every manager and every rep got a 403; the test covering it signed in as an administrator.                                       |
+| **Emptying a basket**                  | There was no way to, and the saved draft was removed by nothing.                                                                                                                |
+| **Archiving a notification**           | The only thing that shortens an inbox which otherwise grows for as long as the account exists.                                                                                  |
+| **Three icons, and three listings**    | All three applications shipped the Expo template's mark. Each now has its own silhouette. `docs/STORE_LISTINGS.md` carries the listings in full.                                |
+
+### The judgement calls
+
+- **The audit is not a committed test.** Written with the strict matcher
+  `callers.test.ts` uses, it reported 84 unreachable endpoints and about sixty
+  were artefacts of paths built from variables. The loose version that gives the
+  honest number — 22 — is too loose to gate with, because it would let through
+  the exact near-miss the strict rule exists for. So the gate stays an explicit
+  list of capabilities somebody wrote down, and the sweep stays a scratch script
+  whose output is recorded here.
+- **`POST /shops/{id}/addresses` rather than opening `PATCH /shops/{id}`.** That
+  endpoint also carries the credit limit, payment terms, discount, price list
+  and status. A sales representative who may set a credit limit is a different
+  product.
+- **Documents go through `apiClient`, not `File.downloadFileAsync`.** The Expo
+  helper carries no interceptor, so an expired token would fail with no refresh
+  and no retry on the screen where somebody is trying to obtain a document.
+
+### Not done
+
+**Seventeen endpoints are still reached by no client.** They are staff and
+administrator work, not customer work, and building them is a phase rather than
+a loose end:
+
+|                |                                                                                                                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inventory      | `GET /inventory/batches/{id}`, `POST /inventory/allocations/reserve`, `GET /purchasing/recall/batches` (the search behind the trace, which does have a screen)                              |
+| Fulfilment     | `POST /fulfilment/picking/{id}/discrepancies/resolve` — a storekeeper can _report_ a discrepancy and nobody can decide it from any screen                                                   |
+| Finance        | `GET /finance/shops/{id}/ledger`, `POST /finance/adjustments`, `GET /finance/reconciliation/{id}`, `POST /finance/reconciliation/{id}/repair`, `POST /finance/credit-reservations/backfill` |
+| Administration | `GET /admin/audit`, `GET /admin/runtime`, `POST /shops/{id}/assign-owner`, `POST /shops/{id}/assign-manager`                                                                                |
+| Notifications  | `GET /notifications/{id}/deliveries`, `POST /notifications/test`                                                                                                                            |
+| Reports        | `GET /reports/orders`, `GET /reports/stock-movements`                                                                                                                                       |
+
+The one worth pulling forward is **`discrepancies/resolve`**: reporting a
+shortfall is wired and deciding it is not, so a picking list can be stopped by a
+discrepancy that no screen can clear.
+
+Also outstanding, unchanged: **nothing has been built into a binary** — Android
+can be built from a workstation or on EAS, iOS needs macOS or an EAS cloud build
+plus an Apple Developer account, and neither has been run. **No category filter
+on the catalogue**, which needs `GET /inventory/medicines/categories`.
+
+### Next phase dependencies
+
+`GET /inventory/medicines/categories` for an honest catalogue filter. A store
+account, an `EAS_PROJECT_ID` and the distributor's legal details before any
+submission — the checklist is at the end of `docs/STORE_LISTINGS.md`.

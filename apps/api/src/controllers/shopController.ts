@@ -281,41 +281,99 @@ async function auditAddress(
   });
 }
 
+type ShopDocument = NonNullable<Awaited<ReturnType<typeof ownShop>>>;
+
+/**
+ * Append one delivery address, whoever asked for it.
+ *
+ * Shared by the customer's own route and the staff one, because the rule is the
+ * same either way: at most twenty, exactly one default, and an audit record
+ * naming whoever did it. The **caller** differs — a shop owner may only reach
+ * their own shop, staff name one — and that is settled before this is called.
+ */
+async function appendAddress(req: AuthRequest, res: Response, shop: ShopDocument) {
+  const data = DeliveryAddressSchema.parse(req.body);
+
+  if (shop.deliveryAddresses.length >= MAX_DELIVERY_ADDRESSES) {
+    return res.status(400).json({
+      error: {
+        code: 'TOO_MANY_ADDRESSES',
+        message: `A shop may keep at most ${MAX_DELIVERY_ADDRESSES} delivery addresses`,
+      },
+    });
+  }
+
+  shop.deliveryAddresses.push(data);
+  const added = shop.deliveryAddresses[shop.deliveryAddresses.length - 1]!;
+  /*
+   * The first address a shop ever adds is its default whatever the form
+   * said — `soleDefaultIndex` returns 0 for a single-element list — and a
+   * later one only takes over if it was asked to.
+   */
+  const chosen = soleDefaultIndex(
+    shop.deliveryAddresses,
+    data.isDefault ? shop.deliveryAddresses.length - 1 : -1,
+  );
+  shop.deliveryAddresses.forEach((address, index) => {
+    address.isDefault = index === chosen;
+  });
+  await shop.save();
+
+  // Where medicines get delivered is a sensitive fact — it is the address a
+  // controlled substance arrives at — so every change to it is recorded.
+  await auditAddress(req, 'SHOP_ADDRESS_ADDED', shop._id, { after: added.toObject() });
+  return res.status(201).json(addressList(shop));
+}
+
 export const addMyAddress = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const data = DeliveryAddressSchema.parse(req.body);
     const shop = await ownShop(req);
     if (!shop) return noShop(res);
+    return await appendAddress(req, res, shop);
+  } catch (error) {
+    next(error);
+  }
+};
 
-    if (shop.deliveryAddresses.length >= MAX_DELIVERY_ADDRESSES) {
-      return res.status(400).json({
-        error: {
-          code: 'TOO_MANY_ADDRESSES',
-          message: `A shop may keep at most ${MAX_DELIVERY_ADDRESSES} delivery addresses`,
-        },
+/**
+ * A delivery address added by staff, for a named customer.
+ *
+ * The order-entry screen has offered "add an address" since the order-entry
+ * phase, and it wrote through `PATCH /shops/:id` — **which admits
+ * administrators only**. A manager or a sales representative taking an order
+ * for a customer whose address was not on file was shown the form, filled it
+ * in, and got a 403. Nothing noticed because the browser test covering that
+ * button signs in as an administrator.
+ *
+ * Deliberately a route of its own rather than widening that endpoint: `PATCH
+ * /shops/:id` also carries the credit limit, the payment terms, the discount,
+ * the price list and the status, and none of those are a sales representative's
+ * to set. An address is not a commercial term — it is where the boxes go.
+ */
+export const addShopAddress = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const shop = await Shop.findById(req.params.id);
+    if (!shop) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Shop not found' } });
+    }
+
+    /*
+     * The same territory rule the list and the detail apply.
+     *
+     * Without it a rep could write a delivery address onto any customer in the
+     * country by pasting an id — scoping on the read and none on the write,
+     * which is the shape of scoping that only looks like scoping.
+     */
+    if (
+      req.user!.role === UserRole.SALES &&
+      !territoryPermits(req.user!.territories, shop.territory)
+    ) {
+      return res.status(403).json({
+        error: { code: 'SHOP_OUTSIDE_TERRITORY', message: 'That customer is not in your area' },
       });
     }
 
-    shop.deliveryAddresses.push(data);
-    const added = shop.deliveryAddresses[shop.deliveryAddresses.length - 1]!;
-    /*
-     * The first address a shop ever adds is its default whatever the form
-     * said — `soleDefaultIndex` returns 0 for a single-element list — and a
-     * later one only takes over if it was asked to.
-     */
-    const chosen = soleDefaultIndex(
-      shop.deliveryAddresses,
-      data.isDefault ? shop.deliveryAddresses.length - 1 : -1,
-    );
-    shop.deliveryAddresses.forEach((address, index) => {
-      address.isDefault = index === chosen;
-    });
-    await shop.save();
-
-    // Where medicines get delivered is a sensitive fact — it is the address a
-    // controlled substance arrives at — so every change to it is recorded.
-    await auditAddress(req, 'SHOP_ADDRESS_ADDED', shop._id, { after: added.toObject() });
-    res.status(201).json(addressList(shop));
+    return await appendAddress(req, res, shop);
   } catch (error) {
     next(error);
   }

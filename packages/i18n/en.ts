@@ -994,6 +994,21 @@ export const en = {
     draftFailed: 'That could not be saved. Try again.',
     remove: 'Remove',
     removed: '{{brand}} removed from your order.',
+
+    /*
+     * Emptying the basket, which also removes the saved draft. The two
+     * descriptions are different because the consequence is: one throws away
+     * something only this phone knows about, the other withdraws an order the
+     * distributor can already see.
+     */
+    emptyBasket: 'Empty this order',
+    emptyTitle: 'Empty this order?',
+    emptyBodyLocal: 'Everything you have added will be taken out. Nothing has been sent yet.',
+    emptyBodySaved:
+      'Everything you have added will be taken out, and the order you saved for later will be withdrawn. Nobody has been asked to supply it yet.',
+    emptyConfirm: 'Empty it',
+    emptied: 'Your order is empty again.',
+    emptyFailed: 'Your order could not be emptied. Try again.',
   },
 
   checkout: {
@@ -3033,6 +3048,7 @@ export const en = {
     collected: 'Collected',
     received: 'Received',
     creditNote: 'Credit note',
+    creditNoteFailed: 'The credit note could not be opened. Try again in a moment.',
     notYet: 'Not yet',
     notIssued: 'Not issued yet',
     customerNotes: 'What the customer told us',
@@ -3406,6 +3422,40 @@ export const en = {
     line1TooShort: 'Write at least five characters — enough for a rider to find it.',
     cityTooShort: 'Write the city.',
     districtTooShort: 'Write the district.',
+  },
+
+  /**
+   * The four things this business hands over as a **file** rather than a
+   * screen: an invoice, a credit note, the photograph taken at the door, and
+   * the deposit slip behind a payment.
+   *
+   * All four are endpoints that answer with bytes, so until this phase they
+   * were reachable only from a desktop browser — which meant a pharmacy could
+   * see that a credit note existed and had no way to obtain it.
+   */
+  documents: {
+    saveInvoice: 'Save or send this invoice',
+    saveCreditNote: 'Save or send this credit note',
+    saveProof: 'Save this photograph',
+    saveAttachment: 'Save this slip',
+    preparing: 'Preparing…',
+
+    // Shown as the title of the sharing sheet, so it says which document is
+    // about to be sent rather than "Share".
+    invoiceTitle: 'Invoice {{reference}}',
+    creditNoteTitle: 'Credit note {{reference}}',
+    proofTitle: 'Delivery {{reference}}',
+    attachmentTitle: 'Payment {{reference}}',
+
+    proof: 'Signed for at the door',
+    photograph: 'Photograph taken on delivery',
+    signature: 'Signature given on delivery',
+    attachment: 'The slip for this payment',
+    pictureFailed: 'This picture could not be loaded. Try again in a moment.',
+
+    couldNotFetch: 'This document could not be downloaded. Check your connection and try again.',
+    couldNotWrite: 'There is not enough room on this phone to save the document.',
+    cannotShare: 'This phone has nothing set up to open or share files.',
   },
 
   pickers: {

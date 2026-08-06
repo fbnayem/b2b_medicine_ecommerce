@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { FlatList, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { apiClient } from '../../../src/api/client';
 import { useCart } from '../../../src/store/useCart';
+import { discardDraft, saveDraft } from '../../../src/orders/drafts';
 import { useQuote } from '../../../src/orders/quote';
 import { formatMoneyMinor } from '../../../src/finance/money';
 import { useLanguage } from '../../../src/i18n/useLanguage';
@@ -18,6 +18,7 @@ import {
   LoadingState,
   Screen,
   toast,
+  useAsk,
 } from '../../../src/components';
 import { colour, layout } from '../../../src/theme';
 
@@ -37,7 +38,8 @@ import { colour, layout } from '../../../src/theme';
  */
 export default function CartScreen() {
   const { t } = useLanguage();
-  const { items, quantity, remove, draftId, setDraftId, restored } = useCart();
+  const ask = useAsk();
+  const { items, quantity, remove, clear, draftId, setDraftId, restored } = useCart();
   const [saving, setSaving] = useState(false);
 
   const { quote, loading, failed, retry } = useQuote(
@@ -47,21 +49,46 @@ export default function CartScreen() {
   async function save() {
     setSaving(true);
     try {
-      const body = {
-        items: items.map((item) => ({
-          medicineId: item.medicineId,
-          requestedQuantity: item.quantity,
-        })),
-      };
-      const response = draftId
-        ? await apiClient.patch(`/orders/drafts/${draftId}`, body)
-        : await apiClient.post('/orders/drafts', body);
-      setDraftId(response.data.data._id);
+      setDraftId(
+        await saveDraft(
+          items.map((item) => ({
+            medicineId: item.medicineId,
+            requestedQuantity: item.quantity,
+          })),
+          draftId,
+        ),
+      );
       toast.success(t('cart.draftSaved'));
     } catch {
       toast.error(t('cart.draftFailed'));
     } finally {
       setSaving(false);
+    }
+  }
+
+  /*
+   * Emptying the basket empties it **on the server too**.
+   *
+   * There was no way to empty it at all — lines came out one at a time — and
+   * the saved draft was never removed by anything. A pharmacy that saved a
+   * draft and then changed its mind left an order sitting in the distributor's
+   * system for a basket that no longer exists, which the next person to look at
+   * that customer reads as a pending order.
+   */
+  async function empty() {
+    const confirmed = await ask.confirm({
+      title: t('cart.emptyTitle'),
+      description: draftId ? t('cart.emptyBodySaved') : t('cart.emptyBodyLocal'),
+      confirmLabel: t('cart.emptyConfirm'),
+      danger: true,
+    });
+    if (!confirmed) return;
+    try {
+      await discardDraft(draftId);
+      clear();
+      toast.success(t('cart.emptied'));
+    } catch {
+      toast.error(t('cart.emptyFailed'));
     }
   }
 
@@ -229,6 +256,8 @@ export default function CartScreen() {
               onPress={() => router.push('/(protected)/checkout')}
             />
           </View>
+
+          <Button variant="secondary" label={t('cart.emptyBasket')} onPress={() => void empty()} />
         </View>
       ) : null}
     </Screen>

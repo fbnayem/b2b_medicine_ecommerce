@@ -45,6 +45,20 @@ const EAS = import.meta.glob('../eas.json', {
   eager: true,
 }) as Record<string, string>;
 
+/**
+ * The launcher icons, as data URIs.
+ *
+ * `?inline` rather than `?raw`, because these are PNGs: read as text the header
+ * is mangled by the text decoder before anything can check it, and every file
+ * would look equally valid and equally broken. Base64 survives intact, and
+ * `node:fs` stays out of a directory whose code ships to Hermes.
+ */
+const ASSETS = import.meta.glob('../assets/*.png', {
+  query: '?inline',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>;
+
 const easJson = JSON.parse(Object.values(EAS)[0]!) as {
   cli: Record<string, unknown>;
   build: Record<string, { extends?: string; env?: Record<string, string>; distribution?: string }>;
@@ -209,6 +223,59 @@ describe('what each application asks the operating system for', () => {
       expect(declared, variant).toContain('expo-localization');
       expect(declared, variant).toContain('expo-notifications');
     }
+  });
+
+  /**
+   * **Three icons, and they are actually there.**
+   *
+   * All three shipped with the Expo template's mark and were told apart by a
+   * background colour, which is no help at all: an operator with two of these
+   * installed picks by silhouette on a home screen, and picking wrong means
+   * taking an order in the rider's application.
+   *
+   * The failure this guards is worse than a missing file — Expo resolves icon
+   * paths at build time, so a name that does not exist fails a cloud build
+   * twenty minutes in, or worse, silently falls back. Reading the actual PNG
+   * headers rather than only checking existence, because a zero-byte or
+   * truncated file is exactly what a half-finished generator leaves behind.
+   */
+  it('gives every application its own icon, and every icon is a real image', () => {
+    const byPath = new Map(
+      Object.entries(ASSETS).map(([path, data]) => [path.replace('../assets/', ''), data]),
+    );
+
+    /** Width and height, straight out of the PNG's IHDR chunk. */
+    function header(name: string) {
+      const uri = byPath.get(name);
+      expect(uri, `assets/${name} does not exist, and app.config.ts names it`).toBeDefined();
+      const bytes = Buffer.from(uri!.slice(uri!.indexOf(',') + 1), 'base64');
+      expect(bytes.subarray(1, 4).toString('ascii'), `assets/${name} is not a PNG`).toBe('PNG');
+      return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+    }
+
+    const seen = new Set<string>();
+    for (const variant of APP_VARIANTS) {
+      const built = configFor(variant);
+      const icon = (built.icon as string).replace('./assets/', '');
+      expect(icon, `${variant} shares an icon with another application`).not.toBe('icon.png');
+      expect(seen.has(icon), `${variant} reuses ${icon}`).toBe(false);
+      seen.add(icon);
+
+      // 1024 square is what both stores take, and neither accepts a smaller
+      // one — this is the size that gets uploaded rather than resized.
+      expect(header(icon), variant).toEqual({ width: 1024, height: 1024 });
+
+      const adaptive = built.android?.adaptiveIcon as Record<string, string>;
+      for (const layer of ['foregroundImage', 'backgroundImage', 'monochromeImage']) {
+        const file = adaptive[layer]!.replace('./assets/', '');
+        expect(file, `${variant} ${layer}`).toContain(variant);
+        const { width, height } = header(file);
+        expect(width, `${variant} ${layer}`).toBe(height);
+      }
+      expect(adaptive.backgroundColor).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+
+    expect(seen.size).toBe(APP_VARIANTS.length);
   });
 
   it('writes a permission prompt that names the application asking', () => {

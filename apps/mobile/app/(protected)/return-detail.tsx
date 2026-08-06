@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { errorMessage } from '@medsupply/api-client';
+import { saveCreditNote } from '../../src/documents/files';
+import { useSaveDocument } from '../../src/documents/useSaveDocument';
 import { formatFinanceDate } from '../../src/finance/date';
 import { createFinancialIdempotencyKey } from '../../src/finance/idempotency';
 import { formatMoneyMinor } from '../../src/finance/money';
@@ -57,6 +59,7 @@ export default function ReturnDetailScreen() {
   const { t, language } = useLanguage();
   const ask = useAsk();
   const role = useAuthStore((state) => state.user?.role);
+  const document = useSaveDocument();
 
   const [record, setRecord] = useState<ReturnDetailView | null>(null);
   const [draft, setDraft] = useState<Draft>({});
@@ -260,6 +263,31 @@ export default function ReturnDetailScreen() {
           <ListRow label={t('returnDetail.rejectionReason')} value={record.rejectionReason} />
         ) : null}
       </Card>
+
+      {/*
+        The credit note itself.
+
+        The reference above has been shown since the returns phase, and it is
+        the *document* that proves the money came back — the thing a pharmacy
+        reconciles against and hands to whoever keeps the books. Until now this
+        client could name it and not fetch it.
+      */}
+      {record.creditNote ? (
+        <Button
+          variant="secondary"
+          busy={document.busy}
+          label={document.busy ? t('documents.preparing') : t('documents.saveCreditNote')}
+          onPress={() =>
+            void document.save(() =>
+              saveCreditNote(
+                record.creditNote!._id,
+                record.creditNote!.reference,
+                t('documents.creditNoteTitle', { reference: record.creditNote!.reference }),
+              ),
+            )
+          }
+        />
+      ) : null}
 
       <SectionTitle>{t('returnDetail.items')}</SectionTitle>
       {record.lines.map((line) => (

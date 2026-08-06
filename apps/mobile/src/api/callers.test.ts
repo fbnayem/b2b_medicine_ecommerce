@@ -174,6 +174,53 @@ const MUST_REACH: ReadonlyArray<{ method: string; path: string; capability: stri
     path: '/shops/my',
     capability: 'read the shop’s own delivery addresses at checkout',
   },
+
+  /*
+   * The four endpoints that answer with a **file** rather than with JSON, and
+   * the two that finish a job the screens above only started.
+   *
+   * These are the second sweep. The first one found the endpoints a screen
+   * would obviously call; these are the ones a screen *mentions* — the invoice
+   * that was rendered but could not be obtained, the credit note whose
+   * reference was printed with no way to open it, the attachment that was
+   * announced as the word "Attachment" and nothing else.
+   */
+  {
+    method: 'get',
+    path: '/fulfilment/invoices/{}/pdf',
+    capability:
+      'keep or send the invoice document itself — to print for the file behind the counter, ' +
+      'or to pass to whoever pays the bills',
+  },
+  {
+    method: 'get',
+    path: '/returns/credit-notes/{}',
+    capability: 'obtain the credit note that proves the money for a return came back',
+  },
+  {
+    method: 'get',
+    path: '/deliveries/proof/{}',
+    capability: 'see who actually signed for a delivery, and what was photographed at the door',
+  },
+  {
+    method: 'get',
+    path: '/payments/{}/attachment',
+    capability: 'see the deposit slip filed against a payment, when a balance is queried',
+  },
+  {
+    method: 'post',
+    path: '/notifications/archive',
+    capability:
+      'take something out of the inbox — the only thing that shortens a list which otherwise ' +
+      'grows for as long as the account exists',
+  },
+  {
+    method: 'delete',
+    path: '/orders/drafts/{}',
+    capability:
+      'withdraw a saved order, so emptying the basket does not leave the distributor holding ' +
+      'a draft for goods nobody wants',
+  },
 ];
 
 function sources(): Array<[string, string]> {

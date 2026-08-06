@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   addMyAddress,
+  addShopAddress,
   createShop,
   getShop,
   listShops,
@@ -70,6 +71,19 @@ router.get(
   requireRole([...managementRoles, UserRole.SALES, UserRole.SHOP_OWNER] as UserRole[]),
   getShop,
 );
+/*
+ * Staff add a delivery address for a customer, and nothing more.
+ *
+ * The order-entry screen has offered this since the order-entry phase and wrote
+ * it through `PATCH /:id` below — administrators only — so a manager or a rep
+ * filling the form in got a 403. Its own browser test signs in as an
+ * administrator, which is why nothing noticed for four phases.
+ *
+ * A rep is included because they are the role that exists to take an order at a
+ * counter, which is exactly where an address turns out to be missing.
+ */
+router.post('/:id/addresses', requireRole(shopReaders as UserRole[]), addShopAddress);
+
 router.patch('/:id', requireRole(adminRoles as UserRole[]), updateShop);
 router.post('/:id/assign-owner', requireRole(adminRoles as UserRole[]), assignOwner);
 router.post('/:id/assign-manager', requireRole(adminRoles as UserRole[]), assignManager);

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Text } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import type { Delivery, User } from '@medsupply/shared-types';
 import { errorMessage } from '@medsupply/api-client';
 import { apiClient } from '../../src/api/client';
+import { authorisedFileSource, saveDeliveryProof } from '../../src/documents/files';
+import { useSaveDocument } from '../../src/documents/useSaveDocument';
 import { formatFinanceDateTime } from '../../src/finance/date';
 import { useLanguage } from '../../src/i18n/useLanguage';
 import {
+  Button,
   Card,
   EmptyState,
   ErrorState,
@@ -17,6 +20,64 @@ import {
   StatusPill,
 } from '../../src/components';
 import { colour, layout } from '../../src/theme';
+
+/**
+ * One stored proof file, shown in place with a way to keep it.
+ *
+ * Rendered rather than downloaded because looking is what a customer wants to
+ * do: the question is "who signed for this", and answering it should not
+ * require a share sheet and a gallery application. The save is there for the
+ * case where the answer has to go to somebody else.
+ */
+function ProofPicture({
+  fileId,
+  caption,
+  reference,
+}: {
+  fileId: string;
+  caption: string;
+  reference: string;
+}) {
+  const { t } = useLanguage();
+  const document = useSaveDocument();
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <View style={{ gap: layout.space[2] }}>
+      <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>{caption}</Text>
+      {failed ? (
+        <Text style={{ color: colour.danger, fontSize: layout.fontSize.sm }}>
+          {t('documents.pictureFailed')}
+        </Text>
+      ) : (
+        <Image
+          // The caption again, because a screen reader reaching an image with
+          // no label announces "image" and moves on.
+          accessibilityLabel={caption}
+          source={authorisedFileSource(`/deliveries/proof/${fileId}`)}
+          onError={() => setFailed(true)}
+          resizeMode="contain"
+          style={{
+            width: '100%',
+            height: 220,
+            borderRadius: layout.radius.md,
+            backgroundColor: colour.canvas,
+          }}
+        />
+      )}
+      <Button
+        variant="secondary"
+        busy={document.busy}
+        label={document.busy ? t('documents.preparing') : t('documents.saveProof')}
+        onPress={() =>
+          void document.save(() =>
+            saveDeliveryProof(fileId, reference, t('documents.proofTitle', { reference })),
+          )
+        }
+      />
+    </View>
+  );
+}
 
 /**
  * Where is my order — the **customer's** view of a delivery.
@@ -141,6 +202,30 @@ export default function DeliveryTrackScreen() {
             value={formatFinanceDateTime(delivery.proof.deliveredAt)}
           />
           <ListRow label={t('finance.receivedBy')} value={delivery.proof.receiverName} />
+
+          {/*
+            What was actually signed, and by whom.
+
+            A name typed into a field is a claim; the photograph and the
+            signature are the evidence behind it, and they are what a pharmacy
+            disputing a delivery — "nobody here signed for that" — needs to
+            look at. `GET /deliveries/proof/{fileId}` has admitted a shop owner
+            since the delivery phase and had **no caller on either client**.
+          */}
+          {delivery.proof.photoFileId ? (
+            <ProofPicture
+              fileId={delivery.proof.photoFileId}
+              caption={t('documents.photograph')}
+              reference={delivery.reference}
+            />
+          ) : null}
+          {delivery.proof.signatureFileId ? (
+            <ProofPicture
+              fileId={delivery.proof.signatureFileId}
+              caption={t('documents.signature')}
+              reference={delivery.reference}
+            />
+          ) : null}
         </Card>
       ) : null}
 

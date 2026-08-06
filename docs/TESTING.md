@@ -523,3 +523,57 @@ plant is named beside it.
   mid-word. Nothing in the repository could see it — it is a valid string, a
   valid file and a valid render.
   _Planted, and it named `hints.riderInstructions`._
+
+## Phase 38 coverage — the documents, and the endpoints nothing reached
+
+- `documents/names.test.ts`: 11 mobile tests over the two string decisions a
+  downloaded file rests on. The one worth reading is **a document reference is
+  not a file name** — the reference comes from the server and is joined onto a
+  directory path, so `../../../etc/passwd` must not become a write outside the
+  cache directory.
+  _Planted by removing the sanitiser: five tests red, including the length cap._
+- `documents/files.test.ts`: the fetch, the write and the share sheet, with
+  `expo-file-system`, `expo-sharing` and the API client all mocked. Asserts the
+  three failure paths separately — a failed fetch writes nothing, a failed write
+  opens no share sheet, and **an unavailable share sheet still reports the file
+  as written**, because telling somebody the save failed when it did not is
+  worse than either. Also pins the two request shapes that are easy to get
+  silently wrong: the invoice asks for A4 rather than the 80 mm till roll, and
+  the credit note asks for `format=pdf` — without which the endpoint answers
+  JSON and the `.pdf` written is a valid, saved, useless file.
+- `api/callers.test.ts` grows from 16 entries to **22**, adding the four
+  documents, the notification archive and the draft discard.
+  _Planted twice. Pointing the invoice PDF at `/fulfilment/invoices/{}` instead
+  named the capability — "keep or send the invoice document itself" — rather
+  than the file. Changing the archive from `post` to `get` failed too, which is
+  the same near-miss the method check was added for in Phase 37._
+- `testing/apiPaths.test.ts` gains **never puts an API address where a browser
+  will fetch it without a token**. `requireAuth` accepts a bearer header and
+  nothing else, so an `<a href="/api/v1/…">` renders a 401 as though the
+  document did not exist. Comments are stripped before the search, because three
+  files now explain this rule by quoting the markup it forbids.
+  _Planted by putting the old credit-note anchor back: the gate named the file._
+- `shopAddressIntegration.test.ts` grows by six, all on the new staff route. The
+  one the route exists for is **adding an address changes nothing else about the
+  customer** — it posts a credit limit, payment terms, a status and a discount
+  alongside the address and asserts all four are untouched, which is the whole
+  argument against having widened `PATCH /shops/{id}` instead. Two more cover
+  territory: a rep may write to a customer in their area and not to one outside
+  it.
+  _Planted by restoring the route to administrators only: the manager test red._
+- `appVariant.test.ts` gains **gives every application its own icon, and every
+  icon is a real image**. Reads the PNG headers through `import.meta.glob` with
+  `?inline` — `?raw` cannot serve this, since a PNG decoded as text has already
+  lost the bytes the header is made of — and fails on a missing file, a shared
+  file, or one that is not 1024 square.
+  _Planted by pointing all three back at one `icon.png`: named the sharing._
+
+### The audit that produced the number
+
+The endpoint sweep behind this phase is not a committed test. It is a scratch
+script, and the reason it is not committed is instructive: written with the
+strict matcher `callers.test.ts` uses, it reported 84 unreachable endpoints, of
+which about sixty were artefacts of paths built from variables. The committed
+gate stays strict and explicit — a list of capabilities somebody wrote down —
+precisely because the general version is either too loose to gate with or too
+strict to believe. See `ASSUMPTIONS.md`.

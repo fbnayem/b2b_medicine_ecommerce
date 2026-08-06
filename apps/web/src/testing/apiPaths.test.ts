@@ -290,6 +290,43 @@ describe('the web app only asks for addresses the API serves', () => {
     ).toEqual([]);
   });
 
+  /**
+   * **Nothing may link straight at the API.**
+   *
+   * `requireAuth` reads a bearer header and nothing else — no cookie, no query
+   * parameter — so an `<a href="/api/v1/…">` opens a tab containing
+   * `{"error":{"code":"UNAUTHORIZED","message":"No token provided"}}`.
+   *
+   * The return screen shipped exactly that on its credit-note link: the one
+   * document proving a customer had been credited, rendered as a working link
+   * that could never work. Nothing caught it, and nothing could have — the
+   * anchor renders, the tab opens, and the failure is on the far side of a
+   * click no test performs. `openDocument` is the way through, because it goes
+   * out over the configured client with the credential attached.
+   */
+  it('never puts an API address where a browser will fetch it without a token', () => {
+    const offenders: string[] = [];
+    for (const [file, code] of SOURCES) {
+      // The one file allowed to know the address: it is the configured base
+      // URL every authenticated request is built from.
+      if (file.endsWith('/api/config.ts')) continue;
+      /*
+       * Comments stripped first. Three files explain this very rule by quoting
+       * the markup it forbids, and a gate that fails on its own explanation
+       * teaches people to delete the explanation.
+       */
+      const source = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+      if (source.includes('/api/v1')) offenders.push(file);
+    }
+
+    expect(
+      offenders,
+      'These build an API address into the page. A browser following one sends no ' +
+        'Authorization header, so it renders a 401 as though the document did not exist. ' +
+        'Fetch it with `openDocument` from lib/openDocument.ts instead.',
+    ).toEqual([]);
+  });
+
   it('the rule detects what it claims to', () => {
     const served = servedPaths();
     // The two paths from the report, and a name that has never existed.

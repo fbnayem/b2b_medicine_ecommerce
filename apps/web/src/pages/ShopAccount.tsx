@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { apiClient } from '../api/client';
 import { FinanceSummaryCards } from '../components/FinanceSummaryCards';
 import {
   Button,
@@ -13,6 +12,7 @@ import {
   toast,
   type Column,
 } from '../components/ui';
+import { openDocument } from '../lib/openDocument';
 import { useApiCollection, useApiResource } from '../lib/query';
 import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
@@ -38,15 +38,7 @@ export function ShopAccount() {
   );
 
   async function openInvoice(invoiceId: string) {
-    try {
-      const response = await apiClient.get(`/fulfilment/invoices/${invoiceId}/pdf`, {
-        params: { layout: 'a4' },
-        responseType: 'blob',
-      });
-      const url = URL.createObjectURL(response.data as Blob);
-      window.open(url, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    } catch {
+    if (!(await openDocument(`/fulfilment/invoices/${invoiceId}/pdf`, { layout: 'a4' }))) {
       toast.error(t('account.pdfFailed'));
     }
   }

@@ -863,6 +863,15 @@ export const bn: Catalogue = {
     draftFailed: 'সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।',
     remove: 'সরান',
     removed: '{{brand}} অর্ডার থেকে সরানো হয়েছে।',
+
+    emptyBasket: 'অর্ডারটি খালি করুন',
+    emptyTitle: 'অর্ডারটি খালি করবেন?',
+    emptyBodyLocal: 'আপনি যা যা যোগ করেছেন সব সরে যাবে। এখনও কিছু পাঠানো হয়নি।',
+    emptyBodySaved:
+      'আপনি যা যা যোগ করেছেন সব সরে যাবে, আর পরে শেষ করার জন্য সংরক্ষণ করা অর্ডারটিও তুলে নেওয়া হবে। এখনও কাউকে সরবরাহ করতে বলা হয়নি।',
+    emptyConfirm: 'খালি করুন',
+    emptied: 'আপনার অর্ডার আবার খালি।',
+    emptyFailed: 'অর্ডারটি খালি করা যায়নি। আবার চেষ্টা করুন।',
   },
 
   checkout: {
@@ -2768,6 +2777,7 @@ export const bn: Catalogue = {
     collected: 'সংগ্রহ',
     received: 'বুঝে নেওয়া',
     creditNote: 'ক্রেডিট নোট',
+    creditNoteFailed: 'ক্রেডিট নোটটি খোলা যায়নি। একটু পরে আবার চেষ্টা করুন।',
     notYet: 'এখনও হয়নি',
     notIssued: 'এখনও দেওয়া হয়নি',
     customerNotes: 'ক্রেতা যা জানিয়েছেন',
@@ -3068,6 +3078,29 @@ export const bn: Catalogue = {
     line1TooShort: 'অন্তত পাঁচটি অক্ষর লিখুন — ডেলিভারিকর্মী যেন খুঁজে পান।',
     cityTooShort: 'শহরের নাম লিখুন।',
     districtTooShort: 'জেলার নাম লিখুন।',
+  },
+
+  documents: {
+    saveInvoice: 'এই চালানটি সংরক্ষণ বা পাঠান',
+    saveCreditNote: 'এই ক্রেডিট নোটটি সংরক্ষণ বা পাঠান',
+    saveProof: 'এই ছবিটি সংরক্ষণ করুন',
+    saveAttachment: 'এই স্লিপটি সংরক্ষণ করুন',
+    preparing: 'প্রস্তুত করা হচ্ছে…',
+
+    invoiceTitle: 'চালান {{reference}}',
+    creditNoteTitle: 'ক্রেডিট নোট {{reference}}',
+    proofTitle: 'ডেলিভারি {{reference}}',
+    attachmentTitle: 'পেমেন্ট {{reference}}',
+
+    proof: 'দরজায় বুঝে নেওয়ার প্রমাণ',
+    photograph: 'ডেলিভারির সময় তোলা ছবি',
+    signature: 'ডেলিভারির সময় দেওয়া স্বাক্ষর',
+    attachment: 'এই পেমেন্টের স্লিপ',
+    pictureFailed: 'ছবিটি লোড করা যায়নি। একটু পরে আবার চেষ্টা করুন।',
+
+    couldNotFetch: 'নথিটি ডাউনলোড করা যায়নি। সংযোগ দেখে আবার চেষ্টা করুন।',
+    couldNotWrite: 'নথিটি সংরক্ষণ করার মতো জায়গা এই ফোনে নেই।',
+    cannotShare: 'ফাইল খোলা বা পাঠানোর মতো কিছু এই ফোনে নেই।',
   },
 
   pickers: {

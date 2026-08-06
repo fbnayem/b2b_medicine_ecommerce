@@ -53,6 +53,20 @@ export async function markAllNotificationsRead() {
   await apiClient.post('/notifications/read-all', { before: new Date().toISOString() });
 }
 
+/**
+ * Take notifications out of the inbox.
+ *
+ * The only thing that removes anything from this list. Without it an inbox
+ * grows for as long as the account exists — every order, every delivery, every
+ * invoice — and "mark all as read" changes a dot, not the length. Web has
+ * archived one at a time since the notification phase; this client had no
+ * caller, so a pharmacy's inbox was permanent.
+ */
+export async function archiveNotifications(notificationIds: string[]) {
+  if (!notificationIds.length) return;
+  await apiClient.post('/notifications/archive', { notificationIds });
+}
+
 export async function fetchCatalogue(): Promise<{
   channels: NotificationChannel[];
   events: CatalogueEntry[];

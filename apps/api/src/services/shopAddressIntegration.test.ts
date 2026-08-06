@@ -35,6 +35,8 @@ const owner = { _id: new Types.ObjectId(), role: UserRole.SHOP_OWNER };
 const otherOwner = { _id: new Types.ObjectId(), role: UserRole.SHOP_OWNER };
 const strandedOwner = { _id: new Types.ObjectId(), role: UserRole.SHOP_OWNER };
 const manager = { _id: new Types.ObjectId(), role: UserRole.MANAGER };
+const rep = { _id: new Types.ObjectId(), role: UserRole.SALES };
+const farRep = { _id: new Types.ObjectId(), role: UserRole.SALES };
 
 let shopId: Types.ObjectId;
 let otherShopId: Types.ObjectId;
@@ -101,6 +103,8 @@ before(async () => {
         [otherOwner, 'address-other-owner', UserRole.SHOP_OWNER],
         [strandedOwner, 'address-stranded', UserRole.SHOP_OWNER],
         [manager, 'address-manager', UserRole.MANAGER],
+        [rep, 'address-rep', UserRole.SALES],
+        [farRep, 'address-far-rep', UserRole.SALES],
       ] as const
     ).map(([who, email, role]) => ({
       _id: who._id,
@@ -110,6 +114,9 @@ before(async () => {
       lastName: 'Person',
       role,
       status: UserStatus.ACTIVE,
+      // One rep covers Dhaka, the other covers somewhere else entirely. A rep
+      // with no territories at all may act anywhere, which is why both are set.
+      ...(role === UserRole.SALES ? { territories: [who === rep ? 'Dhaka' : 'Sylhet'] } : {}),
     })),
   );
 
@@ -118,6 +125,9 @@ before(async () => {
     primaryPhone: '01712000111',
     status: ShopStatus.ACTIVE,
     ownerIds: [owner._id],
+    territory: 'Dhaka',
+    creditLimit: 50_000,
+    paymentTermsDays: 30,
     deliveryAddresses: [address('Shop front', { isDefault: true })],
   });
   shopId = shop._id;
@@ -415,4 +425,99 @@ test('the addresses a customer maintains are the ones the order screen reads', a
     (shops[0]!.deliveryAddresses as Array<{ label: string }>).map((entry) => entry.label).sort(),
     (await stored()).map((entry) => entry.label).sort(),
   );
+});
+
+// ─── The staff route ─────────────────────────────────────────────────────────
+
+/**
+ * `POST /shops/{id}/addresses`, which exists because the order-entry screen
+ * has offered "add an address" since the order-entry phase and wrote it through
+ * `PATCH /shops/{id}` — administrators only. Every manager and every sales
+ * representative filling that form in got a 403, and the browser test covering
+ * the button signs in as an administrator, so nothing caught it.
+ */
+test('a manager adds an address for a named customer, which used to be a 403', async () => {
+  const before = (await stored()).length;
+  const created = await post(`/api/v1/shops/${shopId}/addresses`, manager, address('Counter'));
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+
+  const list = await stored();
+  assert.equal(list.length, before + 1, 'the address was not appended');
+  assert.ok(
+    list.some((entry) => entry.label === 'Counter'),
+    'the manager’s address is not on the shop',
+  );
+});
+
+test('a sales representative may too, for a customer in their own area', async () => {
+  // The role that exists to take an order at a counter is the role most likely
+  // to find that the address is not on file.
+  const created = await post(`/api/v1/shops/${shopId}/addresses`, rep, address('Side entrance'));
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+});
+
+test('and may not, for a customer who is not theirs', async () => {
+  /*
+   * The list and the detail are both narrowed by territory. A write that was
+   * not would let a rep put a delivery address on any customer in the country
+   * by pasting an id — scoping that only looks like scoping.
+   */
+  const refused = await post(`/api/v1/shops/${shopId}/addresses`, farRep, address('Nowhere'));
+  assert.equal(refused.status, 403);
+  assert.equal(
+    (refused.body as unknown as { error: { code: string } }).error.code,
+    'SHOP_OUTSIDE_TERRITORY',
+  );
+  assert.ok(
+    !(await stored()).some((entry) => entry.label === 'Nowhere'),
+    'a refused request wrote an address anyway',
+  );
+});
+
+test('a shop owner cannot reach the staff route at all', async () => {
+  // Their own route is `/shops/my/addresses`. This one names a customer, and a
+  // customer naming another customer is the whole reason the paths differ.
+  const refused = await post(`/api/v1/shops/${otherShopId}/addresses`, owner, address('Theirs'));
+  assert.equal(refused.status, 403);
+});
+
+test('adding an address changes nothing else about the customer', async () => {
+  /*
+   * **The assertion this route exists for.** The alternative fix was to open
+   * `PATCH /shops/{id}` to managers and reps — and that endpoint also carries
+   * the credit limit, the payment terms, the discount, the price list and the
+   * status. A rep who may set a credit limit is a different product.
+   */
+  const before = await Shop.findById(shopId).lean();
+  await post(`/api/v1/shops/${shopId}/addresses`, manager, {
+    ...address('Trojan'),
+    creditLimit: 999_999,
+    paymentTermsDays: 365,
+    status: ShopStatus.SUSPENDED,
+    defaultDiscount: 50,
+  });
+  const after = await Shop.findById(shopId).lean();
+
+  assert.equal(after?.creditLimit, before?.creditLimit);
+  assert.equal(after?.paymentTermsDays, before?.paymentTermsDays);
+  assert.equal(after?.status, before?.status);
+  assert.equal(after?.defaultDiscount, before?.defaultDiscount);
+});
+
+test('the staff route keeps the one-default invariant, and records who did it', async () => {
+  const created = await post(`/api/v1/shops/${shopId}/addresses`, manager, {
+    ...address('New default'),
+    isDefault: true,
+  });
+  assert.equal(created.status, 201);
+
+  const list = await stored();
+  assert.ok(hasSoleDefault(list), 'the shop is left with two defaults or none');
+  assert.equal(list.find((entry) => entry.isDefault)?.label, 'New default');
+
+  const record = await AuditLog.findOne({ action: 'SHOP_ADDRESS_ADDED', entityId: shopId })
+    .sort({ createdAt: -1 })
+    .lean();
+  assert.equal(record?.actorId?.toString(), manager._id.toString());
+  assert.equal(record?.actorRole, UserRole.MANAGER);
 });

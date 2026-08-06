@@ -1641,6 +1641,19 @@ export const OPERATIONS: Operation[] = [
     tag: 'Shops',
     roles: [UserRole.SHOP_OWNER],
   },
+  /*
+   * And the staff equivalent, which is an **add and nothing else**: the order
+   * screen needs an address for a customer standing at a counter, and a rep has
+   * no business changing one that is already on file.
+   */
+  {
+    method: 'post',
+    path: '/api/v1/shops/{id}/addresses',
+    summary: 'Add a delivery address to a named customer',
+    tag: 'Shops',
+    roles: [...MANAGEMENT, UserRole.SALES],
+    body: DeliveryAddressSchema,
+  },
   {
     method: 'get',
     path: '/api/v1/inventory/medicines/{id}',

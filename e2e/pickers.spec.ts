@@ -88,8 +88,15 @@ test('a delivery address can be added while taking an order, which nothing could
    * A shop's addresses were written by the seed script and by nothing else —
    * no screen anywhere could append one — and **a customer with no address
    * cannot order at all**, because both order entry and checkout require one.
+   *
+   * **Signed in as a manager, deliberately.** This test used to sign in as an
+   * administrator, and that is the only reason it passed: the form wrote
+   * through `PATCH /shops/:id`, which admits administrators only, so every
+   * manager and every sales representative — the two roles that actually take
+   * orders — filled this in and got a 403. The button worked for exactly the
+   * one role that never uses it, and the test proved it.
    */
-  await signIn(page, 'admin');
+  await signIn(page, 'manager');
   await page.goto('/orders/new');
   await expectPageRendered(page);
 
@@ -101,8 +108,8 @@ test('a delivery address can be added while taking an order, which nothing could
    *
    * A count taken here races the customer's own record arriving, and the point
    * of the assertion is not arithmetic — it is that this one is **still there**
-   * afterwards, because the patch sends the whole array and a mistake would
-   * replace it rather than append to it.
+   * afterwards, which is what distinguishes adding an address from replacing
+   * the list with one.
    */
   const picker = page.getByRole('combobox', { name: /deliver to/i });
   await expect(picker.locator('option', { hasText: /Shafin Pharmacy/ })).toHaveCount(1);
@@ -121,8 +128,7 @@ test('a delivery address can be added while taking an order, which nothing could
   // The new one is there and selected...
   await expect(picker.locator('option', { hasText: `Back godown ${mark}` })).toHaveCount(1);
   await expect(picker).toHaveValue(/^[a-f0-9]{24}$/);
-  // ...and the one that was already there survived, which is what sending the
-  // whole array back rather than only the new entry is for.
+  // ...and the one that was already there survived.
   await expect(picker.locator('option', { hasText: /Shafin Pharmacy/ })).toHaveCount(1);
 });
 

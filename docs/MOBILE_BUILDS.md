@@ -14,8 +14,31 @@ and a role in two makes "which one do I install?" unanswerable.
 
 The three colours are from `chartLight` in `@medsupply/design-tokens`, which was
 chosen to stay distinguishable in the common forms of colour blindness and in
-greyscale. Three home-screen icons that share a foreground have to be told apart
-by that one field.
+greyscale.
+
+## The icons
+
+`node scripts/icons.mjs` draws all sixteen files. Run it after changing a
+glyph, an accent or the safe-zone margin; the output is committed, so a build
+never depends on it having been run.
+
+|            | Silhouette                     | Why                                            |
+| ---------- | ------------------------------ | ---------------------------------------------- |
+| **Shop**   | a carton with a medicine cross | what arrives at the pharmacy                   |
+| **Manage** | a clipboard                    | the work list a manager and a storekeeper read |
+| **Rider**  | a map pin                      | the one thing a rider's day is about           |
+
+They shipped identical — all three carried the Expo template's mark, told apart
+only by the background colour. That is not enough. An operator can have two of
+these installed, they pick one at 48 pixels on a home screen in daylight, and
+picking wrong means taking an order in the rider's application. A **different
+silhouette** survives greyscale, colour blindness and Android's monochrome
+themed-icon treatment; a background colour survives none of them.
+
+Per application: a 1024 px opaque iOS icon (an alpha channel is rejected at
+upload), three 512/432 px Android adaptive layers, and a splash mark.
+`appVariant.test.ts` reads the PNG headers and fails if `app.config.ts` names a
+file that is missing, shared between two applications, or the wrong size.
 
 ## What differs between them, and what does not
 

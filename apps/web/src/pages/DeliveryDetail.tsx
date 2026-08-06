@@ -31,6 +31,7 @@ import {
   toast,
   useAsk,
 } from '../components/ui';
+import { openDocument } from '../lib/openDocument';
 import { useApiCollection, useApiResource } from '../lib/query';
 import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
@@ -112,14 +113,7 @@ export function DeliveryDetail() {
   }
 
   async function openBlob(url: string, params: Record<string, string> | undefined, failed: string) {
-    try {
-      const file = await apiClient.get(url, { params, responseType: 'blob' });
-      const objectUrl = URL.createObjectURL(file.data as Blob);
-      window.open(objectUrl, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
-    } catch {
-      toast.error(failed);
-    }
+    if (!(await openDocument(url, params))) toast.error(failed);
   }
 
   return (

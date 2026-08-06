@@ -3,6 +3,8 @@ import { Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { errorMessage } from '@medsupply/api-client';
 import { apiClient } from '../../src/api/client';
+import { saveInvoice } from '../../src/documents/files';
+import { useSaveDocument } from '../../src/documents/useSaveDocument';
 import { formatFinanceDate } from '../../src/finance/date';
 import { formatMoneyMinor } from '../../src/finance/money';
 import { useLanguage } from '../../src/i18n/useLanguage';
@@ -63,6 +65,7 @@ export default function InvoiceDetailScreen() {
   const { t, language } = useLanguage();
   const [invoice, setInvoice] = useState<InvoiceView>();
   const [error, setError] = useState('');
+  const document = useSaveDocument();
 
   const load = useCallback(async () => {
     setError('');
@@ -196,6 +199,30 @@ export default function InvoiceDetailScreen() {
           numeric
         />
       </Card>
+
+      {/*
+        The document itself, not a rendering of it.
+
+        A pharmacy needs the issued PDF — to print for the file behind the
+        counter, to send to whoever pays the bills, to attach to a query. The
+        endpoint has existed since the fulfilment phase and web has opened it
+        since; on a phone there was nothing at all, because a phone has no blob
+        URL and no new tab to open one in.
+      */}
+      <Button
+        variant="secondary"
+        busy={document.busy}
+        label={document.busy ? t('documents.preparing') : t('documents.saveInvoice')}
+        onPress={() =>
+          void document.save(() =>
+            saveInvoice(
+              invoice._id,
+              invoice.reference,
+              t('documents.invoiceTitle', { reference: invoice.reference }),
+            ),
+          )
+        }
+      />
 
       {/*
         The one screen that already knows which invoice a return is against, so
