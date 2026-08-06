@@ -1,5 +1,70 @@
 # Changelog
 
+## Phase 34 — a product that explains itself
+
+Asked for: a short description under every box, and a fuller explanation at the
+bottom of every page, so that somebody who is not technical can use this without
+asking anybody.
+
+### What was measured first
+
+**143 form fields across the pages carried 27 hints between them.** The sign-in
+screen — the first thing anybody meets — had none on either box. The medicine
+form had one on nineteen controls, and nothing anywhere told the person typing
+into "Sold as" that putting _Tablet_ there means a shop ordering five gets five
+tablets rather than five boxes.
+
+### What shipped
+
+**A hint under all 150 fields**, in both languages. Written from one table so
+the English and the Bangla cannot drift, and reused where the field repeats —
+the same sentence explains "from" on all six screens that have a date range,
+which is a feature and not a shortcut.
+
+**An explanation under all 73 screens**, answering three questions: what the
+page is for, how to use it, and — only where a screen shows a figure somebody
+could disagree with — how that figure is worked out. Forty-three screens have
+the third answer; thirty do not, and are left without one rather than given a
+sentence saying there is no arithmetic.
+
+`AppShell` renders it from the route rather than each page pasting a block,
+because sixty-four pages doing that is sixty-four chances to forget, and the
+page somebody writes next year would simply not have one.
+
+### Two gates, each proved by planting the defect it claims to catch
+
+`pageGuides.test.ts` fails when a route has no explanation — and also when the
+explanation contains jargon (`endpoint`, `payload`, `basis points`), or is too
+short to be a sentence. That last rule caught four of my own on its first run.
+
+`fieldHints.test.ts` fails when a `<Field>` has no hint. Its parser tracks brace
+depth and quoting, because `/<Field[^>]*>/` is defeated by `onChange={(e) => …}`
+— and it proves that against the four prop shapes that would break it.
+
+Both waiver lists are seeded **empty**, and both were proved by deleting one
+hint and one route and watching each name the exact offender.
+
+### The dev server has never watched the shared packages
+
+Found while verifying the above, and it is the cause of three separate
+investigations in this project — a blank page, a missing export, and a screen of
+raw `home.whoOwesUs` keys this morning.
+
+Every `@medsupply/*` package is aliased to its TypeScript source, so
+`packages/i18n/en.ts` is a real module in the graph. It is not watched: Vite's
+watcher covers the project root, and the root here is `apps/web`. `packages/` is
+a sibling of it.
+
+Measured, not guessed. Touching `apps/web/src/main.tsx` writes
+`page reload src/main.tsx` to the log. Touching `packages/i18n/en.ts` writes
+nothing, and a 143-line log of a working session contained not one mention of
+any file under `packages/`. **A change to a shared package was wrong until
+somebody restarted the server, and nothing on screen said so.**
+
+`watchWorkspaceSources` hands the directory to the watcher. After it, the same
+touch writes `page reload D:/b2b_medicine/packages/i18n/en.ts` and the served
+bytes change — which is how it was verified rather than assumed.
+
 ## Phase 33 — a chart that is honest about the first of the month
 
 Phase 32 filled the database and the home screen still drew a flat line. Two

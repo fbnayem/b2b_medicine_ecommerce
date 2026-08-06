@@ -623,7 +623,11 @@ export function FulfilmentWork() {
                 {current.status === 'PACKING' && isStorekeeper && (
                   <Card className="mb-4">
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <Field label={t('picking.packageCount')} required>
+                      <Field
+                        label={t('picking.packageCount')}
+                        required
+                        hint={t('hints.packageCount')}
+                      >
                         <Input
                           type="number"
                           min={1}
@@ -640,7 +644,11 @@ export function FulfilmentWork() {
                         />
                       </Field>
                     </div>
-                    <Field label={t('picking.packingNotes')} className="mt-3">
+                    <Field
+                      label={t('picking.packingNotes')}
+                      className="mt-3"
+                      hint={t('hints.packingNotes')}
+                    >
                       <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
                     </Field>
                     <div className="mt-3 flex justify-end">
@@ -656,7 +664,11 @@ export function FulfilmentWork() {
                     <h2 className="mb-2 text-lg font-semibold text-text">
                       {t('picking.reportTitle')}
                     </h2>
-                    <Field label={t('picking.reportLine')} className="mb-3">
+                    <Field
+                      label={t('picking.reportLine')}
+                      className="mb-3"
+                      hint={t('hints.reportLine')}
+                    >
                       <Select
                         value={discrepancyLine || (current.items[0]?._id ?? '')}
                         onChange={(event) => setDiscrepancyLine(event.target.value)}
@@ -670,7 +682,7 @@ export function FulfilmentWork() {
                       </Select>
                     </Field>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <Field label={t('picking.reportType')}>
+                      <Field label={t('picking.reportType')} hint={t('hints.reportType')}>
                         <Select
                           value={discrepancyType}
                           onChange={(event) => setDiscrepancyType(event.target.value)}
@@ -682,7 +694,10 @@ export function FulfilmentWork() {
                           ))}
                         </Select>
                       </Field>
-                      <Field label={t('picking.affectedQuantity')}>
+                      <Field
+                        label={t('picking.affectedQuantity')}
+                        hint={t('hints.affectedQuantity')}
+                      >
                         <Input
                           type="number"
                           min={0}
@@ -691,7 +706,11 @@ export function FulfilmentWork() {
                         />
                       </Field>
                     </div>
-                    <Field label={t('fields.notes')} className="mt-3">
+                    <Field
+                      label={t('fields.notes')}
+                      className="mt-3"
+                      hint={t('hints.discrepancyNotes')}
+                    >
                       <Textarea
                         value={discrepancyNotes}
                         onChange={(event) => setDiscrepancyNotes(event.target.value)}

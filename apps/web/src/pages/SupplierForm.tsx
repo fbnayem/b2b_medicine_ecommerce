@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Supplier } from '@medsupply/shared-types';
+import type { Translate } from '@medsupply/i18n';
 import { apiClient, errorMessage, failureReference } from '../api/client';
 import {
   Button,
@@ -31,8 +32,15 @@ const EMPTY = {
 
 type FieldName = keyof typeof EMPTY;
 
+/**
+ * The seven fields rendered from the loop below. `address` and `notes` are not
+ * among them — they are laid out separately because they need more room — so
+ * naming the subset keeps `hintFor` total rather than partial.
+ */
+type LoopField = Exclude<FieldName, 'address' | 'notes'>;
+
 /** `[field, catalogue key, input type, required]`. */
-const FIELDS: Array<[FieldName, string, string, boolean]> = [
+const FIELDS: Array<[LoopField, string, string, boolean]> = [
   ['name', 'supplierName', 'text', true],
   ['contactName', 'contactName', 'text', false],
   ['primaryPhone', 'phone', 'tel', true],
@@ -41,6 +49,28 @@ const FIELDS: Array<[FieldName, string, string, boolean]> = [
   ['drugLicenceExpiryDate', 'licenceExpiry', 'date', false],
   ['paymentTermsDays', 'paymentTerms', 'number', false],
 ];
+
+/**
+ * The description under each box.
+ *
+ * Written out one call at a time rather than as `` t(`hints.${key}`) ``,
+ * because `catalogueKeys.test.ts` only sees literal call sites — the label
+ * above is already invisible to it for exactly that reason, and repeating the
+ * mistake would put seven more strings outside the only gate that proves they
+ * resolve.
+ */
+function hintFor(name: LoopField, t: Translate): string {
+  const hints: Record<LoopField, string> = {
+    name: t('hints.supplierName'),
+    contactName: t('hints.supplierContact'),
+    primaryPhone: t('hints.supplierPhone'),
+    email: t('hints.supplierEmail'),
+    drugLicenceNumber: t('hints.supplierLicence'),
+    drugLicenceExpiryDate: t('hints.supplierLicenceExpiry'),
+    paymentTermsDays: t('hints.supplierPaymentTerms'),
+  };
+  return hints[name];
+}
 
 /**
  * Two hosts, one form.
@@ -109,6 +139,7 @@ export function SupplierForm({ onCreated, onCancel }: SupplierFormProps = {}) {
           <Field
             key={name}
             label={key === 'phone' || key === 'email' ? t(`fields.${key}`) : t(`purchasing.${key}`)}
+            hint={hintFor(name, t)}
             required={required}
           >
             <Input
@@ -123,7 +154,7 @@ export function SupplierForm({ onCreated, onCancel }: SupplierFormProps = {}) {
         ))}
       </div>
 
-      <Field label={t('fields.address')}>
+      <Field label={t('fields.address')} hint={t('hints.supplierAddress')}>
         <Textarea
           rows={2}
           value={form.address}
@@ -131,7 +162,7 @@ export function SupplierForm({ onCreated, onCancel }: SupplierFormProps = {}) {
         />
       </Field>
 
-      <Field label={t('fields.notes')}>
+      <Field label={t('fields.notes')} hint={t('hints.notesInternal')}>
         <Textarea
           rows={3}
           value={form.notes}

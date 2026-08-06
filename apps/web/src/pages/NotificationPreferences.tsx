@@ -183,7 +183,7 @@ export function NotificationPreferences() {
                         />
                         {t('notifications.quietHoursEnable')}
                       </label>
-                      <Field label={t('notifications.quietFrom')}>
+                      <Field label={t('notifications.quietFrom')} hint={t('hints.quietFrom')}>
                         <Input
                           type="time"
                           value={preference.quietHours.start}
@@ -195,7 +195,7 @@ export function NotificationPreferences() {
                           }
                         />
                       </Field>
-                      <Field label={t('notifications.quietTo')}>
+                      <Field label={t('notifications.quietTo')} hint={t('hints.quietTo')}>
                         <Input
                           type="time"
                           value={preference.quietHours.end}

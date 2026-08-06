@@ -183,7 +183,7 @@ export function SystemSettings() {
             {t('settings.quietEnabled')}
           </label>
           <div className="mt-2 flex flex-wrap gap-3">
-            <Field label={t('settings.from')} className="w-40">
+            <Field label={t('settings.from')} className="w-40" hint={t('hints.quietFromAll')}>
               <Input
                 type="time"
                 value={quiet.start}
@@ -192,7 +192,7 @@ export function SystemSettings() {
                 }
               />
             </Field>
-            <Field label={t('settings.to')} className="w-40">
+            <Field label={t('settings.to')} className="w-40" hint={t('hints.quietToAll')}>
               <Input
                 type="time"
                 value={quiet.end}
@@ -207,7 +207,7 @@ export function SystemSettings() {
     if (field === 'locale' || field === 'dateFormat') {
       const options = field === 'locale' ? LOCALE_OPTIONS : DATE_FORMAT_OPTIONS;
       return (
-        <Field key={field} label={label}>
+        <Field key={field} label={label} hint={t('hints.settingValue')}>
           <Select
             value={String(value ?? '')}
             onChange={(event) => setField(group, field, event.target.value)}
@@ -226,7 +226,7 @@ export function SystemSettings() {
 
     if (typeof value === 'number') {
       return (
-        <Field key={field} label={label}>
+        <Field key={field} label={label} hint={t('hints.settingValue')}>
           <Input
             type="number"
             value={value}
@@ -237,7 +237,7 @@ export function SystemSettings() {
     }
 
     return (
-      <Field key={field} label={label}>
+      <Field key={field} label={label} hint={t('hints.settingValue')}>
         <Input
           value={String(value ?? '')}
           onChange={(event) => setField(group, field, event.target.value)}

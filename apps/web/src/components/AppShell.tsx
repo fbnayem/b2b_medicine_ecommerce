@@ -27,6 +27,7 @@ import { NotificationBell } from './NotificationBell';
 import { Toaster } from './ui/toast';
 import { AskProvider } from './ui/ask';
 import { RouteAnnouncer } from './RouteAnnouncer';
+import { PageGuide } from './ui/PageGuide';
 import { useLanguage } from '../lib/useLanguage';
 import { LANGUAGE_LABEL, LANGUAGES } from '@medsupply/i18n';
 import { applyTheme, storedTheme, setTheme, type ThemeChoice } from '../lib/theme';
@@ -189,6 +190,17 @@ export function AppShell() {
             <div className="mx-auto w-full max-w-[100rem]">
               <Breadcrumbs />
               <Outlet />
+              {/*
+                The explanation of the screen, under the screen.
+
+                Rendered here rather than by each page for the same reason
+                `PageHeader` emits its own test id: sixty-four pages pasting the
+                same block is sixty-four chances to forget it, and the page
+                somebody writes next year would simply not have one. Resolved
+                from the route, so a screen with no guidance written for it
+                fails `pageGuides.test.ts` rather than quietly shipping bare.
+              */}
+              <PageGuide routeId={routeIdForPath(location.pathname)} />
             </div>
           </main>
         </div>

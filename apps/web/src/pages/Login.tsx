@@ -56,7 +56,7 @@ export function Login() {
           */}
           {failure && <ErrorState message={failure.message} reference={failure.reference} />}
 
-          <Field label={t('auth.email')} required>
+          <Field label={t('auth.email')} required hint={t('hints.loginEmail')}>
             <Input
               type="email"
               name="email"
@@ -67,7 +67,7 @@ export function Login() {
             />
           </Field>
 
-          <Field label={t('auth.password')} required>
+          <Field label={t('auth.password')} required hint={t('hints.loginPassword')}>
             <Input
               type="password"
               name="password"

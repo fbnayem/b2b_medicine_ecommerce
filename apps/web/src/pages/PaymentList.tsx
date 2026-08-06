@@ -146,14 +146,18 @@ export function PaymentList({ ownerMode = false }: PaymentListProps) {
           setApplied({ q: search.trim(), method, from, to });
         }}
       >
-        <Field label={t('fields.reference')} className="min-w-56">
+        <Field label={t('fields.reference')} className="min-w-56" hint={t('hints.searchReference')}>
           <Input
             value={search}
             placeholder="PAY-2026-000001"
             onChange={(event) => setSearch(event.target.value)}
           />
         </Field>
-        <Field label={t('finance.method')} className="min-w-48">
+        <Field
+          label={t('finance.method')}
+          className="min-w-48"
+          hint={t('hints.paymentMethodFilter')}
+        >
           <Select value={method} onChange={(event) => setMethod(event.target.value)}>
             <option value="">{t('finance.anyMethod')}</option>
             {Object.values(PaymentMethod).map((value) => (
@@ -163,10 +167,10 @@ export function PaymentList({ ownerMode = false }: PaymentListProps) {
             ))}
           </Select>
         </Field>
-        <Field label={t('finance.from')} className="min-w-40">
+        <Field label={t('finance.from')} className="min-w-40" hint={t('hints.dateFrom')}>
           <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
         </Field>
-        <Field label={t('finance.to')} className="min-w-40">
+        <Field label={t('finance.to')} className="min-w-40" hint={t('hints.dateTo')}>
           <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
         </Field>
         <Button type="submit">{t('actions.apply')}</Button>

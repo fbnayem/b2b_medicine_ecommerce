@@ -147,7 +147,7 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
           {failure && <ErrorState message={failure.message} reference={failure.reference} />}
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t('schemes.name')} required>
+            <Field label={t('schemes.name')} required hint={t('hints.schemeName')}>
               <Input
                 required
                 value={form.name}
@@ -173,7 +173,7 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
                 onChange={(event) => setForm({ ...form, buyQuantity: event.target.value })}
               />
             </Field>
-            <Field label={t('schemes.freeQuantity')} required>
+            <Field label={t('schemes.freeQuantity')} required hint={t('hints.freeQuantity')}>
               <Input
                 required
                 inputMode="numeric"
@@ -188,14 +188,14 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
                 onChange={(event) => setForm({ ...form, validFrom: event.target.value })}
               />
             </Field>
-            <Field label={t('schemes.validTo')}>
+            <Field label={t('schemes.validTo')} hint={t('hints.validTo')}>
               <Input
                 type="date"
                 value={form.validTo}
                 onChange={(event) => setForm({ ...form, validTo: event.target.value })}
               />
             </Field>
-            <Field label={t('fields.status')}>
+            <Field label={t('fields.status')} hint={t('hints.activeOnly')}>
               <Select
                 value={form.isActive ? 'active' : 'inactive'}
                 onChange={(event) =>
@@ -235,7 +235,7 @@ export function SchemeForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
               : t('schemes.namedCustomers', { count: shopIds.length })}
           </p>
 
-          <Field label={t('fields.notes')}>
+          <Field label={t('fields.notes')} hint={t('hints.notesInternal')}>
             <Textarea
               rows={2}
               value={form.notes}

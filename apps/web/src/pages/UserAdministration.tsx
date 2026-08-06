@@ -184,14 +184,18 @@ export function UserAdministration() {
           setQuery(search.trim());
         }}
       >
-        <Field label={t('users.searchLabel')} className="min-w-64 flex-1">
+        <Field
+          label={t('users.searchLabel')}
+          className="min-w-64 flex-1"
+          hint={t('hints.searchUsers')}
+        >
           <Input
             value={search}
             placeholder={t('users.searchPlaceholder')}
             onChange={(event) => setSearch(event.target.value)}
           />
         </Field>
-        <Field label={t('users.roleFilter')} className="min-w-48">
+        <Field label={t('users.roleFilter')} className="min-w-48" hint={t('hints.roleFilter')}>
           <Select
             value={role}
             onChange={(event) => {
@@ -207,7 +211,11 @@ export function UserAdministration() {
             ))}
           </Select>
         </Field>
-        <Field label={t('users.statusFilter')} className="min-w-44">
+        <Field
+          label={t('users.statusFilter')}
+          className="min-w-44"
+          hint={t('hints.userStatusFilter')}
+        >
           <Select
             value={status}
             onChange={(event) => {
@@ -265,7 +273,11 @@ export function UserAdministration() {
 
                       {canAdminister ? (
                         <div className="flex flex-wrap items-end gap-2">
-                          <Field label={t('users.roleFor', { email: user.email })} className="w-44">
+                          <Field
+                            label={t('users.roleFor', { email: user.email })}
+                            className="w-44"
+                            hint={t('hints.roleForUser')}
+                          >
                             <Select
                               value={user.role}
                               disabled={busy || isSelf}
@@ -290,6 +302,7 @@ export function UserAdministration() {
                           <Field
                             label={t('users.statusFor', { email: user.email })}
                             className="w-40"
+                            hint={t('hints.statusForUser')}
                           >
                             <Select
                               value={user.status}

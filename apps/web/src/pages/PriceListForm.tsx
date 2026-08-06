@@ -190,7 +190,7 @@ export function PriceListForm({ mode = 'create' }: { mode?: 'create' | 'edit' })
           {failure && <ErrorState message={failure.message} reference={failure.reference} />}
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t('priceLists.name')} required>
+            <Field label={t('priceLists.name')} required hint={t('hints.priceListName')}>
               <Input
                 required
                 value={form.name}
@@ -204,7 +204,7 @@ export function PriceListForm({ mode = 'create' }: { mode?: 'create' | 'edit' })
                 onChange={(event) => setForm({ ...form, validFrom: event.target.value })}
               />
             </Field>
-            <Field label={t('priceLists.validTo')}>
+            <Field label={t('priceLists.validTo')} hint={t('hints.validTo')}>
               <Input
                 type="date"
                 value={form.validTo}
@@ -220,7 +220,7 @@ export function PriceListForm({ mode = 'create' }: { mode?: 'create' | 'edit' })
                 <option value="yes">{t('common.on')}</option>
               </Select>
             </Field>
-            <Field label={t('fields.status')}>
+            <Field label={t('fields.status')} hint={t('hints.activeOnly')}>
               <Select
                 value={form.isActive ? 'active' : 'inactive'}
                 onChange={(event) =>
@@ -231,7 +231,11 @@ export function PriceListForm({ mode = 'create' }: { mode?: 'create' | 'edit' })
                 <option value="inactive">{t('common.inactive')}</option>
               </Select>
             </Field>
-            <Field label={t('fields.notes')} className="sm:col-span-2">
+            <Field
+              label={t('fields.notes')}
+              className="sm:col-span-2"
+              hint={t('hints.notesInternal')}
+            >
               <Textarea
                 rows={2}
                 value={form.description}
@@ -255,14 +259,14 @@ export function PriceListForm({ mode = 'create' }: { mode?: 'create' | 'edit' })
                     })
                   }
                 />
-                <Field label={t('priceLists.unitPrice')}>
+                <Field label={t('priceLists.unitPrice')} hint={t('hints.listUnitPrice')}>
                   <Input
                     inputMode="decimal"
                     value={line.unitPrice}
                     onChange={(event) => patch(line.key, { unitPrice: event.target.value })}
                   />
                 </Field>
-                <Field label={t('priceLists.discountPercent')}>
+                <Field label={t('priceLists.discountPercent')} hint={t('hints.discountPercent')}>
                   <Input
                     inputMode="decimal"
                     value={line.discountPercent}

@@ -122,7 +122,11 @@ export function SupplierList() {
       />
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <Field label={t('purchasing.showInactive')} className="min-w-64">
+        <Field
+          label={t('purchasing.showInactive')}
+          className="min-w-64"
+          hint={t('hints.showInactive')}
+        >
           <Select
             value={includeInactive ? 'yes' : 'no'}
             onChange={(event) => setIncludeInactive(event.target.value === 'yes')}

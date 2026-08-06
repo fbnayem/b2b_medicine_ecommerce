@@ -216,7 +216,7 @@ function FinancialReportPage({ kind }: { kind: ReportKind }) {
       >
         {kind === 'collections' ? (
           <>
-            <Field label={t('finance.from')} className="min-w-44">
+            <Field label={t('finance.from')} className="min-w-44" hint={t('hints.dateFrom')}>
               <Input
                 required
                 type="date"
@@ -224,7 +224,7 @@ function FinancialReportPage({ kind }: { kind: ReportKind }) {
                 onChange={(event) => setFrom(event.target.value)}
               />
             </Field>
-            <Field label={t('finance.to')} className="min-w-44">
+            <Field label={t('finance.to')} className="min-w-44" hint={t('hints.dateTo')}>
               <Input
                 required
                 type="date"
@@ -235,7 +235,7 @@ function FinancialReportPage({ kind }: { kind: ReportKind }) {
             </Field>
           </>
         ) : (
-          <Field label={t('finance.asOf')} className="min-w-44">
+          <Field label={t('finance.asOf')} className="min-w-44" hint={t('hints.asOf')}>
             <Input
               required
               type="date"

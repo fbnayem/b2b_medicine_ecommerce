@@ -104,10 +104,10 @@ export function CustomerLedger() {
           setApplied({ from, to });
         }}
       >
-        <Field label={t('finance.from')} className="min-w-44">
+        <Field label={t('finance.from')} className="min-w-44" hint={t('hints.dateFrom')}>
           <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
         </Field>
-        <Field label={t('finance.to')} className="min-w-44">
+        <Field label={t('finance.to')} className="min-w-44" hint={t('hints.dateTo')}>
           <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
         </Field>
         <Button type="submit">{t('finance.applyDates')}</Button>

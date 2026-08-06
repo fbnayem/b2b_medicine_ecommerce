@@ -232,7 +232,7 @@ export function TripForm() {
                   : undefined
               }
             />
-            <Field label={t('trips.day')} required id={DAY_FIELD}>
+            <Field label={t('trips.day')} required id={DAY_FIELD} hint={t('hints.tripDay')}>
               <Input
                 type="date"
                 required
@@ -240,14 +240,14 @@ export function TripForm() {
                 onChange={(event) => setTripDate(event.target.value)}
               />
             </Field>
-            <Field label={t('trips.vehicle')}>
+            <Field label={t('trips.vehicle')} hint={t('hints.vehicle')}>
               <Input
                 value={vehicleReference}
                 onChange={(event) => setVehicleReference(event.target.value)}
               />
             </Field>
           </div>
-          <Field label={t('trips.notes')} className="mt-3">
+          <Field label={t('trips.notes')} className="mt-3" hint={t('hints.notesOptional')}>
             <Textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
           </Field>
         </Card>

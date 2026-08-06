@@ -217,7 +217,7 @@ export function ShopForm({ onCreated, onCancel }: ShopFormProps = {}) {
         </Link>
       </p>
 
-      <Field label={t('shops.internalNotes')}>
+      <Field label={t('shops.internalNotes')} hint={t('hints.notesInternal')}>
         <Textarea
           rows={3}
           value={form.notes}

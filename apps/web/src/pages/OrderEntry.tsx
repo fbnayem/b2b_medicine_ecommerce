@@ -423,7 +423,7 @@ export function OrderEntry() {
                   : undefined
               }
             />
-            <Field label={t('orderEntry.payment')}>
+            <Field label={t('orderEntry.payment')} hint={t('hints.paymentMethodIntent')}>
               <Select
                 value={paymentMethod}
                 onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
@@ -484,7 +484,10 @@ export function OrderEntry() {
 
             {pending && (
               <div className="flex flex-wrap items-end gap-3">
-                <Field label={t('orderEntry.quantityForPending', { brand: pending.brandName })}>
+                <Field
+                  label={t('orderEntry.quantityForPending', { brand: pending.brandName })}
+                  hint={t('hints.orderQuantity')}
+                >
                   <Input
                     ref={quantityBox}
                     inputMode="numeric"

@@ -290,7 +290,7 @@ function SalesReportBody({
       </Panel>
 
       <Panel title={t('reports.breakdown')}>
-        <Field label={t('reports.groupBy')} className="mb-3 max-w-56">
+        <Field label={t('reports.groupBy')} className="mb-3 max-w-56" hint={t('hints.groupBy')}>
           <Select
             value={dimension}
             onChange={(event) => onDimension(event.target.value as SalesDimension)}

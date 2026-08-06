@@ -297,14 +297,18 @@ export function DeliveryDetail() {
                             : undefined
                         }
                       />
-                      <Field label={t('deliveryDetail.expectedDate')} required>
+                      <Field
+                        label={t('deliveryDetail.expectedDate')}
+                        required
+                        hint={t('hints.expectedDelivery')}
+                      >
                         <Input
                           type="date"
                           value={date}
                           onChange={(event) => setDate(event.target.value)}
                         />
                       </Field>
-                      <Field label={t('deliveryDetail.priority')}>
+                      <Field label={t('deliveryDetail.priority')} hint={t('hints.priority')}>
                         <Select
                           value={priority}
                           onChange={(event) => setPriority(event.target.value as DeliveryPriority)}
@@ -316,7 +320,10 @@ export function DeliveryDetail() {
                           ))}
                         </Select>
                       </Field>
-                      <Field label={t('deliveryDetail.instructions')}>
+                      <Field
+                        label={t('deliveryDetail.instructions')}
+                        hint={t('hints.riderInstructions')}
+                      >
                         <Textarea
                           value={instructions}
                           onChange={(event) => setInstructions(event.target.value)}

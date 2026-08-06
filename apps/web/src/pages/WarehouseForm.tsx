@@ -94,19 +94,19 @@ export function WarehouseForm({ onCreated, onCancel }: WarehouseFormProps = {}) 
             onChange={(event) => set('code', event.target.value.toUpperCase())}
           />
         </Field>
-        <Field label={t('warehouses.name')} required>
+        <Field label={t('warehouses.name')} required hint={t('hints.warehouseName')}>
           <Input required value={form.name} onChange={(event) => set('name', event.target.value)} />
         </Field>
-        <Field label={t('fields.address')}>
+        <Field label={t('fields.address')} hint={t('hints.warehouseAddress')}>
           <Input value={form.line1} onChange={(event) => set('line1', event.target.value)} />
         </Field>
-        <Field label={t('warehouses.city')}>
+        <Field label={t('warehouses.city')} hint={t('hints.city')}>
           <Input value={form.city} onChange={(event) => set('city', event.target.value)} />
         </Field>
-        <Field label={t('warehouses.district')}>
+        <Field label={t('warehouses.district')} hint={t('hints.district')}>
           <Input value={form.district} onChange={(event) => set('district', event.target.value)} />
         </Field>
-        <Field label={t('warehouses.contactPhone')}>
+        <Field label={t('warehouses.contactPhone')} hint={t('hints.contactPhone')}>
           <Input
             type="tel"
             value={form.contactPhone}
@@ -125,7 +125,7 @@ export function WarehouseForm({ onCreated, onCancel }: WarehouseFormProps = {}) 
         </Select>
       </Field>
 
-      <Field label={t('fields.notes')}>
+      <Field label={t('fields.notes')} hint={t('hints.notesOptional')}>
         <Textarea
           rows={3}
           value={form.notes}

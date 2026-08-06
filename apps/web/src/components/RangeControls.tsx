@@ -28,7 +28,7 @@ export function RangeControls({
         range.apply();
       }}
     >
-      <Field label={t('finance.from')} className="min-w-44">
+      <Field label={t('finance.from')} hint={t('hints.dateFrom')} className="min-w-44">
         <Input
           required
           type="date"
@@ -36,7 +36,7 @@ export function RangeControls({
           onChange={(event) => range.setFrom(event.target.value)}
         />
       </Field>
-      <Field label={t('finance.to')} className="min-w-44">
+      <Field label={t('finance.to')} hint={t('hints.dateTo')} className="min-w-44">
         <Input
           required
           type="date"
@@ -45,7 +45,7 @@ export function RangeControls({
           onChange={(event) => range.setTo(event.target.value)}
         />
       </Field>
-      <Field label={t('reports.groupBy')} className="min-w-40">
+      <Field label={t('reports.groupBy')} hint={t('hints.groupBy')} className="min-w-40">
         <Select
           value={range.granularity}
           onChange={(event) => range.setGranularity(event.target.value as Granularity)}

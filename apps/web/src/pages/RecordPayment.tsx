@@ -214,7 +214,7 @@ export function RecordPayment() {
             }}
           />
 
-          <Field label={t('finance.againstInvoice')}>
+          <Field label={t('finance.againstInvoice')} hint={t('hints.againstInvoice')}>
             <Select
               value={invoiceId}
               disabled={!shopId || invoices.isFetching}
@@ -245,7 +245,7 @@ export function RecordPayment() {
                 }}
               />
             </Field>
-            <Field label={t('finance.method')}>
+            <Field label={t('finance.method')} hint={t('hints.paymentMethodReceived')}>
               <Select
                 value={method}
                 onChange={(event) => {
@@ -264,7 +264,7 @@ export function RecordPayment() {
                   ))}
               </Select>
             </Field>
-            <Field label={t('finance.whenCollected')} required>
+            <Field label={t('finance.whenCollected')} required hint={t('hints.whenCollected')}>
               <Input
                 required
                 type="datetime-local"
@@ -298,7 +298,7 @@ export function RecordPayment() {
             />
           </Field>
 
-          <Field label={t('fields.notes')}>
+          <Field label={t('fields.notes')} hint={t('hints.notesOptional')}>
             <Textarea
               maxLength={1000}
               value={notes}

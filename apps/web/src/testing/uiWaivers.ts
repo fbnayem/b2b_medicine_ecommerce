@@ -138,3 +138,23 @@ export const RAW_QUERY_KEYS: readonly string[] = [];
  * write with nothing after it — and the rest is review.
  */
 export const UNINVALIDATED_MUTATIONS: readonly string[] = [];
+
+/**
+ * Screens with no explanation under them.
+ *
+ * The request was that a non-technical reader use this product without asking
+ * anybody, so a screen without guidance is a screen that is not finished. The
+ * list is seeded empty because the phase that added the rule wrote all
+ * seventy-three; an entry here now is a deliberate exception, argued for in
+ * review like any other.
+ */
+export const NO_PAGE_GUIDE: readonly string[] = [];
+
+/**
+ * Form fields shipping without a description under them.
+ *
+ * Entries are `File.tsx#<index of the Field in that file>`, because a file may
+ * hold nine and naming the offender is the deciding detail every time. Seeded
+ * empty: the phase that added the rule wrote all 150.
+ */
+export const NO_FIELD_HINT: readonly string[] = [];

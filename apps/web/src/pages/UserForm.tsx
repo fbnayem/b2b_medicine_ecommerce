@@ -102,10 +102,10 @@ export function UserForm({ mode = 'page', fixedRole, onCreated, onCancel }: User
       {failure && <ErrorState message={failure.message} reference={failure.reference} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t('people.firstName')} required>
+        <Field label={t('people.firstName')} required hint={t('hints.firstName')}>
           <Input required value={form.firstName} onChange={set('firstName')} />
         </Field>
-        <Field label={t('people.lastName')} required>
+        <Field label={t('people.lastName')} required hint={t('hints.lastName')}>
           <Input required value={form.lastName} onChange={set('lastName')} />
         </Field>
         <Field
@@ -166,6 +166,7 @@ export function UserForm({ mode = 'page', fixedRole, onCreated, onCancel }: User
                 body={t('people.roleHelp')}
               />
             }
+            hint={t('hints.userRole')}
           >
             <Select value={role} onChange={(event) => setRole(event.target.value as UserRole)}>
               {allowed.map((option) => (

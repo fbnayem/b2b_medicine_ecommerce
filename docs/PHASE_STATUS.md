@@ -1615,3 +1615,70 @@ is contention over replica-set election and not a code failure. Run it with
 ### Next phase dependencies
 
 None.
+
+## Phase 34: A Product That Explains Itself
+
+**Status:** COMPLETED
+
+### Scope and completed work
+
+Asked for: a short description under every box, and a fuller explanation at the
+bottom of every page, so somebody who is not technical can use this without
+asking anybody.
+
+Measured before starting: **143 form fields across the pages carried 27 hints
+between them.** The sign-in screen had none on either box. The medicine form had
+one on nineteen controls.
+
+- **A hint under all 150 fields**, English and Bangla, generated from one table
+  so the two cannot drift. Reused where the field repeats — one sentence
+  explains "from" on all six screens with a date range.
+- **An explanation under all 73 screens** — what the page is for, how to use it,
+  and how its figures are worked out. The third answer appears on the 43 screens
+  that compute something and is omitted on the 30 that do not.
+- **`PageGuide` is rendered by `AppShell` from the route**, so a new screen
+  cannot ship without guidance; it fails `pageGuides.test.ts` instead.
+- **`watchWorkspaceSources`** — the dev server had never watched `packages/`.
+
+### The dev-server defect this uncovered
+
+Every `@medsupply/*` package is aliased to its TypeScript source, so
+`packages/i18n/en.ts` is a real module in the graph. It was not watched: Vite's
+watcher covers the project root, and the root is `apps/web`.
+
+Touching `apps/web/src/main.tsx` writes `page reload src/main.tsx` to the log.
+Touching `packages/i18n/en.ts` wrote nothing at all, and a 143-line log of a
+working session contained no mention of any file under `packages/`. A change to
+a shared package was **wrong until somebody restarted the server**, with nothing
+on screen saying so.
+
+This is the cause of three separate investigations in this project: a blank
+page, a missing export, and a screen of raw `home.whoOwesUs` keys. After the
+fix, the same touch writes `page reload D:/b2b_medicine/packages/i18n/en.ts` and
+the served bytes change — verified by fetching the module, not assumed.
+
+### Testing
+
+Web 322 (42 files), browser 128 with accessibility still at strict zero, API 170
+unit / 194 integration / 5 route coverage, mobile 93.
+
+Both new gates were proved by planting the defect: one hint deleted from
+`Login.tsx` and one route deleted from `pageGuides.ts`, each named exactly by
+its rule. The jargon and minimum-length rules caught four of the author's own
+guides on their first run.
+
+### Known limitations
+
+- **The `HelpTip` layer is still only on the medicine form and the user form.**
+  Every field now has a hint; the second layer — how a field works and what it
+  affects downstream — is written for those two screens and not the rest.
+- **The Bangla guide copy has not been reviewed by a native speaker.** It is
+  complete and typechecked, which is not the same as idiomatic.
+- **`SupplierForm` and `SystemSettings` build their labels from template
+  literals**, so those labels remain invisible to `catalogueKeys.test.ts`. Their
+  hints do not — they were written as literal calls precisely to avoid widening
+  that hole.
+
+### Next phase dependencies
+
+None.

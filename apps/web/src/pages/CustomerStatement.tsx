@@ -110,7 +110,7 @@ export function CustomerStatement({ ownerMode = false }: CustomerStatementProps)
             setApplied({ from, to });
           }}
         >
-          <Field label={t('statement.from')} className="min-w-44">
+          <Field label={t('statement.from')} className="min-w-44" hint={t('hints.dateFrom')}>
             <Input
               required
               type="date"
@@ -118,7 +118,7 @@ export function CustomerStatement({ ownerMode = false }: CustomerStatementProps)
               onChange={(event) => setFrom(event.target.value)}
             />
           </Field>
-          <Field label={t('statement.to')} className="min-w-44">
+          <Field label={t('statement.to')} className="min-w-44" hint={t('hints.dateTo')}>
             <Input
               required
               type="date"

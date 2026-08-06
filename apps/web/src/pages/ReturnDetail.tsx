@@ -487,7 +487,7 @@ export function ReturnDetail() {
                     rowKey={(line) => `decide-${lineId(line)}`}
                   />
                   <div className="mt-3 flex flex-col gap-3">
-                    <Field label={t('returnDetail.reviewNotes')}>
+                    <Field label={t('returnDetail.reviewNotes')} hint={t('hints.reviewNotes')}>
                       <Textarea
                         rows={2}
                         maxLength={1000}
@@ -495,7 +495,10 @@ export function ReturnDetail() {
                         onChange={(event) => setReviewNotes(event.target.value)}
                       />
                     </Field>
-                    <Field label={t('returnDetail.rejectionLabel')}>
+                    <Field
+                      label={t('returnDetail.rejectionLabel')}
+                      hint={t('hints.rejectionReason')}
+                    >
                       <Input
                         value={rejectionReason}
                         onChange={(event) => setRejectionReason(event.target.value)}

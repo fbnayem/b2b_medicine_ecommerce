@@ -263,7 +263,11 @@ export function PurchaseOrderDetail() {
                   </h2>
                   <p className="mb-3 text-text-muted">{t('purchasing.receiveBody')}</p>
 
-                  <Field label={t('purchasing.supplierInvoiceReference')} className="mb-4 max-w-md">
+                  <Field
+                    label={t('purchasing.supplierInvoiceReference')}
+                    className="mb-4 max-w-md"
+                    hint={t('hints.supplierInvoiceRef')}
+                  >
                     <Input
                       value={supplierInvoiceReference}
                       onChange={(event) => setSupplierInvoiceReference(event.target.value)}
@@ -285,7 +289,10 @@ export function PurchaseOrderDetail() {
                               })}
                             </legend>
                             <div className="grid gap-3 sm:grid-cols-3">
-                              <Field label={t('purchasing.batchNumber')}>
+                              <Field
+                                label={t('purchasing.batchNumber')}
+                                hint={t('hints.batchNumber')}
+                              >
                                 <Input
                                   value={draft.batchNumber}
                                   onChange={(event) =>
@@ -293,7 +300,10 @@ export function PurchaseOrderDetail() {
                                   }
                                 />
                               </Field>
-                              <Field label={t('purchasing.manufacturingDate')}>
+                              <Field
+                                label={t('purchasing.manufacturingDate')}
+                                hint={t('hints.manufacturingDate')}
+                              >
                                 <Input
                                   type="date"
                                   value={draft.manufacturingDate}
@@ -302,7 +312,10 @@ export function PurchaseOrderDetail() {
                                   }
                                 />
                               </Field>
-                              <Field label={t('purchasing.expiryDate')}>
+                              <Field
+                                label={t('purchasing.expiryDate')}
+                                hint={t('hints.expiryDate')}
+                              >
                                 <Input
                                   type="date"
                                   value={draft.expiryDate}
@@ -311,7 +324,10 @@ export function PurchaseOrderDetail() {
                                   }
                                 />
                               </Field>
-                              <Field label={t('purchasing.receivedQuantity')}>
+                              <Field
+                                label={t('purchasing.receivedQuantity')}
+                                hint={t('hints.receivedQuantity')}
+                              >
                                 <Input
                                   inputMode="numeric"
                                   value={draft.receivedQuantity}
@@ -320,7 +336,10 @@ export function PurchaseOrderDetail() {
                                   }
                                 />
                               </Field>
-                              <Field label={t('purchasing.warehouseLocation')}>
+                              <Field
+                                label={t('purchasing.warehouseLocation')}
+                                hint={t('hints.warehouseLocation')}
+                              >
                                 <Input
                                   value={draft.warehouseLocation}
                                   onChange={(event) =>
@@ -328,7 +347,10 @@ export function PurchaseOrderDetail() {
                                   }
                                 />
                               </Field>
-                              <Field label={t('purchasing.supplierBatchReference')}>
+                              <Field
+                                label={t('purchasing.supplierBatchReference')}
+                                hint={t('hints.supplierBatchRef')}
+                              >
                                 <Input
                                   value={draft.supplierBatchReference}
                                   onChange={(event) =>
@@ -336,7 +358,7 @@ export function PurchaseOrderDetail() {
                                   }
                                 />
                               </Field>
-                              <Field label={t('purchasing.unitCost')}>
+                              <Field label={t('purchasing.unitCost')} hint={t('hints.unitCost')}>
                                 <Input
                                   inputMode="decimal"
                                   value={draft.unitCost}

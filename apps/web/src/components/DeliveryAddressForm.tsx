@@ -94,16 +94,16 @@ export function DeliveryAddressForm({ shop, onCreated, onCancel }: DeliveryAddre
         <Field label={t('addresses.line1')} hint={t('addresses.line1Hint')} required>
           <Input required value={form.line1} onChange={set('line1')} />
         </Field>
-        <Field label={t('addresses.line2')}>
+        <Field label={t('addresses.line2')} hint={t('hints.addressLine2')}>
           <Input value={form.line2} onChange={set('line2')} />
         </Field>
-        <Field label={t('addresses.city')} required>
+        <Field label={t('addresses.city')} hint={t('hints.city')} required>
           <Input required value={form.city} onChange={set('city')} />
         </Field>
-        <Field label={t('addresses.district')} required>
+        <Field label={t('addresses.district')} hint={t('hints.district')} required>
           <Input required value={form.district} onChange={set('district')} />
         </Field>
-        <Field label={t('addresses.postalCode')}>
+        <Field label={t('addresses.postalCode')} hint={t('hints.postalCode')}>
           <Input value={form.postalCode} onChange={set('postalCode')} />
         </Field>
       </div>

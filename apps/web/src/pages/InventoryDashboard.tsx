@@ -373,7 +373,7 @@ export function InventoryDashboard() {
               ))}
             </div>
 
-            <Field label={t('fields.notes')}>
+            <Field label={t('fields.notes')} hint={t('hints.notesOptional')}>
               <Textarea
                 value={receipt.notes}
                 onChange={(event) =>

@@ -88,7 +88,7 @@ export function ChangePassword() {
         <form onSubmit={submit} className="flex flex-col gap-4">
           {error && <ErrorState title={t('auth.thatDidNotWork')} message={error} />}
 
-          <Field label={t('auth.currentPassword')} required>
+          <Field label={t('auth.currentPassword')} required hint={t('hints.currentPassword')}>
             <Input
               type="password"
               autoComplete="current-password"
@@ -117,6 +117,7 @@ export function ChangePassword() {
             label={t('auth.repeatPassword')}
             required
             error={mismatch ? t('auth.passwordsDoNotMatch') : undefined}
+            hint={t('hints.repeatPassword')}
           >
             <Input
               type="password"

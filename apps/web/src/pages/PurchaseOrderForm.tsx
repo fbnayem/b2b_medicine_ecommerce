@@ -153,7 +153,7 @@ export function PurchaseOrderForm() {
                 setSupplierLabel(supplier.name ?? '');
               }}
             />
-            <Field label={t('purchasing.expectedDate')}>
+            <Field label={t('purchasing.expectedDate')} hint={t('hints.expectedDate')}>
               <Input
                 type="date"
                 value={expectedDate}
@@ -186,14 +186,14 @@ export function PurchaseOrderForm() {
                     })
                   }
                 />
-                <Field label={t('purchasing.quantity')}>
+                <Field label={t('purchasing.quantity')} hint={t('hints.orderQuantitySupplier')}>
                   <Input
                     inputMode="numeric"
                     value={line.quantity}
                     onChange={(event) => patch(line.key, { quantity: event.target.value })}
                   />
                 </Field>
-                <Field label={t('purchasing.unitCost')}>
+                <Field label={t('purchasing.unitCost')} hint={t('hints.unitCost')}>
                   <Input
                     inputMode="decimal"
                     value={line.unitCost}
@@ -227,7 +227,7 @@ export function PurchaseOrderForm() {
             </div>
           </div>
 
-          <Field label={t('fields.notes')}>
+          <Field label={t('fields.notes')} hint={t('hints.notesOptional')}>
             <Textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} />
           </Field>
 

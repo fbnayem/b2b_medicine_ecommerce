@@ -148,7 +148,7 @@ export function ReturnList() {
           setApplied({ status, q: reference.trim() });
         }}
       >
-        <Field label={t('fields.status')} className="min-w-48">
+        <Field label={t('fields.status')} className="min-w-48" hint={t('hints.statusFilter')}>
           <Select value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="">{t('returns.allStatuses')}</option>
             {RETURN_STATUS_FILTER_ORDER.map((value) => (
@@ -158,7 +158,7 @@ export function ReturnList() {
             ))}
           </Select>
         </Field>
-        <Field label={t('fields.reference')} className="min-w-56">
+        <Field label={t('fields.reference')} className="min-w-56" hint={t('hints.searchReference')}>
           <Input
             value={reference}
             placeholder={t('returns.referenceHint')}

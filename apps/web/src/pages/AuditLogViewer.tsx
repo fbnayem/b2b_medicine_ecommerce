@@ -70,7 +70,7 @@ export function AuditLogViewer() {
       />
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <Field label={t('audit.action')} className="min-w-56">
+        <Field label={t('audit.action')} className="min-w-56" hint={t('hints.auditAction')}>
           <Select
             value={action}
             onChange={(event) => {
@@ -86,7 +86,7 @@ export function AuditLogViewer() {
             ))}
           </Select>
         </Field>
-        <Field label={t('audit.entityType')} className="min-w-48">
+        <Field label={t('audit.entityType')} className="min-w-48" hint={t('hints.auditEntity')}>
           <Input
             value={entityType}
             placeholder={t('audit.entityHint')}
@@ -96,7 +96,7 @@ export function AuditLogViewer() {
             }}
           />
         </Field>
-        <Field label={t('finance.from')} className="min-w-40">
+        <Field label={t('finance.from')} className="min-w-40" hint={t('hints.dateFrom')}>
           <Input
             type="date"
             value={from}
@@ -106,7 +106,7 @@ export function AuditLogViewer() {
             }}
           />
         </Field>
-        <Field label={t('finance.to')} className="min-w-40">
+        <Field label={t('finance.to')} className="min-w-40" hint={t('hints.dateTo')}>
           <Input
             type="date"
             value={to}

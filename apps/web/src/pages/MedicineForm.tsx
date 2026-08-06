@@ -562,6 +562,7 @@ export function MedicineForm({ mode = 'create', onCreated, onCancel }: MedicineF
             />
           }
           error={errors.productType?.message}
+          hint={t('hints.productType')}
         >
           <Select {...form.register('productType')}>
             {Object.values(ProductType).map((value) => (
@@ -581,6 +582,7 @@ export function MedicineForm({ mode = 'create', onCreated, onCancel }: MedicineF
             />
           }
           error={errors.classification?.message}
+          hint={t('hints.classification')}
         >
           <Select {...form.register('classification')}>
             {Object.values(MedicineClassification).map((value) => (
@@ -612,6 +614,7 @@ export function MedicineForm({ mode = 'create', onCreated, onCancel }: MedicineF
           />
         }
         error={errors.description?.message}
+        hint={t('hints.productDescription')}
       >
         <Textarea
           placeholder={t('medicinePlaceholder.description')}

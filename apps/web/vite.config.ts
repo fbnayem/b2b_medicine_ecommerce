@@ -5,6 +5,7 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { neverServeAnEmptySource } from './viteEmptySource.ts';
+import { watchWorkspaceSources } from './viteWatchWorkspace.ts';
 
 const workspacePackage = (name: string) =>
   fileURLToPath(new URL(`../../packages/${name}/index.ts`, import.meta.url));
@@ -23,7 +24,12 @@ export default defineConfig({
    * `?raw` ones, which made the token parity test read an empty string and
    * report agreement between a file and nothing.
    */
-  plugins: [neverServeAnEmptySource(), ...(process.env.VITEST ? [] : [tailwindcss()]), react()],
+  plugins: [
+    neverServeAnEmptySource(),
+    watchWorkspaceSources(),
+    ...(process.env.VITEST ? [] : [tailwindcss()]),
+    react(),
+  ],
 
   server: {
     watch: {

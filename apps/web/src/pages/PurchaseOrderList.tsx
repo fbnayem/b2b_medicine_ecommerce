@@ -120,7 +120,7 @@ export function PurchaseOrderList() {
       />
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <Field label={t('fields.status')} className="min-w-56">
+        <Field label={t('fields.status')} className="min-w-56" hint={t('hints.statusFilter')}>
           <Select value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="">{t('purchasing.allStatuses')}</option>
             {Object.values(PurchaseOrderStatus).map((value) => (

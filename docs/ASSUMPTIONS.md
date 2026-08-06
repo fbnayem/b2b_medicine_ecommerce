@@ -672,3 +672,19 @@ reads a decision rather than guesses at an intention.
 - **Receivables ageing is as-of, not windowed**, and stays that way. What a shop
   owes today does not depend on which period a sales chart happens to be
   showing, so changing the chart's window must not change the debt.
+- **A hint and a help tip are different things, and the rule deciding which is
+  which is:** if leaving a field out causes an _error_ it belongs in the
+  always-visible hint; if it causes a _wrong-but-valid value_ it belongs in the
+  `HelpTip` beside the label. Nobody should have to open a popover to learn a
+  required format, so `fieldHints.test.ts` gates the hint and not the tip.
+- **The page guide answers "how are the figures worked out" only where there
+  are figures.** Thirty of the seventy-three screens compute nothing, and a
+  paragraph announcing that there is no arithmetic is worse than the silence it
+  replaces.
+- **The guide is rendered by `AppShell` from the route, not by each page.** A
+  screen with no guidance written for it fails a test rather than shipping bare,
+  which is not true of a block each page has to remember to paste.
+- **The Vite dev server must be told to watch `packages/`.** Its watcher covers
+  the project root, which is `apps/web`; the shared packages are a sibling of
+  it, so without `watchWorkspaceSources` a change to any of them is invisible
+  until the server restarts — and nothing on screen says so.

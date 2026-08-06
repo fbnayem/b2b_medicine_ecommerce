@@ -908,7 +908,7 @@ export function MedicineDetail() {
                     </Field>
                   ))}
                 </div>
-                <Field label={t('fields.notes')}>
+                <Field label={t('fields.notes')} hint={t('hints.adjustReason')}>
                   <Textarea
                     value={receipt.notes}
                     onChange={(event) =>

@@ -106,14 +106,18 @@ export function ShopList() {
           setApplied({ search: search.trim(), status });
         }}
       >
-        <Field label={t('shops.searchLabel')} className="min-w-64 flex-1">
+        <Field
+          label={t('shops.searchLabel')}
+          className="min-w-64 flex-1"
+          hint={t('hints.searchShops')}
+        >
           <Input
             value={search}
             placeholder={t('shops.searchPlaceholder')}
             onChange={(event) => setSearch(event.target.value)}
           />
         </Field>
-        <Field label={t('shops.statusFilter')} className="min-w-48">
+        <Field label={t('shops.statusFilter')} className="min-w-48" hint={t('hints.statusFilter')}>
           <Select value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="">{t('shops.anyStatus')}</option>
             {Object.values(ShopStatus).map((value) => (

@@ -270,7 +270,7 @@ export function ReturnRequest() {
               {attempt > 0 && <FormNotice problems={problems} focusKey={attempt} />}
 
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label={t('returns.invoice')} required>
+                <Field label={t('returns.invoice')} required hint={t('hints.returnInvoice')}>
                   <Select
                     required
                     value={invoiceId}
@@ -285,7 +285,7 @@ export function ReturnRequest() {
                     ))}
                   </Select>
                 </Field>
-                <Field label={t('returns.mainReason')}>
+                <Field label={t('returns.mainReason')} hint={t('hints.returnReason')}>
                   <Select
                     value={primaryReason}
                     onChange={(event) => setPrimaryReason(event.target.value as ReturnReason)}
@@ -321,7 +321,7 @@ export function ReturnRequest() {
                 </div>
               )}
 
-              <Field label={t('returns.notesForSupplier')}>
+              <Field label={t('returns.notesForSupplier')} hint={t('hints.notesForSupplier')}>
                 <Textarea
                   rows={3}
                   maxLength={1000}

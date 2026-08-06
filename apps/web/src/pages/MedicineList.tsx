@@ -84,7 +84,11 @@ export function MedicineList() {
       />
 
       <form className="mb-6 flex flex-wrap items-end gap-2" onSubmit={submit} role="search">
-        <Field label={t('catalogue.searchLabel')} className="min-w-64 flex-1">
+        <Field
+          label={t('catalogue.searchLabel')}
+          className="min-w-64 flex-1"
+          hint={t('hints.searchMedicines')}
+        >
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}

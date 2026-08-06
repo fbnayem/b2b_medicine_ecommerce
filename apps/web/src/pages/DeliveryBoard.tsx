@@ -61,7 +61,11 @@ export function DeliveryBoard() {
           setQuery(search.trim());
         }}
       >
-        <Field label={t('delivery.searchLabel')} className="min-w-64 flex-1">
+        <Field
+          label={t('delivery.searchLabel')}
+          className="min-w-64 flex-1"
+          hint={t('hints.searchDeliveries')}
+        >
           <Input
             value={search}
             placeholder={t('delivery.searchHint')}

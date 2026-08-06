@@ -19,5 +19,11 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "viteEmptySource.ts", "viteEmptySource.test.ts"]
+  "include": [
+    "vite.config.ts",
+    "viteEmptySource.ts",
+    "viteEmptySource.test.ts",
+    "viteWatchWorkspace.ts",
+    "viteWatchWorkspace.test.ts"
+  ]
 }

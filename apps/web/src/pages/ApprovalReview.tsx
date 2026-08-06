@@ -459,7 +459,7 @@ export function ApprovalReview() {
                     {t('approvals.adjustments')}
                   </h2>
                   <div className="flex flex-col gap-3">
-                    <Field label={t('approvals.orderDiscount')}>
+                    <Field label={t('approvals.orderDiscount')} hint={t('hints.orderDiscount')}>
                       <input
                         inputMode="decimal"
                         value={orderDiscount}
@@ -467,7 +467,7 @@ export function ApprovalReview() {
                         className="min-h-11 w-full rounded-md border border-border bg-surface px-3 tabular-nums text-text"
                       />
                     </Field>
-                    <Field label={t('approvals.deliveryCharge')}>
+                    <Field label={t('approvals.deliveryCharge')} hint={t('hints.deliveryCharge')}>
                       <input
                         inputMode="decimal"
                         value={delivery}
@@ -475,13 +475,13 @@ export function ApprovalReview() {
                         className="min-h-11 w-full rounded-md border border-border bg-surface px-3 tabular-nums text-text"
                       />
                     </Field>
-                    <Field label={t('approvals.internalNotes')}>
+                    <Field label={t('approvals.internalNotes')} hint={t('hints.notesInternal')}>
                       <Textarea
                         value={internal}
                         onChange={(event) => setInternal(event.target.value)}
                       />
                     </Field>
-                    <Field label={t('approvals.shopNotes')}>
+                    <Field label={t('approvals.shopNotes')} hint={t('hints.shopNotes')}>
                       <Textarea
                         value={ownerNote}
                         onChange={(event) => setOwnerNote(event.target.value)}

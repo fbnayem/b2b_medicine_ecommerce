@@ -97,6 +97,8 @@ export const TEST_IDS = {
   dialogConfirm: 'dialog-confirm',
   emptyState: 'empty-state',
   errorState: 'error-state',
+  /** The explanation the shell renders under every screen. */
+  pageGuide: 'page-guide',
   page: (routeId: string) => `page-${routeId}`,
   row: (reference: string) => `row-${reference}`,
 } as const;

@@ -111,6 +111,28 @@ test.describe('every screen on the menu opens', () => {
         await brokenImages(page),
         `${item.path} rendered an image that drew nothing — the browser's broken-image glyph.`,
       ).toEqual([]);
+
+      /*
+       * The screen explains itself, in the browser rather than in a unit test.
+       *
+       * `pageGuides.test.ts` proves the words exist and resolve; it cannot
+       * prove they reach a reader. The shell resolves the guide from the route
+       * by matching the manifest, so a path that matches nothing renders no
+       * guide at all — and that is a failure only a real page load can see.
+       */
+      const guide = page.getByTestId(TEST_IDS.pageGuide);
+      await expect(
+        guide,
+        `${item.path} rendered no explanation. A screen nobody can use without asking somebody ` +
+          'is not finished.',
+      ).toBeVisible();
+
+      // And it is words rather than an empty frame or an unresolved key.
+      const text = (await guide.innerText()).trim();
+      expect(text.length, `${item.path} rendered an empty guide.`).toBeGreaterThan(60);
+      expect(text, `${item.path} rendered a catalogue key instead of a sentence.`).not.toMatch(
+        /guide\.[a-zA-Z]+/,
+      );
     });
   }
 });

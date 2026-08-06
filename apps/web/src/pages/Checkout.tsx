@@ -160,6 +160,7 @@ function CheckoutForm({ shop }: { shop: Shop | undefined }) {
           label={t('checkout.deliveryAddress')}
           required
           error={form.formState.errors.deliveryAddressId?.message}
+          hint={t('hints.deliveryAddress')}
         >
           <Select {...form.register('deliveryAddressId')}>
             <option value="">{t('checkout.selectAddress')}</option>
@@ -175,6 +176,7 @@ function CheckoutForm({ shop }: { shop: Shop | undefined }) {
           label={t('checkout.paymentMethod')}
           required
           error={form.formState.errors.requestedPaymentMethod?.message}
+          hint={t('hints.paymentMethodIntent')}
         >
           {/*
             `value` on every option. Without it an option submits its own text,
@@ -198,7 +200,11 @@ function CheckoutForm({ shop }: { shop: Shop | undefined }) {
           <Input {...form.register('purchaseOrderReference')} />
         </Field>
 
-        <Field label={t('checkout.deliveryNotes')} error={form.formState.errors.shopNotes?.message}>
+        <Field
+          label={t('checkout.deliveryNotes')}
+          error={form.formState.errors.shopNotes?.message}
+          hint={t('hints.deliveryNotes')}
+        >
           <Textarea {...form.register('shopNotes')} />
         </Field>
 

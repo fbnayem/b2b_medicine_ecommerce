@@ -68,7 +68,7 @@ export function StocktakeForm() {
             />
           </Field>
 
-          <Field label={t('stocktake.notes')}>
+          <Field label={t('stocktake.notes')} hint={t('hints.stocktakeNotes')}>
             <Textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} />
           </Field>
 

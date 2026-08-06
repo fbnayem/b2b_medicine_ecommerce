@@ -172,6 +172,503 @@ export const en = {
     security: 'Where you are signed in, and how to sign out elsewhere.',
   } as Record<string, string>,
 
+  /**
+   * The explanation under every screen.
+   *
+   * Three questions, answered for somebody who has not been trained on this
+   * product: what the screen is for, what to do on it, and how any figure on it
+   * was arrived at. `PageGuide` renders them; `pageGuides.ts` maps a route to
+   * the three keys.
+   *
+   * **Plain language is the rule, not a preference**, and it bites hardest
+   * here. The reader is a pharmacy owner at seven in the morning, not the
+   * person who specified the field. Write "what the shop pays", not "trade
+   * price"; "the number goes up", not "the value is incremented". Say what
+   * happens when they press the button.
+   *
+   * `…Maths` is only written where a screen shows a number somebody could
+   * disagree with — a total, a balance, an ageing bucket, a margin. Screens
+   * that compute nothing have no third answer rather than a sentence saying so,
+   * because a paragraph explaining that there is no arithmetic is worse than
+   * the silence it replaces.
+   */
+  guide: {
+    heading: 'How this page works',
+    whatLabel: 'What this page is for',
+    useLabel: 'How to use it',
+    mathsLabel: 'How the figures are worked out',
+
+    dashboardWhat:
+      'Your home screen. The boxes at the top are work waiting for you today; everything below is a way into every other part of the system.',
+    dashboardUse:
+      'Click a box at the top to go straight to that queue. If a box shows nought, there is nothing of that kind waiting and nothing for you to do.',
+    dashboardMaths:
+      'Each box counts orders at one stage. The charts cover the last thirty days, ending today. "Who owes us" is what is unpaid right now, whatever period the chart shows.',
+
+    ordersWhat:
+      'Every order placed, and how far each one has got: waiting for a decision, being picked, packed, on the road, or delivered.',
+    ordersUse:
+      'Use the tabs to narrow the list to one stage, or search by the order reference such as ORD-2026-000001. Click any row to open the full order.',
+
+    orderDetailWhat:
+      'One order in full: who ordered it, what they asked for, what was agreed, and everything that has happened to it since.',
+    orderDetailUse:
+      'Read down the page for the history. The buttons at the top offer only what this order can do next, so if a button is missing the order is not at that stage yet.',
+    orderDetailMaths:
+      'Each line is quantity times the agreed price for that line, less any discount on it. The order total adds the lines, takes off any discount on the whole order, and adds the delivery charge.',
+
+    orderEntryWhat:
+      'Placing an order for a customer, for when a shop telephones instead of ordering themselves.',
+    orderEntryUse:
+      'Choose the shop first, then the address it goes to, then add each medicine and how many. Check the total at the bottom before you send it. The shop sees this exactly as if they had placed it.',
+    orderEntryMaths:
+      'Prices shown are the ordinary price for that customer. They are worked out again when the order is submitted, so if a price changes in between, the order uses the newer one.',
+
+    cartWhat: 'The order you are putting together, before you send it.',
+    cartUse:
+      'Change any quantity, or remove a line you no longer want. Nothing is ordered and no stock is held until you go to checkout and send it.',
+    cartMaths:
+      'Each line is the quantity times the price for that medicine. The figure here is an estimate: the final price is set when the order is submitted.',
+
+    checkoutWhat: 'The last step before an order is sent to the distributor.',
+    checkoutUse:
+      'Choose where it should be delivered and add a note if anything about it is unusual. Press the button once. If nothing seems to happen, wait rather than pressing again — pressing twice cannot create two orders, but waiting is quicker.',
+    checkoutMaths:
+      'The total is the lines, less any discount you have been given, plus delivery. It is confirmed by the distributor when they approve the order, and the confirmed figure is the one you will be invoiced for.',
+
+    approvalsWhat:
+      'Orders waiting for somebody to decide on them: whether the price is right, whether the quantity is right, and whether the customer has the credit for it.',
+    approvalsUse:
+      'Open the oldest first — a customer is waiting at the other end of each of these. Nothing is picked or reserved until you approve it.',
+
+    approvalReviewWhat:
+      'One order, with everything you need to decide on it: what was asked for, what it is worth, what the customer already owes, and whether their licence covers it.',
+    approvalReviewUse:
+      'Check each line, changing the quantity or price where you need to, then approve, hold, send back for clarification, or reject. Holding and rejecting both need a reason, and the customer reads that reason, so write it for them.',
+    approvalReviewMaths:
+      'Credit left is the customer’s limit less everything they already owe and less this order. If that comes out below nought, this order takes them past their limit and you are being told so before you approve it.',
+
+    fulfilmentWhat:
+      'Orders that have been approved and are waiting to be picked from the shelves, and the ones somebody is picking now.',
+    fulfilmentUse:
+      'Take the top of the queue unless something is urgent. Once you start one it is yours, and it stays yours until you finish it.',
+
+    fulfilmentWorkWhat:
+      'The pick list for one order: every line, the batch to take it from, and where that batch is.',
+    fulfilmentWorkUse:
+      'Work down the list. Scan or type each batch as you take it, and enter the number you actually took — not the number asked for. When every line is done, pack it, and the invoice is raised at that moment.',
+    fulfilmentWorkMaths:
+      'The batch offered is the one that expires soonest, so the oldest stock leaves first. If you pack fewer than were allocated, the rest goes back to available stock automatically.',
+
+    fulfilmentReadyWhat: 'Orders that are packed and waiting for a rider to take them.',
+    fulfilmentReadyUse:
+      'Hand a package to a rider and record the handover here. Read the reference off the package in your hand rather than from the screen — the check exists to catch the wrong box.',
+
+    deliveriesWhat: 'Who is carrying what, where it has got to, and what has arrived.',
+    deliveriesUse:
+      'Filter by rider or by state to find one delivery. This screen refreshes on its own, so leave it open on a wall and it stays current.',
+
+    deliveryDetailWhat:
+      'One delivery: what is in it, who is carrying it, and every step it has been through.',
+    deliveryDetailUse:
+      'Assign a rider if none is assigned yet. The rider records the rest from their phone as they go, so this page fills itself in.',
+
+    tripsWhat: 'Delivery rounds: a rider, a day, and the stops they are making.',
+    tripsUse: 'Open a round to see its stops in order, or plan a new one.',
+
+    tripNewWhat: 'Planning one rider’s round for one day.',
+    tripNewUse:
+      'Choose the rider and the day, then add the stops. The order you add them in is the order they will be driven in, so add them in the order that makes sense on the road.',
+
+    tripDetailWhat: 'One round, stop by stop, and how far along it the rider is.',
+    tripDetailUse:
+      'Follow the stops in order. This is the sheet a rider works from, so it prints cleanly if you would rather carry it on paper.',
+
+    returnsWhat: 'Goods coming back from customers, and the credit raised against them.',
+    returnsUse:
+      'Open a request to decide it. Nothing is credited to the customer until somebody approves it here.',
+
+    returnNewWhat: 'Asking to send goods back.',
+    returnNewUse:
+      'Choose the invoice they were bought on, tick the lines coming back and say how many of each, and say why. The reason decides whether the goods can be sold again, so be accurate rather than brief.',
+
+    returnDetailWhat: 'One return: what is coming back, why, and what it was worth.',
+    returnDetailUse:
+      'Approve or refuse the request. Approving raises a credit note against the original invoice; refusing needs a reason the customer will read.',
+    returnDetailMaths:
+      'The credit is the quantity coming back at the price it was originally sold at, not at today’s price.',
+
+    medicinesWhat: 'The catalogue: everything sold, and at what price.',
+    medicinesUse:
+      'Search by brand or generic name. Click any product to see its stock, its prices and its history.',
+
+    medicineDetailWhat:
+      'One product in full: what it is, what is on the shelf, and what it sells for.',
+    medicineDetailUse:
+      'Use Edit to change anything about the product. The price can be changed on its own without reopening the whole form.',
+    medicineDetailMaths:
+      'Margin is what the shop pays less what you paid, shown as a percentage of what the shop pays. Available stock is everything on hand less whatever is already promised to an order.',
+
+    medicineNewWhat: 'Adding a product to the catalogue.',
+    medicineNewUse:
+      'Fill in the name, the pack and the prices. The hint under each box says what belongs in it, and the "i" beside a label explains what that box affects. Get "Sold as" right — it decides what a shop is ordering when they type 5.',
+    medicineNewMaths:
+      'What the shop pays may not be above the printed price on the pack. Nothing here is calculated for you; every price is the one you type.',
+
+    medicineEditWhat: 'Changing a product already in the catalogue.',
+    medicineEditUse:
+      'Change what you need and save. Changing a price affects future orders only — orders already placed keep the price they were agreed at.',
+
+    priceListsWhat:
+      'Special prices for particular customers, for when one shop has agreed different rates from everybody else.',
+    priceListsUse:
+      'Open a list to see which prices it sets. A customer is put on a list from their own record, not from here.',
+
+    priceListNewWhat: 'Creating a set of special prices.',
+    priceListNewUse:
+      'Give the list a name you will recognise later, set the dates it applies between, then add a line for each medicine and its price. Leave out anything that should stay at the ordinary price.',
+
+    priceListDetailWhat: 'One set of special prices, and the medicines it covers.',
+    priceListDetailUse:
+      'Add, change or remove lines and save. It takes effect for orders placed from now on.',
+    priceListDetailMaths:
+      'A price here replaces the ordinary price for the customers on this list. If a customer is on a list and also has their own discount, the list price is used first.',
+
+    schemesWhat: 'Free-goods offers: buy so many of something and get more of it at no charge.',
+    schemesUse: 'Open an offer to see what it gives away and when it runs.',
+
+    schemeNewWhat: 'Creating a free-goods offer.',
+    schemeNewUse:
+      'Choose the medicine, then say how many must be bought and how many are given free. Set the dates it runs between.',
+    schemeNewMaths:
+      'The free goods are worked out whole times only. On a buy ten get one offer, ordering twenty-five gives two free, not two and a half.',
+
+    schemeDetailWhat:
+      'One free-goods offer: what has to be bought, what is given free, and when it runs.',
+    schemeDetailUse:
+      'Change the quantities or the dates and save. Orders already placed are not changed.',
+
+    inventoryWhat:
+      'What is physically on the shelves: every batch, how much is left, what is promised to orders, and what is near expiry.',
+    inventoryUse:
+      'Search for a product to see its batches. Receive new stock here when a delivery arrives from a supplier.',
+    inventoryMaths:
+      'Available is what is on hand less what is already promised to orders. A batch that is blocked or expired counts in neither.',
+
+    warehousesWhat: 'The places stock is kept.',
+    warehousesUse: 'Add a warehouse before you receive stock into it.',
+
+    warehouseNewWhat: 'Adding a place where stock is kept.',
+    warehouseNewUse:
+      'Give it a name and a code your team will recognise, and say where it is. The code is what appears on picking lists, so keep it short.',
+
+    stocktakesWhat: 'Counts of what is actually on the shelves, against what the system thinks.',
+    stocktakesUse: 'Open a count to enter figures, or start a new one.',
+
+    stocktakeNewWhat:
+      'Starting a count of what is actually on the shelves, so the system can be corrected to match.',
+    stocktakeNewUse:
+      'Choose which part of the warehouse to count, or leave it empty to count everything. Everything in scope goes on the sheet at the figures the system holds now, and those figures are hidden until you finish counting, so nobody can write down what they expected to find.',
+
+    stocktakeDetailWhat: 'One count: what was expected, what was found, and the difference.',
+    stocktakeDetailUse:
+      'Enter what you counted for each line. When you post the count, stock is corrected to your figures and the difference is recorded against your name.',
+    stocktakeDetailMaths:
+      'The difference is what you counted less what the system expected. Over and short are shown separately rather than cancelling each other out, because two mistakes are not the same as no mistake.',
+
+    recallWhat:
+      'Given a batch number: who has it, and where it came from. For when a supplier issues a recall.',
+    recallUse:
+      'Type the batch number printed on the carton. Looking changes nothing, so check as often as you need.',
+
+    controlledRegisterWhat:
+      'What came in and what went out for every prescription medicine, and whether the arithmetic matches the shelf.',
+    controlledRegisterUse:
+      'Choose the period, then read down. This is the record an inspector asks for, so it is deliberately plain.',
+    controlledRegisterMaths:
+      'Closing balance is the opening balance, plus everything received, less everything issued. If that does not match what is on the shelf, the difference is a discrepancy somebody must explain.',
+
+    suppliersWhat: 'The companies you buy from.',
+    suppliersUse: 'Add a supplier before you can raise a purchase order to them.',
+
+    supplierNewWhat: 'Adding a company you buy from.',
+    supplierNewUse:
+      'The company name and a telephone number are enough to start. Everything else can be added later.',
+
+    purchaseOrdersWhat: 'What you have ordered from suppliers, and what has arrived.',
+    purchaseOrdersUse: 'Open an order to record a delivery against it when it arrives.',
+
+    purchaseOrderNewWhat: 'Ordering stock from a supplier.',
+    purchaseOrderNewUse:
+      'Choose the supplier, then add each medicine with how many and what you are paying for each. If the supplier is not on the list yet you can add them here without losing the lines you have typed.',
+    purchaseOrderNewMaths:
+      'Each line is the quantity times the cost each. This is what you pay, not what a shop pays.',
+
+    purchaseOrderDetailWhat: 'One purchase order, and what has arrived against it.',
+    purchaseOrderDetailUse:
+      'When a delivery comes in, enter what actually arrived, its batch number and its expiry date. That is what puts the stock on the shelf and makes it sellable.',
+    purchaseOrderDetailMaths:
+      'Outstanding is what you ordered less what has arrived. A delivery can be short; the rest stays outstanding until it comes or you close the order.',
+
+    paymentsWhat: 'Money received from customers.',
+    paymentsUse:
+      'Open a payment to see what it was put against. Record a new one when money comes in.',
+
+    paymentNewWhat: 'Recording money received from a customer.',
+    paymentNewUse:
+      'Choose the shop, enter the amount and how it was paid, and say when it was received rather than when you are typing it. Attach the slip if you have one.',
+    paymentNewMaths:
+      'The amount is put against that shop’s oldest unpaid invoices first, unless you choose which invoices it should go against.',
+
+    paymentDetailWhat: 'One payment: what was received, from whom, and what it was put against.',
+    paymentDetailUse:
+      'Reverse it if it was entered in error. Reversing does not delete anything — it records a correction, and both entries stay visible.',
+
+    collectionsWhat: 'Cash riders have collected on their rounds, waiting to be checked in.',
+    collectionsUse:
+      'Count the cash against what the rider recorded, then check it in. It becomes a payment against the customer’s account only once you do.',
+    collectionsMaths:
+      'The rider’s figure and yours are kept separately. A difference between them is recorded rather than quietly overwritten.',
+
+    reportOutstandingWhat: 'What every shop owes today.',
+    reportOutstandingUse:
+      'Sort by the largest to see who to telephone first. Export it if you want to work from it away from the screen.',
+    reportOutstandingMaths:
+      'What is owed is everything invoiced less everything paid and less any credit notes. Orders not yet invoiced are not counted.',
+
+    reportOverdueWhat: 'What is past its due date, and by how long.',
+    reportOverdueUse:
+      'Work down from the oldest. The longer a debt sits, the less of it comes back.',
+    reportOverdueMaths:
+      'An invoice is overdue the day after its due date. The due date is the invoice date plus that customer’s agreed number of days.',
+
+    reportCollectionsWhat: 'What has been collected, by whom, over a period.',
+    reportCollectionsUse: 'Choose the dates, then read by person or by day.',
+    reportCollectionsMaths:
+      'Counted on the day the money was received, not the day it was typed in.',
+
+    shopLedgerWhat:
+      'One customer’s account: every charge, payment, credit and reversal, in the order they happened.',
+    shopLedgerUse:
+      'Read down to see how the balance got to where it is. Nothing here can be edited — a correction is a new entry, never a change to an old one.',
+    shopLedgerMaths:
+      'Each row moves the balance up or down, and the running balance is shown beside it. The last row is what they owe now.',
+
+    shopStatementWhat: 'A customer’s account for one period, in the form you would send them.',
+    shopStatementUse: 'Choose the period and print or export it.',
+    shopStatementMaths:
+      'Opening balance, plus what was invoiced in the period, less what was paid and credited, gives the closing balance.',
+
+    analyticsWhat: 'Sales, stock and receivables at a glance.',
+    analyticsUse:
+      'Change the period at the top to look at any stretch of time. Each chart has a "figures behind this chart" line if you would rather read the numbers.',
+    analyticsMaths:
+      'Sales are counted from invoices, on the day the invoice is dated. Returns are shown separately rather than quietly taken off the sales figure.',
+
+    analyticsSalesWhat: 'What has been bought and returned over time.',
+    analyticsSalesUse:
+      'Choose the period and whether to group by day, week or month. Break it down by medicine or by customer to see where the money came from.',
+    analyticsSalesMaths: 'Net sales are what was invoiced less what was credited back on returns.',
+
+    analyticsReturnsWhat: 'What is coming back, and why.',
+    analyticsReturnsUse:
+      'Look at the reasons before the totals. A rising count for one reason usually points at one supplier or one product.',
+
+    analyticsInventoryWhat: 'Stock cover, movement and expiry risk.',
+    analyticsInventoryUse:
+      'Start with what is expiring, because that is the only part of this you cannot fix later.',
+    analyticsInventoryMaths:
+      'Stock value is counted at what you paid, not at what a shop pays, so it is what the stock cost you rather than what it might make.',
+
+    analyticsDeliveriesWhat: 'How deliveries are performing.',
+    analyticsDeliveriesUse: 'Compare riders and days to see where rounds are running late.',
+
+    analyticsReceivablesWhat:
+      'How the debt is ageing: how much is owed, and how long each part of it has been owed for.',
+    analyticsReceivablesUse:
+      'The further right a bar sits, the older the money is and the harder it will be to collect.',
+    analyticsReceivablesMaths:
+      'Each invoice sits in one band by how many days past its due date it is. Anything not yet due sits in "not yet due" rather than in a band.',
+
+    shopsWhat: 'Your customers: their credit terms, their addresses and their licences.',
+    shopsUse: 'Open a shop to see everything about it, or add one.',
+
+    shopNewWhat: 'Adding a customer, so they can be ordered for and invoiced.',
+    shopNewUse:
+      'The name, a telephone number and at least one address are needed before they can order at all. Set the credit limit and the days to pay if they have been agreed.',
+
+    shopDetailWhat: 'One customer: what they owe, what they may order, and what they have ordered.',
+    shopDetailUse:
+      'Change their terms, addresses or licence here. Their account history is on the account page.',
+    shopDetailMaths:
+      'Credit available is their limit less what they already owe. When that reaches nought, new orders are held for a decision rather than refused outright.',
+
+    usersWhat: 'People who can sign in, and what each of them may do.',
+    usersUse:
+      'Change somebody’s role to change what they can reach. Deactivate rather than delete when somebody leaves — their past actions must stay attributable.',
+
+    userNewWhat: 'Adding somebody who can sign in.',
+    userNewUse:
+      'Their name, their email address and their role. The role decides everything they can see and do, so pick the narrowest one that lets them do their job. They set their own password the first time they sign in.',
+
+    settingsWhat: 'Tax, credit, expiry windows, notifications and how your documents look.',
+    settingsUse:
+      'Change a setting and save. These apply across the whole business immediately, so read what a box does before changing it.',
+
+    auditWhat: 'Every action that matters, who took it and when.',
+    auditUse:
+      'Filter by person, by kind of action or by date. Nothing here can be changed or removed, by anybody, which is what makes it worth having.',
+
+    activityWhat: 'What has happened recently, across the business.',
+    activityUse: 'A running list, newest first. Use it to catch up after a day away.',
+
+    shopAccountWhat: 'What you owe, what credit you have left, and your invoices.',
+    shopAccountUse: 'Open any invoice to see or print it. Your payments are on their own page.',
+    shopAccountMaths:
+      'What you owe is everything invoiced less everything you have paid and less any credit notes. Credit left is your limit less what you owe.',
+
+    myPaymentsWhat: 'Payments recorded against your account.',
+    myPaymentsUse:
+      'Check these against your own records. If something is missing, it may not have been checked in yet.',
+
+    myPaymentDetailWhat: 'One payment, and the invoices it was put against.',
+    myPaymentDetailUse: 'Keep the reference if you need to ask about this payment later.',
+
+    myStatementWhat: 'Your account, period by period.',
+    myStatementUse: 'Choose the period and print or export it for your own books.',
+    myStatementMaths:
+      'Opening balance, plus what you were invoiced, less what you paid and were credited, gives the closing balance.',
+
+    notificationsWhat: 'Everything the system has told you.',
+    notificationsUse: 'Unread ones are marked. Opening one takes you to whatever it is about.',
+
+    notificationPreferencesWhat: 'Which things you are told about, and how.',
+    notificationPreferencesUse:
+      'Turn off anything you do not need. Turning something off here stops the message reaching you; it does not stop the thing happening.',
+
+    securityWhat: 'Where you are signed in, and how to sign out elsewhere.',
+    securityUse:
+      'If you see a sign-in you do not recognise, sign it out and change your password. Signing out elsewhere does not sign you out here.',
+
+    changePasswordWhat: 'Changing your own password.',
+    changePasswordUse:
+      'Your current password, then the new one twice. You stay signed in here; anywhere else you are signed in is signed out.',
+  },
+
+  hints: {
+    addressLine2: 'A second line, if the address needs one. You can leave this empty.',
+    postalCode: 'The post code, if the area has one. You can leave this empty.',
+    supplierName: 'The company name as it appears on their invoices.',
+    supplierContact: 'The person you deal with there.',
+    supplierPhone: 'A number somebody answers during working hours.',
+    supplierEmail: 'Where purchase orders will be sent.',
+    supplierLicence:
+      'Their drug licence number. You need it to buy prescription medicines from them.',
+    supplierLicenceExpiry: 'When their licence runs out. You will be warned before it does.',
+    supplierPaymentTerms: 'How many days you have to pay them after an invoice.',
+    dateFrom: 'The first day to include.',
+    dateTo: 'The last day to include.',
+    asOf: 'The figures are worked out as they stood at the end of this day.',
+    statusFilter: 'Show only records at this stage. Leave it on All to see everything.',
+    searchReference: 'Part of a reference is enough — you need not type all of it.',
+    notesInternal: 'Only your own team sees this. The customer does not.',
+    notesOptional: 'Anything worth recording later. You can leave this empty.',
+    groupBy: 'Whether each point on the chart is a day, a week or a month.',
+    auditAction: 'Show only one kind of action. Leave it empty to see all of them.',
+    auditEntity: 'Show only actions taken on one kind of record.',
+    paymentMethodFilter: 'Show only payments made one way.',
+    showInactive: 'Include suppliers you have stopped using.',
+    searchDeliveries: 'Search by order reference, shop name or rider.',
+    searchMedicines: 'Search by brand name, generic name or your own stock code.',
+    searchShops: 'Search by shop name, code or telephone number.',
+    searchUsers: 'Search by name or email address.',
+    roleFilter: 'Show only people with one role.',
+    userStatusFilter: 'Show only active accounts, or only deactivated ones.',
+    loginEmail: 'The address your account was set up with.',
+    loginPassword: 'If you have forgotten it, ask an administrator to reset it.',
+    currentPassword: 'The password you use now, so we know it is you.',
+    repeatPassword: 'Type the new password again. The two must match exactly.',
+    orderDiscount: 'Money off the whole order, on top of any discount on a single line. In taka.',
+    deliveryCharge:
+      'What the customer is charged to have this delivered. In taka. Put 0 if it is free.',
+    shopNotes: 'The customer reads this, so write it for them.',
+    deliveryAddress:
+      'Where this order should be delivered. Add a new one if it is going somewhere different this time.',
+    paymentMethodIntent: 'How you intend to pay. You can still change this when it arrives.',
+    deliveryNotes: 'Anything the rider needs to know — a gate code, or a better time to come.',
+    orderQuantity:
+      'How many the shop wants. Check whether this is sold by the box or by the strip before typing a number.',
+    packageCount: 'How many separate boxes this order is going into. Each one gets its own label.',
+    packingNotes: 'Anything the rider or the shop should know about how it is packed.',
+    reportLine: 'Which line on the pick list has the problem.',
+    reportType: 'What is wrong with it — short, damaged, or not found on the shelf.',
+    affectedQuantity: 'How many units the problem affects, not the size of the whole line.',
+    discrepancyNotes:
+      'What you found, in enough detail that whoever decides on it later does not have to ask.',
+    adjustReason:
+      'Why this is being changed. It is kept with the record and cannot be removed later.',
+    productType:
+      'Which shelf this sits on. It changes nothing about pricing or stock; it is for browsing and reporting.',
+    classification:
+      'Whether this is dispensed against a prescription. Choosing Prescription makes the generic name, strength and form required.',
+    productDescription: 'Shown to shops on the product page. Not for internal notes.',
+    priceListName:
+      'A name you will recognise later, such as the customer or the agreement it came from.',
+    validTo: 'The last day it applies. Leave it empty for no end date.',
+    activeOnly: 'Only an active one is used when an order is priced.',
+    listUnitPrice: 'What this customer pays for one, in taka. It replaces the ordinary price.',
+    discountPercent:
+      'Money off as a percentage, if you would rather set it that way than type a price.',
+    schemeName: 'A name you will recognise later, such as "Napa, October".',
+    freeQuantity: 'How many are given free once the buying quantity is reached.',
+    supplierInvoiceRef:
+      'The number on the supplier’s own invoice, so the two can be matched later.',
+    batchNumber: 'The batch number printed on the carton. It is what a recall is traced by.',
+    manufacturingDate: 'The date printed on the pack.',
+    expiryDate:
+      'The date on the pack. Stock is sold oldest first, so this decides what leaves next.',
+    receivedQuantity: 'How many actually arrived, not how many were ordered.',
+    warehouseLocation: 'Where this batch is being put, so a picker can find it.',
+    supplierBatchRef:
+      'The supplier’s own reference for this batch, if it differs from the batch number.',
+    unitCost: 'What you pay for one, in taka. This is your cost, not what a shop pays.',
+    expectedDate: 'When you expect the supplier to deliver.',
+    orderQuantitySupplier: 'How many you are ordering.',
+    supplierAddress: 'Where they are, for the paperwork.',
+    againstInvoice:
+      'Choose an invoice to put this against, or leave it and the oldest unpaid ones are used first.',
+    paymentMethodReceived: 'How the money was received.',
+    whenCollected: 'When the money was actually received, not when you are typing it in.',
+    returnInvoice: 'The invoice these goods were bought on.',
+    returnReason: 'Why they are coming back. This decides whether they can be sold again.',
+    notesForSupplier: 'Anything the distributor needs to know about the condition of the goods.',
+    reviewNotes: 'What you checked and what you decided. Kept with the return.',
+    rejectionReason: 'Why it is being refused. The customer reads this.',
+    expectedDelivery: 'The day the customer has been told to expect it.',
+    priority: 'Urgent rounds are driven first. Leave it as normal unless there is a reason.',
+    riderInstructions: 'Anything the rider needs to know before they set off.',
+    tripDay: 'The day this round will be driven.',
+    vehicle: 'Which vehicle, for your own records.',
+    stocktakeNotes: 'Why this count is being taken, if there is a reason worth recording.',
+    warehouseName: 'What your team calls this place.',
+    warehouseAddress: 'Where it is.',
+    city: 'The city or town it is in.',
+    district: 'The district it is in.',
+    contactPhone: 'A number to ring if a delivery cannot be made.',
+    firstName: 'Their given name, as they would write it themselves.',
+    lastName: 'Their family name.',
+    userRole:
+      'What they will be able to see and do. Pick the narrowest one that lets them do their job.',
+    roleForUser: 'Changing this changes what they can see and do, straight away.',
+    statusForUser:
+      'Deactivating stops them signing in. Everything they have already done stays on the record.',
+    quietFrom: 'The time messages stop reaching you at night.',
+    quietTo: 'The time messages start reaching you again in the morning.',
+    quietFromAll: 'The time messages stop reaching people at night.',
+    quietToAll: 'The time messages start reaching people again in the morning.',
+    settingValue: 'This applies across the whole business as soon as it is saved.',
+  },
+
   errorPages: {
     notFoundTitle: 'That page does not exist',
     /*
