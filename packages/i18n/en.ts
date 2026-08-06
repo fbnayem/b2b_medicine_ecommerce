@@ -42,6 +42,7 @@ export const en = {
   common: {
     appName: 'MedSupply B2B',
     loading: 'Loading',
+    searching: 'Searching…',
     retry: 'Try again',
     cancel: 'Cancel',
     save: 'Save',

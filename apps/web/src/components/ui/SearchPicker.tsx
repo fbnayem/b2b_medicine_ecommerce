@@ -44,6 +44,19 @@ export interface SearchPickerProps {
   options: readonly SearchPickerOption[];
   /** Shown in place of the list when a term found nothing. */
   emptyLabel: string;
+  /**
+   * What to say while the search is still running.
+   *
+   * Without this the picker rendered `emptyLabel` from the moment it opened,
+   * so a supplier search said **"No suppliers yet"** before it had asked the
+   * server anything. That read as true for as long as nothing was seeded, and
+   * became a lie the day the seed grew four suppliers — the message a person
+   * saw while waiting was a statement about the database that nobody had
+   * checked.
+   */
+  searchingLabel: string;
+  /** True while the query behind `options` is in flight. */
+  searching?: boolean;
   onChoose: (value: string) => void;
   /** The current choice, rendered under the box so it survives the term changing. */
   chosen?: ReactNode;
@@ -69,6 +82,8 @@ export function SearchPicker({
   onTermChange,
   options,
   emptyLabel,
+  searchingLabel,
+  searching = false,
   onChoose,
   chosen,
   create,
@@ -136,7 +151,9 @@ export function SearchPicker({
       {open && (
         <ul id={listId} role="listbox" className="flex flex-col rounded-md border border-border">
           {options.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-text-muted">{emptyLabel}</li>
+            <li className="px-3 py-2 text-sm text-text-muted" aria-live="polite">
+              {searching ? searchingLabel : emptyLabel}
+            </li>
           ) : (
             options.map((option, index) => (
               <li key={option.value} role="option" aria-selected={index === highlighted}>

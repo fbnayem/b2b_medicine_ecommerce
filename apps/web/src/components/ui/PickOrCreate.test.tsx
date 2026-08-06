@@ -88,6 +88,7 @@ describe('searching instead of ending', () => {
         onTermChange={() => {}}
         options={found}
         emptyLabel="No medicines matched"
+        searchingLabel="Searching"
         onChoose={onChoose}
       />,
     );
@@ -126,6 +127,7 @@ describe('searching instead of ending', () => {
         onTermChange={() => {}}
         options={[]}
         emptyLabel="No medicines matched"
+        searchingLabel="Searching"
         onChoose={() => {}}
       />,
     );

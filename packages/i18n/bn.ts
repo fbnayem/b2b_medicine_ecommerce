@@ -44,6 +44,7 @@ export const bn: Catalogue = {
   common: {
     appName: 'MedSupply B2B',
     loading: 'লোড হচ্ছে',
+    searching: 'খোঁজা হচ্ছে…',
     retry: 'আবার চেষ্টা করুন',
     cancel: 'বাতিল',
     save: 'সংরক্ষণ',

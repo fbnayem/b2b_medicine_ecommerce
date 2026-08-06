@@ -1,5 +1,60 @@
 # Changelog
 
+## Phase 32 — demo data worth testing against
+
+The seed parked one order at each state a screen exists for. That is enough to
+prove a screen renders and nowhere near enough to _use_ the system: with no
+issued invoice there was no revenue, no receivable, nothing to age, nothing to
+collect and nothing to chart — which is why the home screen's new sales line was
+a flat zero and its "who owes us" card said nothing was outstanding.
+
+Now: **36 medicines** across nine categories — prescription-only lines, two cold
+chain lines, syrups, injections, an inhaler, a sachet, prices spanning three
+orders of magnitude — **9 shops**, **4 suppliers**, **2 purchase orders** with
+one received in full, **14 orders driven the whole way to an issued invoice**,
+**8 payments** and **6 deliveries**, three of them out on the road.
+
+Every state transition still goes through the HTTP API as the role the server
+requires. The seed writes no status anywhere, so if a workflow gains a rule the
+seed fails rather than producing a database no sequence of clicks could create —
+which is how the three defects below were found.
+
+### What it cost to write it honestly
+
+**`PICK_LIMIT`.** The picking detail endpoint populates `medicineId` into a
+document, so stringifying it gave `[object Object]`, no line matched, and the
+server reported it as picking more than was allocated.
+
+**`ADDRESS_REQUIRED`.** Six new shops hung off the two existing owners looked
+tidier and could not place an order: a shop owner belongs to one ordering shop,
+which `ASSUMPTIONS.md` has said since phase 2. Six new owner accounts.
+
+**`HANDOVER_MISMATCH`.** The handover is a _check_ — the storekeeper reads the
+references off the package in their hands and the server refuses if they do not
+match what it issued. Invented references are correctly rejected.
+
+### One real defect, and it was the data that exposed it
+
+**A picker said "No suppliers yet" while it was still searching.** `SearchPicker`
+had no loading state: it rendered the empty label whenever the option list was
+empty, including before the request came back. That read as true for as long as
+nothing was seeded, and became a lie the moment four suppliers existed. It now
+says which of the two it means.
+
+`pickers.spec.ts` was resting on the same accident. It typed "Padma", expected
+"no suppliers yet", and passed either way — because the message it was reading
+described a request that had not returned. It now searches a term that genuinely
+matches nothing.
+
+### The seed can be run twice
+
+Idempotency is keyed on the seed's own records rather than on the tables being
+empty. The end-to-end database is never dropped, and `pickers.spec.ts` creates a
+supplier every run, so "are there any suppliers" was true after the first
+browser run and the seed skipped its own four for good — which is how the
+purchasing screens came to show nothing but a column of _Padma Traders
+1785988918156508_.
+
 ## Phase 31 — the redesign
 
 Asked for a redesign: more modern, more colourful, and charts on the dashboard.

@@ -1482,3 +1482,60 @@ integration / 5 route coverage, mobile 93.
 ### Next phase dependencies
 
 None.
+
+## Phase 32: Demo Data Worth Testing Against
+
+**Status:** COMPLETED
+
+### Scope and completed work
+
+The seed parked one order at each state a screen exists for. That proves a
+screen renders and is nowhere near enough to _use_ the system: with no issued
+invoice there was no revenue, no receivable, nothing to age, nothing to collect
+and nothing to chart — which is why the home screen's sales line was flat and
+its "who owes us" card said nothing was outstanding.
+
+- **36 medicines** across nine categories, including prescription-only lines,
+  two cold-chain lines, syrups, injections, an inhaler and a sachet, with
+  prices spanning three orders of magnitude and an MRP on every one.
+- **9 shops** with an owner account each, **4 suppliers**, **2 purchase
+  orders** with one received in full.
+- **14 orders driven the whole way to an issued invoice** through the real
+  endpoints, dated across the last five weeks, with **8 payments** posted —
+  full, partial and none — and two invoices left overdue on purpose.
+- **6 deliveries assigned, 3 out on the road.**
+
+### Defect found and fixed
+
+**A picker said "No suppliers yet" while it was still searching.** There is no
+loading state in `SearchPicker`: it rendered the empty label whenever the option
+list was empty, including before the request came back. That read as true while
+nothing was seeded and became a lie the moment four suppliers existed. It now
+says which of the two it means, and `pickers.spec.ts` — whose "nothing is
+seeded" premise this invalidated — searches a term that genuinely matches
+nothing rather than relying on an empty table.
+
+### Testing
+
+Web 301, browser 128 with accessibility still at strict zero, API 170 unit /
+194 integration / 5 route coverage, mobile 93. The seed was run three times
+against fresh databases and twice against a populated one, to prove it resumes
+rather than duplicates.
+
+### Known limitations
+
+- **No delivery is completed**, so nothing reaches `DELIVERED` and the delivery
+  performance figures stay empty. Completion needs the OTP proof, and forging
+  one is not something a seed should do.
+- **No returns, price lists or free-goods offers are seeded**, so those three
+  screens still open on an empty state.
+- **The sales chart shows only the current month** because the report defaults
+  to it; the older invoices are visible in the ageing card and on the analytics
+  screen with a wider range.
+- **The end-to-end database is never dropped**, so records created by browser
+  specs accumulate across runs. The seed is now idempotent against that, but
+  the accumulation itself is untouched.
+
+### Next phase dependencies
+
+None.

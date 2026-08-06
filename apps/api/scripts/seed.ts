@@ -19,6 +19,9 @@ import { MedicineBatch } from '../src/models/MedicineBatch';
 import { Shop } from '../src/models/Shop';
 import { User } from '../src/models/User';
 import { Order } from '../src/models/Order';
+import { Invoice } from '../src/models/Invoice';
+import { Supplier } from '../src/models/Supplier';
+import { PurchaseOrder } from '../src/models/PurchaseOrder';
 import { receiveStock } from '../src/services/inventoryService';
 
 /**
@@ -109,10 +112,83 @@ const ACCOUNTS: SeedAccount[] = [
     lastName: 'Ahmed',
     role: UserRole.SHOP_OWNER,
   },
+
+  /*
+   * One account per new shop, because `ASSUMPTIONS.md` says a shop owner
+   * belongs to **one** ordering shop and the submit endpoint means it: an order
+   * is placed against the owner's shop, so an address belonging to their second
+   * shop is refused with `ADDRESS_REQUIRED`. Hanging six shops off the two
+   * existing owners looked tidier and could not place an order.
+   */
+  {
+    key: 'owner3',
+    email: 'gulshan@medsupply.local',
+    firstName: 'Rumana',
+    lastName: 'Kabir',
+    role: UserRole.SHOP_OWNER,
+  },
+  {
+    key: 'owner4',
+    email: 'dhanmondi@medsupply.local',
+    firstName: 'Shakil',
+    lastName: 'Mahmud',
+    role: UserRole.SHOP_OWNER,
+  },
+  {
+    key: 'owner5',
+    email: 'banani@medsupply.local',
+    firstName: 'Nabila',
+    lastName: 'Chowdhury',
+    role: UserRole.SHOP_OWNER,
+  },
+  {
+    key: 'owner6',
+    email: 'mohakhali@medsupply.local',
+    firstName: 'Arif',
+    lastName: 'Hasan',
+    role: UserRole.SHOP_OWNER,
+  },
+  {
+    key: 'owner7',
+    email: 'bashundhara@medsupply.local',
+    firstName: 'Sadia',
+    lastName: 'Noor',
+    role: UserRole.SHOP_OWNER,
+  },
+  {
+    key: 'owner8',
+    email: 'savar@medsupply.local',
+    firstName: 'Milon',
+    lastName: 'Sarker',
+    role: UserRole.SHOP_OWNER,
+  },
 ];
 
-/** Ten medicines a Bangladeshi distributor would actually carry. */
-const CATALOGUE = [
+interface SeedMedicine {
+  sku: string;
+  brand: string;
+  generic: string;
+  strength: string;
+  price: number;
+  form?: string;
+  category?: string;
+  prescription?: boolean;
+  coldChain?: boolean;
+}
+
+/**
+ * A catalogue a Bangladeshi distributor would actually carry.
+ *
+ * The first ten are the originals and keep their `MED-SEED-001…010` references,
+ * because the browser suite and several screenshots name them. Everything after
+ * is new, and it is deliberately not ten more paracetamols: the point of a
+ * wider catalogue is to exercise the things a narrow one hides — searching,
+ * paging past the first screenful, a prescription line that makes generic name
+ * and strength mandatory, a cold-chain line, syrups and injections whose "sold
+ * as" is not a box of ten, and prices spanning three orders of magnitude so a
+ * money column has something to line up.
+ */
+const CATALOGUE: SeedMedicine[] = [
   { sku: 'NAP-500', brand: 'Napa', generic: 'Paracetamol', strength: '500mg', price: 12_00 },
   { sku: 'SEC-20', brand: 'Seclo', generic: 'Omeprazole', strength: '20mg', price: 70_00 },
   { sku: 'MON-10', brand: 'Monas', generic: 'Montelukast', strength: '10mg', price: 140_00 },
@@ -128,6 +204,244 @@ const CATALOGUE = [
     generic: 'Losartan Potassium',
     strength: '50mg',
     price: 85_00,
+  },
+
+  // ── Pain, fever and inflammation ──────────────────────────────────────────
+  {
+    sku: 'NAP-EXT',
+    brand: 'Napa Extra',
+    generic: 'Paracetamol + Caffeine',
+    strength: '500mg+65mg',
+    price: 20_00,
+    category: 'Painkillers',
+  },
+  {
+    sku: 'ACE-PLUS',
+    brand: 'Ace Plus',
+    generic: 'Paracetamol + Caffeine',
+    strength: '500mg+65mg',
+    price: 18_00,
+    category: 'Painkillers',
+  },
+  {
+    sku: 'ETO-90',
+    brand: 'Etorix',
+    generic: 'Etoricoxib',
+    strength: '90mg',
+    price: 210_00,
+    category: 'Painkillers',
+  },
+  {
+    sku: 'DIC-50',
+    brand: 'Voltalin',
+    generic: 'Diclofenac Sodium',
+    strength: '50mg',
+    price: 45_00,
+    category: 'Painkillers',
+  },
+  {
+    sku: 'NAP-SYP',
+    brand: 'Napa Syrup',
+    generic: 'Paracetamol',
+    strength: '120mg/5ml',
+    price: 35_00,
+    form: 'Syrup',
+    category: 'Painkillers',
+  },
+
+  // ── Antibiotics, all prescription-only ────────────────────────────────────
+  {
+    sku: 'AZI-500',
+    brand: 'Azithral',
+    generic: 'Azithromycin',
+    strength: '500mg',
+    price: 285_00,
+    category: 'Antibiotics',
+    prescription: true,
+  },
+  {
+    sku: 'CIP-500',
+    brand: 'Ciprocin',
+    generic: 'Ciprofloxacin',
+    strength: '500mg',
+    price: 190_00,
+    category: 'Antibiotics',
+    prescription: true,
+  },
+  {
+    sku: 'FLU-150',
+    brand: 'Flugal',
+    generic: 'Fluconazole',
+    strength: '150mg',
+    price: 95_00,
+    category: 'Antibiotics',
+    prescription: true,
+  },
+  {
+    sku: 'CEF-SYP',
+    brand: 'Cef-3 Syrup',
+    generic: 'Cefixime',
+    strength: '100mg/5ml',
+    price: 260_00,
+    form: 'Syrup',
+    category: 'Antibiotics',
+    prescription: true,
+  },
+  {
+    sku: 'CEFT-1G',
+    brand: 'Roceph',
+    generic: 'Ceftriaxone',
+    strength: '1g',
+    price: 340_00,
+    form: 'Injection',
+    category: 'Antibiotics',
+    prescription: true,
+  },
+
+  // ── Long-term conditions ──────────────────────────────────────────────────
+  {
+    sku: 'AML-5',
+    brand: 'Amlovas',
+    generic: 'Amlodipine',
+    strength: '5mg',
+    price: 48_00,
+    category: 'Heart and blood pressure',
+  },
+  {
+    sku: 'ATE-50',
+    brand: 'Atenol',
+    generic: 'Atenolol',
+    strength: '50mg',
+    price: 40_00,
+    category: 'Heart and blood pressure',
+  },
+  {
+    sku: 'ATO-20',
+    brand: 'Atorva',
+    generic: 'Atorvastatin',
+    strength: '20mg',
+    price: 130_00,
+    category: 'Heart and blood pressure',
+  },
+  {
+    sku: 'CLO-75',
+    brand: 'Clopid',
+    generic: 'Clopidogrel',
+    strength: '75mg',
+    price: 175_00,
+    category: 'Heart and blood pressure',
+    prescription: true,
+  },
+  {
+    sku: 'GLI-80',
+    brand: 'Comet DS',
+    generic: 'Gliclazide',
+    strength: '80mg',
+    price: 72_00,
+    category: 'Diabetes',
+  },
+  {
+    sku: 'LEV-50',
+    brand: 'Thyrox',
+    generic: 'Levothyroxine',
+    strength: '50mcg',
+    price: 88_00,
+    category: 'Hormones',
+    prescription: true,
+  },
+
+  // ── Cold chain ────────────────────────────────────────────────────────────
+  {
+    sku: 'INS-100',
+    brand: 'Insulet 30/70',
+    generic: 'Human Insulin',
+    strength: '100IU/ml',
+    price: 480_00,
+    form: 'Injection',
+    category: 'Diabetes',
+    prescription: true,
+    coldChain: true,
+  },
+  {
+    sku: 'VAC-TT',
+    brand: 'Tetavax',
+    generic: 'Tetanus Toxoid',
+    strength: '0.5ml',
+    price: 220_00,
+    form: 'Injection',
+    category: 'Vaccines',
+    prescription: true,
+    coldChain: true,
+  },
+
+  // ── Everyday counter lines ────────────────────────────────────────────────
+  {
+    sku: 'ORS-20',
+    brand: 'Orsaline-N',
+    generic: 'Oral Rehydration Salts',
+    strength: '20.5g',
+    price: 8_00,
+    form: 'Sachet',
+    category: 'General',
+  },
+  {
+    sku: 'ZIN-20',
+    brand: 'Zinet',
+    generic: 'Zinc Sulphate',
+    strength: '20mg',
+    price: 30_00,
+    form: 'Syrup',
+    category: 'Vitamins',
+  },
+  {
+    sku: 'VIT-D',
+    brand: 'D-Rise',
+    generic: 'Cholecalciferol',
+    strength: '40000IU',
+    price: 65_00,
+    category: 'Vitamins',
+  },
+  {
+    sku: 'CAL-500',
+    brand: 'Calbo-D',
+    generic: 'Calcium + Vitamin D3',
+    strength: '500mg',
+    price: 95_00,
+    category: 'Vitamins',
+  },
+  {
+    sku: 'ANT-GEL',
+    brand: 'Antacid Plus',
+    generic: 'Aluminium Hydroxide',
+    strength: '200mg/5ml',
+    price: 55_00,
+    form: 'Suspension',
+    category: 'Stomach',
+  },
+  {
+    sku: 'DOM-10',
+    brand: 'Domin',
+    generic: 'Domperidone',
+    strength: '10mg',
+    price: 42_00,
+    category: 'Stomach',
+  },
+  {
+    sku: 'SAL-INH',
+    brand: 'Asthalin',
+    generic: 'Salbutamol',
+    strength: '100mcg',
+    price: 310_00,
+    form: 'Inhaler',
+    category: 'Respiratory',
+  },
+  {
+    sku: 'CET-10',
+    brand: 'Alatrol',
+    generic: 'Cetirizine',
+    strength: '10mg',
+    price: 25_00,
+    category: 'Respiratory',
   },
 ];
 
@@ -165,6 +479,85 @@ const SHOPS: SeedShop[] = [
     creditLimit: 20_000_00,
     phone: '01711000003',
   },
+
+  /*
+   * Six more, so a customer picker has to be searched rather than scrolled and
+   * the ledger, ageing and collection screens have more than two rows to sort.
+   * They belong to the two seeded owners because an owner is a user account and
+   * adding more of those changes who the role tests are talking about — a shop
+   * with several branches under one owner is also the ordinary case here.
+   */
+  {
+    key: 'shop-d',
+    name: 'Gulshan Pharma',
+    ownerKey: 'owner3',
+    status: ShopStatus.ACTIVE,
+    creditLimit: 300_000_00,
+    phone: '01711000004',
+  },
+  {
+    key: 'shop-e',
+    name: 'Dhanmondi Medicine Corner',
+    ownerKey: 'owner4',
+    status: ShopStatus.ACTIVE,
+    creditLimit: 150_000_00,
+    phone: '01711000005',
+  },
+  {
+    key: 'shop-f',
+    name: 'Banani Health Store',
+    ownerKey: 'owner5',
+    status: ShopStatus.ACTIVE,
+    creditLimit: 120_000_00,
+    phone: '01711000006',
+  },
+  {
+    key: 'shop-g',
+    name: 'Mohakhali Drug Mart',
+    ownerKey: 'owner6',
+    status: ShopStatus.ACTIVE,
+    creditLimit: 80_000_00,
+    phone: '01711000007',
+  },
+  {
+    key: 'shop-h',
+    name: 'Bashundhara City Pharmacy',
+    ownerKey: 'owner7',
+    status: ShopStatus.ACTIVE,
+    creditLimit: 250_000_00,
+    phone: '01711000008',
+  },
+  {
+    key: 'shop-i',
+    name: 'Savar Janata Medical Hall',
+    ownerKey: 'owner8',
+    status: ShopStatus.ACTIVE,
+    creditLimit: 60_000_00,
+    phone: '01711000009',
+  },
+];
+
+/** Who this distributor buys from. Nothing anywhere created one before. */
+const SUPPLIERS = [
+  {
+    key: 'beximco',
+    name: 'Beximco Pharmaceuticals Ltd',
+    contact: 'Kamrul Hasan',
+    phone: '01811000001',
+  },
+  {
+    key: 'square',
+    name: 'Square Pharmaceuticals PLC',
+    contact: 'Nasrin Sultana',
+    phone: '01811000002',
+  },
+  {
+    key: 'incepta',
+    name: 'Incepta Pharmaceuticals Ltd',
+    contact: 'Sabbir Rahman',
+    phone: '01811000003',
+  },
+  { key: 'renata', name: 'Renata Limited', contact: 'Farida Yasmin', phone: '01811000004' },
 ];
 
 let base = '';
@@ -298,15 +691,21 @@ async function seedCatalogue() {
         genericName: item.generic,
         manufacturer: 'Seed Pharmaceuticals Ltd',
         strength: item.strength,
-        dosageForm: 'Tablet',
-        packSize: '10',
-        unit: 'box',
-        category: 'General',
+        dosageForm: item.form ?? 'Tablet',
+        packSize: item.form && item.form !== 'Tablet' ? '1' : '10',
+        unit: item.form && item.form !== 'Tablet' ? item.form.toLowerCase() : 'box',
+        category: item.category ?? 'General',
         barcode: `880${String(1000000 + index).padStart(10, '0')}`,
         costPriceMinor: Math.round(item.price * 0.7),
+        // A round retail price above trade, so the margin the medicine page
+        // computes is a real number rather than a blank.
+        mrpMinor: Math.round((item.price * 1.25) / 100) * 100,
         defaultSellingPriceMinor: item.price,
         minimumOrderQuantity: 1,
-        classification: MedicineClassification.OTC,
+        coldChain: item.coldChain ?? false,
+        classification: item.prescription
+          ? MedicineClassification.PRESCRIPTION
+          : MedicineClassification.OTC,
         createdBy,
       });
     }
@@ -401,6 +800,284 @@ async function orderForReview(orderId: string): Promise<ReviewOrder> {
   return order;
 }
 
+/** Suppliers and one received purchase order, neither of which existed before. */
+async function seedPurchasing() {
+  process.stdout.write('Buying in\n');
+  /*
+   * Keyed on this seed's own records rather than on "are there any suppliers".
+   *
+   * The end-to-end database is not thrown away between runs, and
+   * `pickers.spec.ts` creates a supplier every time it proves a purchase order
+   * can be raised for one that did not exist yet. So "the table is not empty"
+   * was true after the first browser run, and the seed then skipped its own
+   * four suppliers and both purchase orders for good — which is how the
+   * purchasing screens came to show nothing but a column of
+   * *Padma Traders 1785988918156508*.
+   */
+  const supplierIds = new Map<string, string>();
+  let madeSuppliers = 0;
+  for (const supplier of SUPPLIERS) {
+    const known = await Supplier.findOne({ name: supplier.name }).select('_id');
+    if (known) {
+      supplierIds.set(supplier.key, String(known._id));
+      continue;
+    }
+    const created = await must<{ _id: string }>(
+      `Supplier ${supplier.key}`,
+      'POST',
+      '/api/v1/purchasing/suppliers',
+      {
+        as: 'manager',
+        body: {
+          name: supplier.name,
+          primaryPhone: supplier.phone,
+          contactName: supplier.contact,
+          paymentTermsDays: 45,
+        },
+      },
+    );
+    supplierIds.set(supplier.key, created._id);
+    madeSuppliers += 1;
+  }
+  note(`${madeSuppliers} suppliers created, ${SUPPLIERS.length - madeSuppliers} already there`);
+
+  if (!(await PurchaseOrder.exists({ supplierReference: 'BEX-PO-4471' }))) {
+    /*
+     * Two purchase orders: one still open, one received in full — so the goods
+     * receipt screen has both a thing to do and a thing already done, and the
+     * batches that arrive carry a different cost from the seeded ones, which is
+     * what makes a stock valuation more than one number repeated.
+     */
+    const beximco = supplierIds.get('beximco')!;
+    const square = supplierIds.get('square')!;
+    const line = (sku: string, quantity: number, cost: number) => ({
+      medicineId: String(fixedId(`medicine:${sku}`)),
+      orderedQuantity: quantity,
+      unitCostMinor: cost,
+    });
+
+    await must('Open purchase order', 'POST', '/api/v1/purchasing/orders', {
+      as: 'manager',
+      body: {
+        supplierId: beximco,
+        supplierReference: 'BEX-PO-4471',
+        lines: [
+          line('NAP-500', 2000, 8_40),
+          line('ACE-100', 1500, 6_60),
+          line('ORS-20', 3000, 5_20),
+        ],
+      },
+    });
+
+    const receivable = await must<{ _id: string; lines: Array<{ _id: string }> }>(
+      'Received purchase order',
+      'POST',
+      '/api/v1/purchasing/orders',
+      {
+        as: 'manager',
+        body: {
+          supplierId: square,
+          supplierReference: 'SQ-PO-8820',
+          lines: [line('SEC-20', 800, 48_00), line('MET-500', 600, 38_00)],
+        },
+      },
+    );
+
+    const expiry = new Date();
+    expiry.setMonth(expiry.getMonth() + 20);
+    await must('Goods receipt', 'POST', `/api/v1/purchasing/orders/${receivable._id}/receipts`, {
+      as: 'storekeeper',
+      body: {
+        supplierInvoiceReference: 'SQ-INV-19003',
+        lines: receivable.lines.map((entry, index) => ({
+          purchaseOrderLineId: String(entry._id),
+          receivedQuantity: index === 0 ? 800 : 600,
+          batchNumber: `SQ-${index === 0 ? 'SEC' : 'MET'}-2601`,
+          expiryDate: expiry.toISOString().slice(0, 10),
+          manufacturingDate: new Date(expiry.getFullYear() - 2, expiry.getMonth(), 1)
+            .toISOString()
+            .slice(0, 10),
+          unitCostMinor: index === 0 ? 48_00 : 38_00,
+          warehouseLocation: index === 0 ? 'B1-1' : 'B1-2',
+        })),
+      },
+    });
+    note('2 purchase orders, one received in full');
+  } else {
+    note('purchase orders already there');
+  }
+}
+
+interface FulfilledOrder {
+  orderId: string;
+  invoiceId?: string;
+  invoiceTotalMinor?: number;
+  deliveryId?: string;
+}
+
+/**
+ * One order, all the way from a shop owner pressing Submit to an issued
+ * invoice, through the endpoints a person uses.
+ *
+ * Nothing here writes a status. Every step is the request the screen makes,
+ * signed in as the role the server requires, which is what stops the seed
+ * drifting away from the product: if approval starts demanding a field, this
+ * fails rather than producing an order no sequence of clicks could create.
+ *
+ * Each step checks the current state first, so a rerun resumes rather than
+ * repeats — `submit` is idempotent by key, and the rest are guarded by the
+ * status they would move away from.
+ */
+async function fulfilOrder(
+  key: string,
+  shopKey: string,
+  ownerKey: string,
+  lines: Array<{ sku: string; quantity: number }>,
+): Promise<FulfilledOrder> {
+  const shopId = fixedId(`shop:${shopKey}`);
+  const shop = await Shop.findById(shopId).select('deliveryAddresses');
+  const submitted = await must<{ _id: string }>(`Order ${key}`, 'POST', '/api/v1/orders/submit', {
+    as: ownerKey,
+    body: {
+      items: lines.map((entry) => ({
+        medicineId: String(fixedId(`medicine:${entry.sku}`)),
+        requestedQuantity: entry.quantity,
+      })),
+      deliveryAddressId: String(shop!.deliveryAddresses[0]!._id),
+      requestedPaymentMethod: PaymentMethod.CASH,
+      idempotencyKey: `seed-order-${key}`,
+    },
+  });
+  const orderId = submitted._id;
+
+  const review = await orderForReview(orderId);
+  if (review.status === 'SUBMITTED' || review.status === 'UNDER_REVIEW') {
+    await must('Approve', 'POST', `/api/v1/approvals/${orderId}/approve`, {
+      as: 'manager',
+      body: {
+        version: review.version,
+        lines: review.items.map((item) => ({
+          orderItemId: String(item._id),
+          approvedQuantity: item.requestedQuantity,
+          unitPriceMinor: item.estimatedUnitPriceMinor,
+          lineDiscountMinor: 0,
+        })),
+        orderDiscountMinor: 0,
+        deliveryChargeMinor: 60_00,
+      },
+    });
+  }
+
+  const queue = await must<
+    Array<{ _id: string; version: number; status: string; orderId: { _id: string } | string }>
+  >('Picking queue', 'GET', '/api/v1/fulfilment/queue', { as: 'storekeeper' });
+  const list = queue.find((entry) => {
+    const owner = typeof entry.orderId === 'string' ? entry.orderId : entry.orderId?._id;
+    return String(owner) === orderId;
+  });
+  // Nothing to pick means the order never reached fulfilment, which is a
+  // failure worth stopping on rather than a state to skip past.
+  if (!list) throw new Error(`Order ${key} has no picking list; approval did not produce one.`);
+
+  /*
+   * `medicineId` comes back **populated** on this endpoint — the picker's
+   * screen needs the brand name — while `batchId` deliberately does not,
+   * because the client posts that one straight back. So the id has to be dug
+   * out of the document rather than stringified, and getting that wrong fails
+   * as `PICK_LIMIT`: the server matches no line, finds no confirmation for the
+   * allocation, and reports it as picking too much.
+   */
+  interface PickingDetail {
+    _id: string;
+    version: number;
+    status: string;
+    items: Array<{ medicineId: string | { _id: string }; batchId: string; quantity: number }>;
+  }
+  const idOf = (value: string | { _id: string }) =>
+    typeof value === 'string' ? value : String(value._id);
+
+  let detail = await must<PickingDetail>(
+    'Picking detail',
+    'GET',
+    `/api/v1/fulfilment/picking/${list._id}`,
+    { as: 'storekeeper' },
+  );
+
+  if (detail.status === 'PENDING') {
+    await must('Start picking', 'POST', `/api/v1/fulfilment/picking/${list._id}/start`, {
+      as: 'storekeeper',
+      body: { version: detail.version },
+    });
+    detail = await must<PickingDetail>(
+      'Picking detail',
+      'GET',
+      `/api/v1/fulfilment/picking/${list._id}`,
+      { as: 'storekeeper' },
+    );
+  }
+
+  if (detail.status === 'PICKING') {
+    await must('Complete picking', 'POST', `/api/v1/fulfilment/picking/${list._id}/progress`, {
+      as: 'storekeeper',
+      body: {
+        version: detail.version,
+        action: 'COMPLETE',
+        items: detail.items.map((item) => ({
+          medicineId: idOf(item.medicineId),
+          batchId: String(item.batchId),
+          pickedQuantity: item.quantity,
+        })),
+      },
+    });
+    detail = await must<PickingDetail>(
+      'Picking detail',
+      'GET',
+      `/api/v1/fulfilment/picking/${list._id}`,
+      { as: 'storekeeper' },
+    );
+  }
+
+  if (detail.status === 'PACKING') {
+    const packed = await must<{
+      invoice?: { _id: string; grandTotalMinor: number };
+    }>('Pack', 'POST', `/api/v1/fulfilment/picking/${list._id}/pack`, {
+      as: 'storekeeper',
+      body: {
+        version: detail.version,
+        items: detail.items.map((item) => ({
+          medicineId: idOf(item.medicineId),
+          batchId: String(item.batchId),
+          packedQuantity: item.quantity,
+        })),
+        packageCount: 1,
+        weightGrams: 900,
+      },
+    });
+    return {
+      orderId,
+      invoiceId: packed.invoice?._id,
+      invoiceTotalMinor: packed.invoice?.grandTotalMinor,
+    };
+  }
+
+  /*
+   * Already packed on an earlier run, so nothing above issued an invoice — but
+   * one exists, and everything downstream (the dates, the payments, the
+   * ageing) is keyed on it. Without this a second seed against the same
+   * database reported "0 invoices" and quietly left the money side empty,
+   * which is exactly the shape of failure the loud `must()` helper exists to
+   * prevent and this silently walked past.
+   */
+  const issued = await Invoice.findOne({ orderId }).select('_id grandTotalMinor');
+  return issued
+    ? {
+        orderId,
+        invoiceId: String(issued._id),
+        invoiceTotalMinor: (issued as { grandTotalMinor?: number }).grandTotalMinor,
+      }
+    : { orderId };
+}
+
 async function main() {
   if (process.env.NODE_ENV === 'production') {
     process.stderr.write(`${PRODUCTION_REFUSAL}\n`);
@@ -485,6 +1162,320 @@ async function main() {
     });
   }
   note(`APPROVED           ${toPick.orderId}`);
+
+  await seedPurchasing();
+
+  /*
+   * A month of trading.
+   *
+   * Everything above parks one order at each state a screen exists for. That
+   * is enough to prove a screen renders and nowhere near enough to *use* the
+   * system: with no issued invoice there is no revenue, no receivable, nothing
+   * to age, nothing to collect and nothing to chart — which is why the home
+   * screen's sales line was flat and its "who owes us" card said nothing is
+   * outstanding.
+   *
+   * Fourteen orders across seven shops, each driven the whole way to an issued
+   * invoice through the real endpoints.
+   */
+  process.stdout.write('A month of trading\n');
+  const TRADING: Array<{
+    key: string;
+    shop: string;
+    owner: string;
+    daysAgo: number;
+    lines: Array<{ sku: string; quantity: number }>;
+  }> = [
+    {
+      key: 't01',
+      shop: 'shop-a',
+      owner: 'owner',
+      daysAgo: 34,
+      lines: [
+        { sku: 'NAP-500', quantity: 60 },
+        { sku: 'ORS-20', quantity: 120 },
+      ],
+    },
+    {
+      key: 't02',
+      shop: 'shop-d',
+      owner: 'owner3',
+      daysAgo: 31,
+      lines: [
+        { sku: 'AZI-500', quantity: 20 },
+        { sku: 'CET-10', quantity: 40 },
+      ],
+    },
+    {
+      key: 't03',
+      shop: 'shop-f',
+      owner: 'owner5',
+      daysAgo: 28,
+      lines: [
+        { sku: 'ATO-20', quantity: 30 },
+        { sku: 'AML-5', quantity: 45 },
+      ],
+    },
+    {
+      key: 't04',
+      shop: 'shop-b',
+      owner: 'owner2',
+      daysAgo: 25,
+      lines: [
+        { sku: 'SEC-20', quantity: 25 },
+        { sku: 'DOM-10', quantity: 35 },
+      ],
+    },
+    {
+      key: 't05',
+      shop: 'shop-h',
+      owner: 'owner7',
+      daysAgo: 22,
+      lines: [
+        { sku: 'INS-100', quantity: 12 },
+        { sku: 'GLI-80', quantity: 30 },
+      ],
+    },
+    {
+      key: 't06',
+      shop: 'shop-e',
+      owner: 'owner4',
+      daysAgo: 19,
+      lines: [
+        { sku: 'NAP-SYP', quantity: 50 },
+        { sku: 'ZIN-20', quantity: 40 },
+      ],
+    },
+    {
+      key: 't07',
+      shop: 'shop-g',
+      owner: 'owner6',
+      daysAgo: 16,
+      lines: [
+        { sku: 'CIP-500', quantity: 18 },
+        { sku: 'FLU-150', quantity: 22 },
+      ],
+    },
+    {
+      key: 't08',
+      shop: 'shop-a',
+      owner: 'owner',
+      daysAgo: 13,
+      lines: [
+        { sku: 'MON-10', quantity: 20 },
+        { sku: 'SAL-INH', quantity: 10 },
+      ],
+    },
+    {
+      key: 't09',
+      shop: 'shop-i',
+      owner: 'owner8',
+      daysAgo: 11,
+      lines: [
+        { sku: 'CAL-500', quantity: 30 },
+        { sku: 'VIT-D', quantity: 25 },
+      ],
+    },
+    {
+      key: 't10',
+      shop: 'shop-d',
+      owner: 'owner3',
+      daysAgo: 8,
+      lines: [
+        { sku: 'CEFT-1G', quantity: 15 },
+        { sku: 'ETO-90', quantity: 20 },
+      ],
+    },
+    {
+      key: 't11',
+      shop: 'shop-f',
+      owner: 'owner5',
+      daysAgo: 6,
+      lines: [
+        { sku: 'MET-500', quantity: 40 },
+        { sku: 'ATE-50', quantity: 35 },
+      ],
+    },
+    {
+      key: 't12',
+      shop: 'shop-h',
+      owner: 'owner7',
+      daysAgo: 4,
+      lines: [
+        { sku: 'AMO-500', quantity: 22 },
+        { sku: 'NAP-EXT', quantity: 60 },
+      ],
+    },
+    {
+      key: 't13',
+      shop: 'shop-e',
+      owner: 'owner4',
+      daysAgo: 2,
+      lines: [
+        { sku: 'CEF-SYP', quantity: 16 },
+        { sku: 'ANT-GEL', quantity: 30 },
+      ],
+    },
+    {
+      key: 't14',
+      shop: 'shop-b',
+      owner: 'owner2',
+      daysAgo: 1,
+      lines: [
+        { sku: 'DIC-50', quantity: 40 },
+        { sku: 'ACE-PLUS', quantity: 50 },
+      ],
+    },
+  ];
+
+  const traded: Array<FulfilledOrder & { shop: string; daysAgo: number }> = [];
+  for (const entry of TRADING) {
+    const result = await fulfilOrder(entry.key, entry.shop, entry.owner, entry.lines);
+    traded.push({ ...result, shop: entry.shop, daysAgo: entry.daysAgo });
+  }
+
+  /*
+   * The one thing here that is not done through the API: moving the clock.
+   *
+   * An invoice is issued when it is packed, and the packing endpoint quite
+   * rightly has no "pretend this happened last month" parameter. So the
+   * transitions above are all real and only the two dates are rewritten
+   * afterwards — which is what turns fourteen invoices dated today into a month
+   * of trade with an ageing profile. Payments need no such help: `collectedAt`
+   * is part of the request a person makes.
+   */
+  const invoiced = traded.filter((entry) => entry.invoiceId);
+  for (const entry of invoiced) {
+    const issued = new Date();
+    issued.setDate(issued.getDate() - entry.daysAgo);
+    const due = new Date(issued);
+    due.setDate(due.getDate() + 30);
+    await Invoice.updateOne(
+      { _id: entry.invoiceId },
+      { $set: { invoiceDate: issued, dueDate: due } },
+    );
+  }
+  note(`${invoiced.length} invoices, dated across the last five weeks`);
+
+  /*
+   * Who has paid, and who has not.
+   *
+   * Deliberately uneven, because an ageing report where everything is either
+   * settled or outstanding tells you nothing: the oldest are paid in full, the
+   * middle are part-paid, and the newest are untouched. The two oldest are left
+   * unpaid on purpose so the overdue bucket and the credit block have a real
+   * example to show.
+   */
+  process.stdout.write('Money in\n');
+  let payments = 0;
+  for (const [index, entry] of invoiced.entries()) {
+    if (!entry.invoiceTotalMinor) continue;
+    const overdue = entry.daysAgo > 30;
+    const share = overdue ? 0 : index % 3 === 0 ? 1 : index % 3 === 1 ? 0.6 : 0;
+    if (share === 0) continue;
+
+    const collected = new Date();
+    collected.setDate(collected.getDate() - Math.max(0, entry.daysAgo - 5));
+    await must('Payment', 'POST', '/api/v1/payments', {
+      as: 'manager',
+      body: {
+        shopId: String(fixedId(`shop:${entry.shop}`)),
+        invoiceId: entry.invoiceId,
+        amountMinor: Math.round(entry.invoiceTotalMinor * share),
+        method: PaymentMethod.CASH,
+        collectedAt: collected.toISOString(),
+        postNow: true,
+        idempotencyKey: `seed-payment-${entry.orderId}`,
+      },
+    });
+    payments += 1;
+  }
+  note(`${payments} payments posted, two invoices left overdue on purpose`);
+
+  /*
+   * On the road.
+   *
+   * Packing creates the delivery; nothing had ever moved one, so the deliveries
+   * board, the rider's screens and the home screen's "out for delivery" tile
+   * were all permanently empty. Six of the fourteen are pushed along, three of
+   * them the whole way to the rider having set off.
+   *
+   * Deliberately stopping short of `complete`: completion demands the proofs
+   * `DELIVERY_REQUIRED_PROOFS` asks for, which is an OTP sent to the shop owner
+   * and read back. Faking that would mean writing a code the system believes it
+   * generated, and a seed that forges a proof of delivery is exactly the kind of
+   * record the audit rules exist to prevent.
+   */
+  process.stdout.write('On the road\n');
+  const riderId = String(fixedId('user:rider'));
+  let assigned = 0;
+  let travelling = 0;
+
+  for (const [index, entry] of traded.slice(0, 6).entries()) {
+    const delivery = await call<{
+      items?: Array<{ _id: string; version: number; status: string }>;
+    }>('GET', `/api/v1/deliveries?orderId=${entry.orderId}`, { as: 'manager' });
+    const list = Array.isArray(delivery.data)
+      ? (delivery.data as Array<{ _id: string; version: number; status: string }>)
+      : (delivery.data?.items ?? []);
+    const found = list.find(Boolean);
+    if (!found) continue;
+
+    interface DeliveryNow {
+      version: number;
+      status: string;
+      packageId?: { reference?: string; packageCount?: number };
+      invoiceId?: { reference?: string } | string;
+    }
+    const read = (as: string) =>
+      must<DeliveryNow>('Delivery', 'GET', `/api/v1/deliveries/${found._id}`, { as });
+
+    const step = async (path: string, as: string, body: Record<string, unknown> = {}) => {
+      const current = await read(as);
+      await must(`Delivery ${path}`, 'POST', `/api/v1/deliveries/${found._id}/${path}`, {
+        as,
+        body: { version: current.version, idempotencyKey: `seed-${path}-${found._id}`, ...body },
+      });
+    };
+
+    const expected = new Date();
+    expected.setDate(expected.getDate() + 1);
+
+    if (found.status === 'READY_FOR_ASSIGNMENT') {
+      await step('assign', 'manager', {
+        deliveryPersonId: riderId,
+        expectedDeliveryDate: expected.toISOString().slice(0, 10),
+        priority: index % 3 === 0 ? DeliveryPriority.HIGH : DeliveryPriority.NORMAL,
+      });
+      assigned += 1;
+    }
+
+    // The first three carry on until the rider has left the building.
+    if (index < 3) {
+      /*
+       * The handover is a *check*, not a declaration: the storekeeper reads the
+       * references off the package in their hands and the server refuses if
+       * they do not match what it issued. So they are read back from the
+       * delivery rather than invented — inventing them is `HANDOVER_MISMATCH`,
+       * which is the endpoint doing its job.
+       */
+      const current = await read('storekeeper');
+      const invoice = await Invoice.findById(entry.invoiceId).select('reference');
+      await step('handover', 'storekeeper', {
+        packageReference: current.packageId?.reference,
+        invoiceReference:
+          typeof current.invoiceId === 'object'
+            ? current.invoiceId?.reference
+            : (invoice?.reference ?? undefined),
+        packageCount: current.packageId?.packageCount ?? 1,
+      });
+      await step('acknowledge', 'rider');
+      await step('pickup', 'rider');
+      await step('start', 'rider');
+      travelling += 1;
+    }
+  }
+  note(`${assigned} deliveries assigned, ${travelling} out on the road`);
 
   const summary = await Order.countDocuments({});
   process.stdout.write(`\n${summary} orders in the database.\n`);

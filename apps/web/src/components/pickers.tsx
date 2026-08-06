@@ -94,6 +94,8 @@ export function MedicinePicker({
       term={term}
       onTermChange={setTerm}
       emptyLabel={t('catalogue.none')}
+      searchingLabel={t('common.searching')}
+      searching={results.isFetching}
       options={items.map((medicine) => ({
         value: medicine._id,
         label: `${medicine.brandName} ${medicine.strength ?? ''}`.trim(),
@@ -155,6 +157,8 @@ export function SupplierPicker({
       term={term}
       onTermChange={setTerm}
       emptyLabel={t('purchasing.suppliersNone')}
+      searchingLabel={t('common.searching')}
+      searching={results.isFetching}
       options={items.map((supplier) => ({
         value: supplier._id,
         label: supplier.name,
@@ -221,6 +225,8 @@ export function CustomerPicker({
       term={term}
       onTermChange={setTerm}
       emptyLabel={t('shops.none')}
+      searchingLabel={t('common.searching')}
+      searching={results.isFetching}
       options={items.map((shop) => ({
         value: shop._id,
         label: shop.name,

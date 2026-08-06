@@ -45,9 +45,20 @@ test('a purchase order is raised with a supplier that did not exist when it star
   const mark = stamp();
   const supplier = `Padma Traders ${mark}`;
 
-  // Nothing is seeded, so the search is the honest empty case rather than a
-  // contrived one: a real answer that says so, not a blank box.
-  await page.getByRole('combobox', { name: /supplier/i }).fill('Padma');
+  /*
+   * A term that matches nothing, and it has to be built rather than chosen.
+   *
+   * This used to type "Padma" and rely on the supplier table being empty —
+   * true when the seed created no suppliers, and quietly false once it created
+   * four and this spec's own earlier runs had left their "Padma Traders …"
+   * behind. Worse, it passed either way: the picker rendered "No suppliers yet"
+   * while the search was still in flight, so the assertion was reading a
+   * message about a request that had not come back.
+   *
+   * The picker now says which of the two it means, and this asks a question
+   * whose answer is genuinely nothing.
+   */
+  await page.getByRole('combobox', { name: /supplier/i }).fill(`Zzz-${mark}`);
   await expect(page.getByText(/no suppliers yet/i)).toBeVisible();
 
   await page.getByRole('button', { name: /add a supplier/i }).click();

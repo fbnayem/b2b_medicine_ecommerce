@@ -636,3 +636,28 @@ reads a decision rather than guesses at an intention.
 - **A chart's figures table is never optional, only collapsible.** The SVG is
   `aria-hidden`, so a chart without its table does not exist for anybody using a
   screen reader.
+
+## Phase 32 — the demo data
+
+- **Every state transition still goes through the HTTP API.** The seed submits,
+  approves, picks, packs, assigns and hands over as the role the server
+  requires. It writes no status anywhere, so if a workflow gains a rule the
+  seed fails rather than producing a database no sequence of clicks could
+  create.
+- **The one exception is the clock**, and it is narrow: after an invoice is
+  issued, its `invoiceDate` and `dueDate` are rewritten so fourteen invoices
+  dated today become five weeks of trade with an ageing profile. The packing
+  endpoint has no "pretend this was last month" parameter and should not have
+  one. Payments need no such help — `collectedAt` is part of the request.
+- **One shop owner per shop.** `ASSUMPTIONS.md` already said a shop owner
+  belongs to one ordering shop, and the submit endpoint means it: an address
+  belonging to their second shop is refused with `ADDRESS_REQUIRED`. The six
+  new shops therefore carry six new owner accounts.
+- **Idempotency is keyed on the seed's own records, not on emptiness.** The
+  end-to-end database is not dropped between runs and `pickers.spec.ts` creates
+  a supplier every time it runs, so "are there any suppliers" was true after
+  the first browser run and the seed skipped its own four for good.
+- **Deliveries stop short of completion.** Completing one demands the proofs
+  `DELIVERY_REQUIRED_PROOFS` asks for — an OTP sent to the shop owner and read
+  back. A seed that forged one would be creating exactly the unaccountable
+  record the audit rules exist to prevent.
