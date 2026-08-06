@@ -150,6 +150,51 @@ test('an application that cannot load says so instead of painting white', async 
   await expect(page.locator('#root')).toBeEmpty();
 });
 
+/**
+ * The home screen, and the one thing that can go wrong with a figure on it.
+ *
+ * It used to be twenty cards naming twenty destinations the sidebar names too,
+ * and not one fact about the business. The figures that replaced them borrow
+ * the query key and the URL of the screen they link to precisely so the number
+ * and the list cannot disagree — this is the assertion that holds somebody to
+ * that when they later reach for a cheaper count endpoint.
+ */
+test('the number on the home screen is the number on the screen it opens', async ({ page }) => {
+  await signIn(page, 'manager');
+  await page.goto('/dashboard');
+
+  const signal = page.getByTestId('signal-approvals');
+  await expect(signal).toBeVisible();
+  const shown = Number(/\d+/.exec(await signal.innerText())?.[0]);
+  expect(Number.isNaN(shown), 'the approvals signal shows a number').toBe(false);
+
+  await signal.click();
+  await expect(page).toHaveURL(/\/approvals$/);
+  await expectPageRendered(page);
+
+  /*
+   * Both branches, because the seeded queue is one order deep and
+   * `journey.spec.ts` runs between the two projects that execute this file —
+   * so whether there is anything waiting depends on the run. What must hold
+   * either way is that the two screens agree.
+   */
+  if (shown === 0) {
+    await expect(page.getByTestId(TEST_IDS.emptyState)).toBeVisible();
+  } else {
+    await expect(page.locator('[data-test^="row-"]')).toHaveCount(shown);
+  }
+});
+
+test('a shop owner is shown what they owe, not the warehouse’s backlog', async ({ page }) => {
+  await signIn(page, 'owner');
+  await page.goto('/dashboard');
+
+  // Their side of this business is money and what is on its way to them.
+  await expect(page.getByTestId('signal-owed')).toContainText(/\d/);
+  await expect(page.getByTestId('signal-approvals')).toHaveCount(0);
+  await expect(page.getByTestId('signal-picking')).toHaveCount(0);
+});
+
 test('the boot screen gets out of the way once the application has started', async ({ page }) => {
   await page.goto('/login');
   await expectPageRendered(page);

@@ -114,15 +114,30 @@ export function MedicineList() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-sm text-text-muted">{medicine.reference}</span>
-                      <Badge tone={medicine.isActive ? 'success' : 'neutral'}>
-                        {medicine.isActive
-                          ? t('catalogue.listedActive')
-                          : t('catalogue.listedInactive')}
-                      </Badge>
+                      {/*
+                        Shown only when it is delisted, which is the whole point
+                        of a badge. "Available to order" sat on every card in the
+                        catalogue, so it distinguished nothing and was read as
+                        decoration — and it sat two centimetres from "In stock",
+                        which is a different fact people then had to work out the
+                        difference between. The exception is the news; the rule
+                        is not.
+                      */}
+                      {!medicine.isActive && (
+                        <Badge tone="neutral">{t('catalogue.listedInactive')}</Badge>
+                      )}
                     </div>
                     <ProductImage path={medicine.productImageUrl} />
                     <h2 className="text-lg font-semibold text-text">
-                      <Link className="text-brand underline" to={`/medicines/${medicine._id}`}>
+                      {/*
+                        `underline-offset-2` because at this weight and size the
+                        default offset cuts through the descenders of a name like
+                        "Amoxin 500mg".
+                      */}
+                      <Link
+                        className="text-brand underline underline-offset-2"
+                        to={`/medicines/${medicine._id}`}
+                      >
                         {[medicine.brandName, medicine.strength].filter(Boolean).join(' ')}
                       </Link>
                     </h2>

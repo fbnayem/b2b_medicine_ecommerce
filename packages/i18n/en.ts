@@ -106,7 +106,7 @@ export const en = {
    */
   dashboard: {
     welcome: 'Welcome back, {{name}}',
-    subtitle: 'Everything you can do in {{business}}, grouped by what it is for.',
+    subtitle: 'What is waiting for you, and everywhere else you can go in {{business}}.',
     groupWork: 'Work',
     groupCatalogue: 'Catalogue',
     groupPurchasing: 'Buying in',
@@ -114,6 +114,22 @@ export const en = {
     groupInsight: 'Reports',
     groupAdministration: 'Administration',
     groupAccount: 'My account',
+  },
+
+  /**
+   * The figures at the top of the home screen.
+   *
+   * Each is a backlog somebody can shorten today. The words go *under* the
+   * number and explain it, so they read as the answer to "what is this" rather
+   * than as a heading nobody needed.
+   */
+  home: {
+    waitingForYou: 'Waiting for you',
+    awaitingDecision: 'Orders waiting for your decision',
+    toPick: 'Orders to pick',
+    readyToHandOver: 'Packed, waiting for a rider',
+    onTheRoad: 'Out for delivery now',
+    youOwe: 'You owe',
   },
 
   /** What each section is *for*, in the words of the person who uses it. */

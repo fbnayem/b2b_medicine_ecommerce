@@ -99,7 +99,7 @@ export const bn: Catalogue = {
 
   dashboard: {
     welcome: 'স্বাগতম, {{name}}',
-    subtitle: '{{business}}-এ আপনি যা যা করতে পারেন, কাজ অনুযায়ী সাজানো।',
+    subtitle: 'আপনার জন্য কী অপেক্ষা করছে, আর {{business}}-এ আর কোথায় কোথায় যেতে পারেন।',
     groupWork: 'কাজ',
     groupCatalogue: 'ওষুধের তালিকা',
     groupPurchasing: 'কেনাকাটা',
@@ -107,6 +107,15 @@ export const bn: Catalogue = {
     groupInsight: 'রিপোর্ট',
     groupAdministration: 'প্রশাসন',
     groupAccount: 'আমার অ্যাকাউন্ট',
+  },
+
+  home: {
+    waitingForYou: 'আপনার জন্য অপেক্ষা করছে',
+    awaitingDecision: 'আপনার সিদ্ধান্তের অপেক্ষায় থাকা অর্ডার',
+    toPick: 'যে অর্ডারগুলি তুলতে হবে',
+    readyToHandOver: 'প্যাক হয়ে গেছে, ডেলিভারি কর্মীর অপেক্ষায়',
+    onTheRoad: 'এখন ডেলিভারিতে আছে',
+    youOwe: 'আপনার বাকি',
   },
 
   purpose: {

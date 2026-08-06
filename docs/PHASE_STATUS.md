@@ -1342,3 +1342,47 @@ place, and the `/` route removed.
 
 None. The Phase 27 item stands: linking `Warehouse` to
 `MedicineBatch.warehouseLocation` is a data change rather than a screen.
+
+## Phase 29: A Home Screen That Knows Something
+
+**Status:** COMPLETED
+
+### Scope and completed work
+
+The component craft in this application was not the weak part — the token
+system, focus rings, empty states and dark theme were already in place. The
+weak part was information design, and `/dashboard` was the proof: a card per
+destination, twenty of them on a manager's account, naming the same places the
+sidebar names beside it, and carrying no fact about the business.
+
+- **`lib/homeSignals.ts`** declares what is waiting for each role. A figure
+  reuses the query key _and_ the URL of the screen it links to, so the number
+  and the list cannot disagree and the click is served from cache; the
+  navigation manifest decides who sees each one, so no figure can 403.
+- Only work queues qualify — a total nobody can act on teaches people to stop
+  reading the ones that matter. A zero is shown, and muted.
+- A shop owner sees what they owe and what is out for delivery to them.
+- The catalogue's "Available to order" badge, which sat on every card, now
+  appears only when a medicine is delisted.
+
+### Testing
+
+Web 286 (six for the signal policy), browser 128 (two new, run against both web
+targets), API 170 unit / 194 integration / 5 route coverage, mobile 93.
+
+### Known limitations
+
+- **A delivery person gets no figures on the web.** Their job is the mobile
+  app; the one web screen they hold is a read-only view of their own round.
+  Recorded rather than papered over with a number that means nothing.
+- **A sales rep gets no figures either.** They reach pricing and their own
+  customers, neither of which is a queue with a backlog.
+- **Nothing gates "only queues qualify".** The rule is written in
+  `homeSignals.ts` and enforced by review, not by a test — a future signal
+  pointed at `/orders` would pass everything.
+- The figures load independently and each renders nothing until it has an
+  answer, so the row fills in rather than appearing at once.
+
+### Next phase dependencies
+
+None.

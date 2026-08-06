@@ -572,3 +572,21 @@ reads a decision rather than guesses at an intention.
 - **The file is `FrontDoor.tsx`, not `Landing.tsx`.** `app/landing.ts` sits
   beside it, and Windows resolves `./Landing` to `./landing` — an import that
   works on CI and hands back `undefined` on a developer's machine.
+
+## Phase 29 — the home screen
+
+- **A home-screen figure reuses the destination's query key and URL.** Not a
+  new count endpoint: the same request the screen it links to already makes. The
+  number and the list then cannot disagree, the click is served from cache, and
+  the invalidation written for that screen keeps this one current. It also means
+  a signal can never read something its role may not read.
+- **The navigation manifest decides who sees each figure.** The same source
+  `AppShell`, the route guards and mobile read. The home screen is the one place
+  nobody chose to open, so a card that answers 403 there is worse than no card.
+- **Only queues, and a zero is shown but muted.** A figure earns a place only if
+  its unfiltered length is itself a backlog — which is why there is no "Orders"
+  or "Medicines" card. Zero stays on screen because "nothing is stuck" is an
+  answer and a card that disappears when empty moves the ones beside it.
+- **A badge is for the exception.** "Available to order" was on every card in
+  the catalogue, so it distinguished nothing and was read as decoration. It now
+  appears only when a medicine is delisted.

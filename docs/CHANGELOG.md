@@ -1,5 +1,52 @@
 # Changelog
 
+## Phase 29 — a home screen that knows something
+
+Asked whether I could learn some design skills. The component craft in this
+application is not the weak part — the token system, the focus rings, the empty
+states and the dark theme are all in place. The weak part is **information
+design**, and the home screen was the proof.
+
+### Twenty cards, not one fact
+
+`/dashboard` was a card per destination, describing what each screen is for. On
+a manager's account that is twenty cards naming twenty places the sidebar names
+too, three centimetres to the left. Opening it told you nothing you did not know
+before you opened it.
+
+It now opens with what is waiting: orders needing a decision, orders to pick,
+packed orders waiting for a rider, deliveries on the road. A shop owner sees
+what they owe and what is on its way to them. The directory stays, below.
+
+Two rules keep those numbers honest, both in `lib/homeSignals.ts`. **A figure
+reuses the query key and the URL of the screen it links to** — not a new
+endpoint and not a cheaper count — so the number and the list cannot disagree,
+the click is served from cache, and every invalidation already written for that
+screen keeps this one current. **The navigation manifest decides who sees each
+one**, the same source the route guards and mobile read, because a card that
+403s on the first screen of somebody's day is worse than no card.
+
+Only queues qualify. There is no "Orders" or "Medicines" figure, because their
+totals are inventory of the system rather than work outstanding, and a number
+nobody can act on teaches people to stop reading the ones that matter. A zero is
+shown but muted: "nothing is stuck" is an answer, and a card that vanishes when
+empty moves the three beside it and reads as a fault.
+
+Writing the test for it corrected me. I asserted a shop owner sees no queue at
+all; the manifest said they hold `deliveries`, scoped by the server to their own
+shop — which makes "out for delivery now" the one queue that is genuinely
+theirs, and worth more to a pharmacy than anything else on the screen.
+
+### Two smaller things, on the catalogue
+
+**"Available to order" sat on every card**, so it distinguished nothing and read
+as decoration — two centimetres from "In stock", which is a different fact
+people then had to work out the difference between. The badge now appears only
+when a medicine is delisted. The exception is the news; the rule is not.
+
+The product name's underline ran through the descenders of "Amoxin 500mg" at
+that weight. Offset, not removed — it is the affordance.
+
 ## Phase 28 — the white blank page, and the front door behind it
 
 Reported as "the system is showing a white blank page". It was, and the cause was
