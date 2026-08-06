@@ -99,6 +99,14 @@ export const SCREEN_READS: Readonly<Record<string, readonly string[]>> = {
   'my-payments': ['GET /api/v1/payments'],
   'my-payment-detail': ['GET /api/v1/payments/{id}'],
   'my-statement': ['GET /api/v1/finance/my/statement'],
+  /*
+   * The shop's own record, which is where its delivery addresses live. The
+   * three writes beside it are `POST`/`PATCH`/`DELETE` on
+   * `/shops/my/addresses`; only the opening read belongs here, because a screen
+   * whose *content* 403s is broken and one whose buttons would is a different
+   * problem — the distinction this table's own comment draws.
+   */
+  addresses: ['GET /api/v1/shops/my'],
   notifications: ['GET /api/v1/notifications'],
   'notification-preferences': ['GET /api/v1/notifications/preferences'],
   activity: ['GET /api/v1/activity'],

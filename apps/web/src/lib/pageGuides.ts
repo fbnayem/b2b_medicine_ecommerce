@@ -281,6 +281,7 @@ const GUIDES: Record<string, (t: Translate) => Guide> = {
     use: t('guide.myStatementUse'),
     maths: t('guide.myStatementMaths'),
   }),
+  addresses: (t) => ({ what: t('guide.addressesWhat'), use: t('guide.addressesUse') }),
 
   notifications: (t) => ({ what: t('guide.notificationsWhat'), use: t('guide.notificationsUse') }),
   'notification-preferences': (t) => ({

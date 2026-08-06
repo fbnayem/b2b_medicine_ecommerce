@@ -789,6 +789,24 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: 'money',
   },
   {
+    /*
+     * Where a customer's deliveries go, maintained by the customer.
+     *
+     * Shop owner only, and deliberately not staff: an administrator changes the
+     * same field through `PATCH /shops/{id}`, which carries the credit limit,
+     * payment terms, discount and price list with it. Two doors onto one fact
+     * is acceptable when they are genuinely different decisions; giving staff
+     * this one as well would be two doors onto the *same* decision with
+     * different audit actions behind them.
+     */
+    id: 'addresses',
+    label: 'Delivery addresses',
+    path: '/account/addresses',
+    roles: [UserRole.SHOP_OWNER],
+    group: 'account',
+    icon: 'shops',
+  },
+  {
     id: 'notifications',
     label: 'Notifications',
     path: '/notifications',

@@ -611,6 +611,10 @@ export const en = {
     myStatementMaths:
       'Opening balance, plus what you were invoiced, less what you paid and were credited, gives the closing balance.',
 
+    addressesWhat: 'The places your orders are delivered to.',
+    addressesUse:
+      'Add one for each shop or store room you take deliveries at. One is always the default, which is the one an order starts with — you can pick a different one on any order. Removing an address does not change where an order already on its way is going.',
+
     notificationsWhat: 'Everything the system has told you.',
     notificationsUse: 'Unread ones are marked. Opening one takes you to whatever it is about.',
 
@@ -3502,6 +3506,7 @@ export const en = {
     notifications: 'Notifications',
     'notification-preferences': 'Notification settings',
     activity: 'Activity',
+    addresses: 'Delivery addresses',
     'change-password': 'Change your password',
     security: 'Sign-in and security',
   } as Record<string, string>,

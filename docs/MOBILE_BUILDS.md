@@ -131,3 +131,22 @@ These are outstanding and are not code:
 - **A real API address**, per the note above.
 - **`version`** is `1.0.0` for all three in `app.config.ts`. They will diverge;
   decide then whether they version together or apart.
+
+## What the Shop build now carries (phase 37)
+
+Nothing about the build changed, but what somebody installs did, and two points
+matter for a store listing.
+
+- **The Shop build registers a `register` route; the other two do not.** It is
+  guarded in `app/_layout.tsx` by `APP_VARIANT === AppVariant.SHOP`, and the
+  sign-in screen shows the link on the same condition. A rider or a storekeeper
+  has an account created for them by an administrator, so offering them
+  "register your pharmacy" would invite somebody to make an account nobody can
+  use.
+- **The Shop build still declares no camera and no location.** Everything added
+  this phase — the quote, the addresses, the return form, the password change,
+  registration — is HTTP and a keyboard. `pnpm --filter @medsupply/mobile
+config:shop` still resolves `android.permissions` as absent, and
+  `appVariant.test.ts` checks it against the screens' own imports rather than
+  against the table, so a screen that later reaches for a camera fails the suite
+  instead of the store review.

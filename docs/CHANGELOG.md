@@ -1,5 +1,137 @@
 # Changelog
 
+## Phase 37 — MedSupply Shop, the customer application
+
+Asked for: a plan for the Shop app, and then all of it.
+
+### The measurement this phase started from
+
+**A `SHOP_OWNER` may call 55 endpoints. The application called 22 of them.**
+
+Reordering, cancelling, raising a return, reading an invoice, tracking a
+delivery, changing a password, managing a delivery address and pricing a basket
+correctly were all finished server work with no way to use it. Every test passed
+the whole time, because a screen that does not exist has nothing to fail.
+
+### The one that was charging the wrong amount
+
+The basket multiplied `medicine.defaultSellingPriceMinor` by the quantity. That
+is the **list** price — before the shop's own discount, before whichever price
+list they are assigned, before any free-goods offer and before the delivery
+charge. `POST /orders/submit` reprices from `resolvePriceFrom` on the way in, so
+**the customer was shown one total and charged another**, and the endpoint that
+answers exactly that question, `POST /orders/quote`, had existed since the
+order-entry phase with no caller on this client. The web cart was moved onto it
+a phase ago; mobile was not.
+
+The arithmetic was correct. The inputs were wrong, so a test asserting the
+multiplication would have agreed with the defect. `customerMoney.test.ts` is the
+rule instead: no screen may do arithmetic on a catalogue price, and any screen
+showing one must say that is what it is.
+
+The basket also lived in memory only, so a phone call during a twenty-line order
+lost all of it. It now persists — as ids and quantities, never as `Medicine`
+objects, because a restored basket holding whole catalogue records would bring
+back a price that was true last week.
+
+### What a shop can now do that it could not
+
+|                          |                                                                                                                                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Order it again**       | `POST /orders/{id}/duplicate` — the last delivered order, one tap, into the basket                                                                                                 |
+| **Ask to cancel**        | `POST /orders/{id}/cancellation-request`, with the reason the endpoint requires                                                                                                    |
+| **Where is it**          | `GET /deliveries/order/{orderId}` on a customer's screen. Tapping "Deliveries" used to open the **rider's working board** — a rider's active statuses over an offline action queue |
+| **Read an invoice**      | line by line, with the batch numbers and expiry dates a pharmacist checks against the boxes                                                                                        |
+| **Send something back**  | `POST /returns` had **no caller on this client at all**. A pharmacy standing over a damaged carton had to find a computer                                                          |
+| **Say where to deliver** | `deliveryAddresses` had one writer, `PATCH /shops/{id}`, which is administrators only                                                                                              |
+| **Change a password**    | on the device most likely to be lost, handed on, or read over a shoulder                                                                                                           |
+| **Open an account**      | without telephoning anybody                                                                                                                                                        |
+
+### A home screen that answers the questions somebody opens the app to ask
+
+It was a list of buttons with hard-coded English on it, built from raw
+`Pressable` and `StyleSheet` rather than the primitives — and it announced the
+reader's own role back to them, which is a thing a staff tool does and a shop
+does not care about. Three questions instead, in the order they are asked: what
+do I owe, what is coming, and can I have that again.
+
+The catalogue stopped at 100 medicines with nothing saying so; it now pages, and
+says when the list has genuinely ended.
+
+### Where deliveries go
+
+`isDefault` is a boolean on each element of an array expressing a fact about the
+array as a whole: exactly one address is the default. **Nothing enforced it.**
+The seed set one, the admin form patched the array wholesale, and a shop could
+hold two defaults or none — at which point checkout took
+`deliveryAddresses[0]`, document order, which has nothing to do with which one
+the shop marked. A pharmacy whose default is their second branch was offered the
+first one on every single order.
+
+Three new routes under `/shops/my/addresses`, deliberately **not**
+`PATCH /shops/{id}` opened up: that endpoint also carries the credit limit,
+payment terms, discount, price list and status, and none of those are a
+customer's to set. Every write goes through `soleDefaultIndex`; deleting the
+default promotes its neighbour; and where medicines are delivered is audited
+with the previous address on the record.
+
+### Self-registration
+
+I raised this as inappropriate — credit terms, licence checks and price lists
+are the distributor's decisions, not a stranger's — and was told to build it. It
+is built. What makes it defensible is not the rate limit:
+
+- **`orderController` refuses a submission unless the shop is `ACTIVE`**, so a
+  self-registered shop must be created ACTIVE or it can browse and never buy.
+- **Credit is checked at approval, not at submission.** Every order still lands
+  in a manager's queue, and with a credit limit of zero a credit order is
+  refused there unless an administrator overrides it in writing.
+
+So it creates work for a manager, not exposure. A shop opens with credit limit
+0, payment terms 0, no discount and no price list — written from constants, not
+read from the request, and `RegisterShopSchema` does not name them, so a
+customer cannot set their own terms even by sending them. The drug licence
+number is **required** here although the staff shop form leaves it optional:
+staff have spoken to the customer, and nobody has spoken to this one.
+
+The half that makes it safe to operate is on the staff side: the customer list
+gains **"waiting for terms"**, and every self-registered shop says so on its
+row. Without it a manager meets one of these customers for the first time as a
+refused order in the approval queue. It is a burn-down — setting a credit limit
+takes the shop off the list.
+
+### The rest of the account
+
+Signing out lived at the bottom of the home screen, which is a strange place for
+it and also the reason it had to be there: there was no account menu to put it
+in. There is now, with the addresses, the returns, notification settings, the
+session list, the password — and a **language switch, which mobile did not
+have at all**. Both sign-out buttons now share one sequence, so the push token
+is unregistered while the credential authorising it is still valid; without
+that, a signed-out counter tablet goes on receiving another pharmacy's order
+updates.
+
+### The gates, each proved by planting
+
+| Gate                                | Planted with                          | Caught                                       |
+| ----------------------------------- | ------------------------------------- | -------------------------------------------- |
+| No arithmetic on a catalogue price  | the list price back in the basket     | the original defect                          |
+| Every endpoint has a caller         | the return request pointed elsewhere  | named the capability, not the file           |
+| One default address                 | the fallback dropped from the rule    | two unit tests                               |
+| …and at the endpoint                | `isDefault: false` honoured literally | "a shop cannot leave itself with no default" |
+| Self-registration cannot get credit | a 50,000 limit "to get them started"  | five tests, first the one it rests on        |
+| Bangla uses codepoints that exist   | an unassigned one, U+09C9             | `hints.riderInstructions`                    |
+
+That last one was a real defect this phase shipped and then caught: `রওনা`
+became `র৉না`, an empty box in the middle of a word. A valid string, a valid
+file and a valid render — nothing in the repository could see it.
+
+### Numbers
+
+API 182 unit and 225 integration + 5 coverage, up from 174 and 194. Mobile 206
+logic tests and 33 render, from 93 and 33. Web 333. Typecheck clean, lint zero
+errors.
+
 ## Phase 36 — three applications, one codebase
 
 Asked for: a customer app, a manager/owner app and a delivery rider app.

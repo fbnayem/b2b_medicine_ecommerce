@@ -226,6 +226,10 @@ export const ROUTES: readonly RouteNode[] = [
 
   { id: 'shop-account', element: page(() => import('../pages/ShopAccount'), 'ShopAccount') },
   {
+    id: 'addresses',
+    element: page(() => import('../pages/DeliveryAddresses'), 'DeliveryAddresses'),
+  },
+  {
     id: 'my-payments',
     element: page(() => import('../pages/PaymentList'), 'PaymentList'),
     props: { ownerMode: true },

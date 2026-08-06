@@ -438,3 +438,88 @@ Verified on a real MongoDB 6.0 replica set: 71 passed, 0 failed.
 - `navigationRules.test.ts` gains 4: every role belongs to exactly one application, no application is built for nobody, every tab an application carries can be opened by one of its own roles, and each application carries exactly the tabs its roles are given.
 
 Both were proved by planting the defect: `STOREKEEPER` placed in two applications reported `STOREKEEPER -> staff, rider`; a camera added to the shop application and `production-rider` pointed at the shop each named the exact line.
+
+## Phase 37 coverage — MedSupply Shop
+
+Every gate below was proved by planting the defect it claims to catch, and the
+plant is named beside it.
+
+### The two rules that are about the product rather than the code
+
+- `customerMoney.test.ts`: 5 mobile tests over every file in `app/` and `src/`.
+  **No screen may do arithmetic on a catalogue price**, and any screen showing
+  one must label it as the catalogue's. Both waiver lists are empty. The rule
+  reads the source with comments and string literals stripped, because three
+  files' doc comments _explain_ the defect — including the fix's own
+  `quote.ts` — and a rule that cannot be described in a comment is a rule
+  nobody keeps. The stripper has its own self-proof: an early version never
+  returned to template mode after `${…}`, so every file after the first
+  template read as empty and the rule **passed**.
+  _Planted by putting `defaultSellingPriceMinor * quantity` back in the basket._
+- `callers.test.ts`: 5 mobile tests. **Every endpoint this application exists to
+  reach has something that reaches it**, by method as well as path. This is the
+  check that would have caught the measurement this phase started from: a shop
+  owner may call 55 endpoints and the client called 22. A server-side coverage
+  percentage cannot see it — `routeCoverage.test.ts` reads 100% documented and
+  98% tested while a third of a customer's endpoints have no caller on the
+  device they use. Each entry carries the sentence that says what a shop loses,
+  so a failure reads "a pharmacy can no longer send anything back" rather than a
+  file and a line.
+  _Planted by pointing the return request at a different path: reported the
+  capability, not the file. Written without the method it did **not** fail,
+  because `GET /returns` — the list — satisfied the entry for `POST /returns`;
+  that near-miss is now its own self-proof._
+
+### The rest
+
+- `shopAddressRules.test.ts`: 8 API tests. Exactly one delivery address is the
+  default, expressed as the cases that used to break it — nothing marked, two
+  marked, a stale index, an empty list, and the deletion that has to promote a
+  neighbour. `hasSoleDefault` is asserted on after every write in the
+  integration file, so it carries its own self-proof too.
+  _Planted by dropping the "or the first one" fallback: two tests red._
+- `shopAddressIntegration.test.ts`: 16 replica-set tests. Adding, correcting,
+  promoting and removing; the first address being the default whatever the form
+  said; unticking the only default being answered rather than obeyed; an empty
+  patch refused rather than written and audited; one owner unable to touch
+  another shop's addresses; a manager having no route here at all; an owner with
+  no shop told so rather than met with a 500; the twenty-address ceiling; the
+  audit trail carrying the previous address; and the reconciliation that makes
+  the rest worth running — `GET /shops/my`, which checkout reads, returning
+  exactly what these writes stored.
+  _Planted by honouring `isDefault: false` literally: "a shop cannot leave itself
+  with no default by unticking the only one" went red._
+- `registrationIntegration.test.ts`: 15 replica-set tests. The first is the one
+  the whole feature rests on — a credit order from a freshly self-registered
+  shop is **refused at approval**, and an administrator can let it through only
+  with a written reason. Then: the same shop buying prepaid the same day; the
+  four commercial terms all at nothing and unsettable from the request; the
+  owner being a `SHOP_OWNER` with no forced password change; registration not
+  signing anybody in; both records appearing or neither; duplicate email and
+  duplicate phone each naming _which_; the licence number being required; a
+  non-Bangladesh number refused; the audit naming no member of staff; and the
+  "waiting for terms" queue containing the right shops and shrinking when a
+  manager sets terms.
+  _Planted by giving the new shop a 50,000 credit limit to "get them started":
+  five tests red, beginning with the one the argument depends on._
+- `registration.test.ts`: 12 mobile tests, of which the last four feed
+  **`RegisterShopSchema` itself** the drafts the form calls acceptable — in both
+  directions. A client stricter than the server invents a rule nobody wrote down;
+  a client looser than it sends a finished ten-field form and gets back a list of
+  paths.
+- `addresses.test.ts`, `password.test.ts`, `request.test.ts`: 44 mobile tests for
+  the rules each screen applies before it asks the server anything. Each ends
+  with the same assertion — **every catalogue key the rule can return is a key
+  the catalogue holds** — because these reach the screen as `t(problem.key)`,
+  a variable, which `catalogueKeys.test.ts` is documented as unable to see.
+- `openOrders.test.ts`, `actions.test.ts`, `quote.test.ts`, `cart.test.ts`: the
+  judgements the home screen and the basket make, including the basket signature
+  that decides when the server is asked to price again — a signature ignoring
+  quantity would price a basket once and never again, and one including line
+  order would spend a request per keystroke.
+- `language.test.ts` gains **spells Bangla with characters that exist**. A
+  Bangla string shipped in this phase's first draft containing U+09C9, an
+  unassigned codepoint in the Bengali block: `রওনা` became `র৉না`, an empty box
+  mid-word. Nothing in the repository could see it — it is a valid string, a
+  valid file and a valid render.
+  _Planted, and it named `hints.riderInstructions`._

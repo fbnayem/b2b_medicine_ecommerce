@@ -1827,3 +1827,62 @@ Mobile 113 (was 93), API 174 unit (was 170), web 332, integration 194, browser
 ### Next phase dependencies
 
 Three icons and three store listings, before any submission.
+
+## Phase 37: MedSupply Shop — The Customer Application
+
+**Asked for:** a plan for the Shop app — every screen, every button, every
+function — and then all of it built.
+
+**Started from a measurement.** A `SHOP_OWNER` may call 55 endpoints; the
+application called 22. The other 33 were finished server work with no way to
+use it, and no test could see that, because a screen that does not exist has
+nothing to fail.
+
+### Shipped
+
+|                                                   |                                                                                                                                                                                                                                                     |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The basket shows what this shop actually pays** | It multiplied the _list_ price by the quantity while submission repriced. `POST /orders/quote` is now the only source of any figure with money in it, the basket survives a restart, and free goods are shown before the invoice rather than on it. |
+| **Things a customer can do with an order**        | Order it again, ask to cancel, see where it is. Three endpoints with no caller. The customer delivery screen is theirs — "Deliveries" used to open the rider's working board.                                                                       |
+| **The catalogue does not stop at a hundred**      | It pages, says when the list has ended, and a medicine can be added from its own screen.                                                                                                                                                            |
+| **A home screen that answers three questions**    | What do I owe, what is coming, can I have that again — replacing a list of buttons with hard-coded English on it.                                                                                                                                   |
+| **Delivery addresses, maintained by the shop**    | Three new routes under `/shops/my/addresses`. Exactly one address is the default, and the server holds that invariant for the first time.                                                                                                           |
+| **Raising a return from the phone**               | `POST /returns` had no caller on this client. It is raised where the batch numbers are: standing over the carton.                                                                                                                                   |
+| **Changing a password**                           | On the device most likely to be lost. The screen says the change ends every other session **before** the button.                                                                                                                                    |
+| **Self-registration**                             | A pharmacy opens its own account, prepaid only, and a manager finds it in the "waiting for terms" queue rather than as a refused order.                                                                                                             |
+
+### The judgement calls
+
+- **Self-registration was flagged as inappropriate and built anyway**, because
+  that was the decision. What makes it defensible is that credit is checked at
+  approval rather than at submission, so it creates work for a manager and not
+  exposure. `docs/ASSUMPTIONS.md` carries the full argument and the six defaults
+  it rests on.
+- **No category filter on the catalogue.** `category` is free text with no
+  endpoint listing the ones in use, so a filter could only offer the categories
+  in the page already loaded — hiding everything that sorts later. A filter that
+  lies is worse than one that is missing.
+- **`delivery-track` and `invoice-detail` are mobile screens, not shared
+  navigation entries.** Web reaches the same information correctly and
+  differently — the delivery inside `order-detail`, the invoice as a PDF from the
+  account — and a shared manifest that claimed otherwise would describe screens
+  web deliberately does not have. `callers.test.ts` covers what the shared ids
+  would have bought.
+
+### Not done
+
+- **`OrderEntry`'s "add an address" button 403s for a manager or a sales rep.**
+  It writes through `PATCH /shops/{id}`, which admits administrators only. The
+  new customer routes are `SHOP_OWNER`-only by design and do not help. It is a
+  staff-screen defect, found here and left with the staff screen.
+- **Paying in the app**, because `POST /payments` is staff-only and there is no
+  payment gateway in this product. **Product photographs**, because
+  `productImageUrl` does not exist on `Medicine`. **Forgot password**, because
+  no endpoint exists; a reset is a staff action.
+- **Nothing has been built into a binary**, and the three icons and three store
+  listings from Phase 36 are still outstanding.
+
+### Next phase dependencies
+
+`GET /inventory/medicines/categories`, if the catalogue is to have a filter that
+does not lie. Three icons and three store listings, before any submission.

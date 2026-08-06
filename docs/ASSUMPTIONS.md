@@ -751,3 +751,116 @@ reads a decision rather than guesses at an intention.
   _directory_, and Metro then follows its `package.json` `main` to
   `dist/index.js` - a build produced by whichever unrelated npm script ran most
   recently.
+
+## Phase 37 — MedSupply Shop, the customer application
+
+Measured before anything was written: **a `SHOP_OWNER` may call 55 endpoints and
+the application called 22 of them.** Everything below follows from deciding what
+to do about the other 33.
+
+### The money
+
+- **No screen works out for itself what a customer will pay.** The basket
+  multiplied `defaultSellingPriceMinor` by the quantity — the _list_ price,
+  before the shop's discount, their price list, free goods and delivery — while
+  submission repriced from `resolvePriceFrom`. The customer was shown one total
+  and charged another. `POST /orders/quote` is now the only source of any figure
+  with money in it, and `customerMoney.test.ts` makes the arithmetic a build
+  failure rather than a habit.
+- **The basket stores medicine ids and quantities, never a `Medicine`.** A
+  persisted basket that held whole catalogue objects would restore a price that
+  was true a week ago, which is the same defect wearing a different hat. The
+  migration deliberately discards a basket saved in the old shape.
+- **A pro-rated return estimate is allowed and labelled as an estimate.** It is
+  arithmetic on `lineTotalMinor` — what the shop was actually charged, computed
+  by the server — and not on any catalogue price. What is credited is decided by
+  a manager, line by line, and the screen says so.
+
+### The shop's own record
+
+- **A customer maintains their delivery addresses and nothing else about
+  themselves.** `POST`/`PATCH`/`DELETE /shops/my/addresses` exist rather than
+  opening `PATCH /shops/{id}` to owners, because that endpoint also carries the
+  credit limit, payment terms, discount, price list and status. The path is the
+  scope.
+- **Exactly one address is the default, and the server holds that invariant.**
+  `isDefault` is a boolean per element expressing a fact about the array;
+  nothing enforced it, so a shop could hold two or none. Removing the default
+  promotes its neighbour. A shop with **no** addresses has no default, which is
+  a real state — it is what a newly registered pharmacy looks like.
+- **Deleting an address is allowed even when it is the last one.** Orders
+  already placed carry `deliveryAddressSnapshot`, so nothing in flight can be
+  misdirected, and a shop left with none is told plainly at checkout.
+- **Twenty addresses per shop.** The array lives inside a document read by the
+  order screen, checkout, the customer list and every invoice snapshot; an
+  unbounded list is a document that grows until something that reads it is slow.
+
+### Self-registration
+
+Raised as inappropriate for a wholesale product — credit terms, licence checks
+and price lists are the distributor's decisions — and built because that was the
+answer. The design is what makes it defensible:
+
+- **The shop is created `ACTIVE`.** `orderController` refuses a submission from
+  a shop that is not, so any other status produces a customer who can browse and
+  never buy — which reads as broken rather than as pending.
+- **Credit limit 0, payment terms 0, no discount, no price list**, written from
+  constants rather than read from the request. `RegisterShopSchema` does not
+  name those fields, so a customer cannot set their own commercial terms even by
+  sending them.
+- **The safety comes from where the credit check is**, not from the rate limit.
+  `approvalService` checks credit at _approval_, so every order this shop places
+  lands in a manager's queue and a credit order is refused there until an
+  administrator overrides it with a written reason. Registration creates work
+  for a manager, not financial exposure.
+- **A drug licence number is required**, although `CreateShopSchema` leaves it
+  optional. Staff creating a shop have spoken to the customer; nobody has spoken
+  to this one, and the licence is the single field checkable against a register.
+- **One address, used as both billing and delivery.** A pharmacy registering
+  from a phone has one shop at one address, and asking twice on a small screen
+  is how a form gets abandoned.
+- **Registering does not sign anybody in.** Sign-in is where lockout,
+  `forcePasswordChange` and the wrong-application refusal live; a second way in
+  that skips all three is a second thing to keep correct.
+- **`createdBy` is left unset and the audit names the person themselves.**
+  Filling in an administrator would make the record claim a decision nobody
+  took.
+- **Staff must be able to find these shops before an order does.** The customer
+  list gains "waiting for terms", and it is a burn-down: setting a credit limit
+  or payment terms takes the shop off it.
+
+### Screens, and which of them are shared
+
+- **The Shop application has its own delivery screen.** `(tabs)/deliveries.tsx`
+  is the rider's working board — a rider's active statuses and an offline action
+  queue — and a shop owner tapping "Deliveries" was landing on it. "Where is my
+  order" is a different screen with different content and no buttons.
+- **`delivery-track` and `invoice-detail` are mobile screens and not entries in
+  `@medsupply/navigation`.** The shared manifest answers "what exists and who
+  may see it" across both clients, and web answers both questions differently
+  and correctly: the delivery is rendered inside `order-detail`, and an invoice
+  is offered as a PDF from the account. Adding shared ids for mobile's own
+  arrangement of the same information would make the manifest describe screens
+  web deliberately does not have. `callers.test.ts` covers what those ids would
+  have bought — that the endpoints have a caller at all.
+- **`addresses` _is_ a shared entry**, because it is a destination both clients
+  were missing and both now have.
+- **No category filter on the catalogue.** `category` is free text on `Medicine`
+  with no enum and no endpoint listing the ones in use, so a filter could offer
+  only the categories present in the page already loaded — quietly hiding every
+  category that sorts later. It needs `GET /inventory/medicines/categories`, and
+  a filter that lies is worse than one that is missing.
+- **The mobile language switch lives on the account screen.** Mobile had none at
+  all: the catalogue picked a language from the handset and the tenant and
+  offered no way to disagree. Each language names itself in its own script, from
+  `LANGUAGE_LABEL` rather than the catalogue, because that is the one label that
+  must not change when the language does.
+
+### Known, and not fixed here
+
+- **`OrderEntry`'s "add an address" button is staff-facing and writes through
+  `PATCH /shops/{id}`, which admits administrators only.** A manager or a sales
+  rep pressing it gets a 403. The new `/shops/my/addresses` routes are
+  `SHOP_OWNER`-only by design and do not help; the fix is a staff-side route or
+  a widening of the existing one, and it belongs with the order-entry screen
+  rather than with the customer application.
