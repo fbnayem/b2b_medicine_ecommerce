@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text } from 'react-native';
 import { router } from 'expo-router';
-import { APP_VARIANT_NAME } from '@medsupply/navigation';
+import { APP_VARIANT_NAME, AppVariant } from '@medsupply/navigation';
 import { translatedOr } from '@medsupply/i18n';
 import { useAuthStore } from '../src/store/useAuth';
 import { apiClient } from '../src/api/client';
@@ -139,6 +139,20 @@ export default function SignInScreen() {
         busy={busy}
         disabled={!email || !password}
       />
+
+      {/*
+        Shop only. A rider or a storekeeper has an account created for them by
+        an administrator, so offering them "register your pharmacy" would be an
+        invitation to make something nobody can use — and the route is not even
+        registered in those builds.
+      */}
+      {APP_VARIANT === AppVariant.SHOP ? (
+        <Button
+          variant="secondary"
+          label={t('register.link')}
+          onPress={() => router.push('/register')}
+        />
+      ) : null}
     </Screen>
   );
 }

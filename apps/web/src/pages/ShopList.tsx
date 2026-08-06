@@ -33,11 +33,26 @@ export function ShopList() {
   const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const [applied, setApplied] = useState({ search: '', status: '' });
+  /*
+   * The queue that makes self-registration safe to operate.
+   *
+   * A pharmacy can now create its own account, and it arrives with a credit
+   * limit of zero, no payment terms, no discount and no price list — so it can
+   * trade prepaid and its first credit order is refused at approval. That is
+   * the right answer only if somebody can *find* these shops; without this
+   * filter a manager meets one for the first time as a refused order in the
+   * approval queue, with no context and a customer waiting.
+   *
+   * It is a burn-down, not a label: setting a credit limit or payment terms
+   * takes the shop off the list. The list shrinking is the work being done.
+   */
+  const [awaitingTerms, setAwaitingTerms] = useState(false);
+  const [applied, setApplied] = useState({ search: '', status: '', awaitingTerms: false });
 
   const params = new URLSearchParams();
   if (applied.search) params.set('search', applied.search);
   if (applied.status) params.set('status', applied.status);
+  if (applied.awaitingTerms) params.set('awaitingTerms', 'true');
   const shops = usePagedCollection<Shop>(
     keys.shops.list(applied),
     `/shops${params.size ? `?${params.toString()}` : ''}`,
@@ -53,7 +68,28 @@ export function ShopList() {
         </Link>
       ),
     },
-    { key: 'name', header: t('shops.name'), cell: (shop) => shop.name },
+    {
+      key: 'name',
+      header: t('shops.name'),
+      cell: (shop) => (
+        <div>
+          <p className="text-text">{shop.name}</p>
+          {/*
+            Visible in the unfiltered list too, not only when the filter is on.
+            "This customer set their own terms up, which is to say nobody did"
+            is a fact worth meeting before an order arrives, and a row that
+            looks like every other row does not carry it.
+          */}
+          {shop.selfRegisteredAt && shop.creditLimit === 0 && (
+            <p className="text-sm text-text-muted">
+              {t('shops.selfRegisteredOn', {
+                date: formatFinanceDate(shop.selfRegisteredAt),
+              })}
+            </p>
+          )}
+        </div>
+      ),
+    },
     { key: 'phone', header: t('fields.phone'), cell: (shop) => shop.primaryPhone },
     { key: 'territory', header: t('shops.territory'), cell: (shop) => shop.territory || '—' },
     {
@@ -103,7 +139,7 @@ export function ShopList() {
         role="search"
         onSubmit={(event) => {
           event.preventDefault();
-          setApplied({ search: search.trim(), status });
+          setApplied({ search: search.trim(), status, awaitingTerms });
         }}
       >
         <Field
@@ -127,8 +163,28 @@ export function ShopList() {
             ))}
           </Select>
         </Field>
+        <Field
+          label={t('shops.awaitingTerms')}
+          className="min-w-56"
+          hint={t('hints.awaitingTerms')}
+        >
+          <label className="flex min-h-11 items-center gap-2 text-text">
+            <input
+              type="checkbox"
+              checked={awaitingTerms}
+              onChange={(event) => setAwaitingTerms(event.target.checked)}
+            />
+            {t('shops.awaitingTermsOnly')}
+          </label>
+        </Field>
         <Button type="submit">{t('actions.apply')}</Button>
       </form>
+
+      {applied.awaitingTerms && (
+        // Said out loud, because a filtered list that looks like the whole list
+        // is how somebody concludes the business has six customers.
+        <p className="mb-4 text-text-muted">{t('shops.awaitingTermsBody')}</p>
+      )}
 
       <Resource
         query={shops}

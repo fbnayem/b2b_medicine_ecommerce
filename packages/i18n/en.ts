@@ -115,6 +115,40 @@ export const en = {
   },
 
   /**
+   * A pharmacy opening its own account, in the Shop application only.
+   *
+   * `termsBody` is the sentence this whole feature turns on and it is on the
+   * screen **before** the button. A shop that registers can buy today, paying
+   * on delivery, and cannot buy on credit until somebody at the distributor
+   * agrees terms with them. Finding that out by having an order refused is how
+   * a new customer decides the supplier is unreliable.
+   */
+  register: {
+    link: 'Register your pharmacy',
+    title: 'Open an account on {{app}}',
+    subtitle: 'It takes a minute. You can order the same day, paying on delivery.',
+    aboutYou: 'About you',
+    aboutShop: 'About your pharmacy',
+    emailHint: 'You will sign in with this, and invoices are sent to it.',
+    phoneHint: 'The number our rider will call. 01XXXXXXXXX or +8801XXXXXXXXX.',
+    licenceHint: 'Your drug licence number, exactly as it appears on the licence.',
+    nameTooShort: 'Write at least two letters.',
+    emailInvalid: 'That does not look like an email address.',
+    shopNameTooShort: 'Write the name above your shop.',
+    phoneInvalid: 'Write a Bangladesh mobile number, like 01712345678.',
+    licenceRequired: 'Your drug licence number is needed before we can supply medicines.',
+    termsTitle: 'What you can do straight away',
+    termsBody:
+      'You can order today and pay on delivery. Buying on credit needs terms agreed with us first — send your first order and somebody will be in touch.',
+    submit: 'Open the account',
+    haveAccount: 'I already have an account',
+    failed: 'The account could not be opened.',
+    doneTitle: 'Your account is open',
+    doneBody:
+      'Sign in with the email address you gave. Quote the reference above if you telephone us.',
+  },
+
+  /**
    * The three applications, by the name a person reads under the icon.
    *
    * The same in both languages on purpose: this is what is printed in the store
@@ -619,6 +653,8 @@ export const en = {
     searchDeliveries: 'Search by order reference, shop name or rider.',
     searchMedicines: 'Search by brand name, generic name or your own stock code.',
     searchShops: 'Search by shop name, code or telephone number.',
+    awaitingTerms:
+      'Shops that opened their own account and have no credit limit or payment terms yet.',
     searchUsers: 'Search by name or email address.',
     roleFilter: 'Show only people with one role.',
     userStatusFilter: 'Show only active accounts, or only deactivated ones.',
@@ -1340,6 +1376,17 @@ export const en = {
     searchPlaceholder: 'Name, phone or reference',
     statusFilter: 'Status',
     anyStatus: 'Any status',
+    /*
+     * The queue self-registration creates. A pharmacy can open its own account
+     * and arrives with no credit limit and no payment terms, so it can buy on
+     * delivery and nothing else. These are the shops waiting for somebody to
+     * decide what they may buy on credit.
+     */
+    awaitingTerms: 'Waiting for terms',
+    awaitingTermsOnly: 'Only shops that registered themselves',
+    awaitingTermsBody:
+      'These pharmacies opened their own accounts. They can order paying on delivery, and nothing on credit, until somebody sets a credit limit and payment terms. Setting either takes the shop off this list.',
+    selfRegisteredOn: 'Registered themselves on {{date}} — no terms set',
     loading: 'Loading shops',
     couldNotLoad: 'The shops could not be loaded.',
     none: 'No shops matched',

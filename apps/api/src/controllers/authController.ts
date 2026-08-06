@@ -3,8 +3,9 @@ import bcrypt from 'bcrypt';
 import mongoose from 'mongoose';
 import { User } from '../models/User';
 import { Session } from '../models/Session';
-import { ChangePasswordSchema, LoginSchema } from '@medsupply/validation';
-import { UserStatus, UserRole } from '@medsupply/shared-types';
+import { Shop } from '../models/Shop';
+import { ChangePasswordSchema, LoginSchema, RegisterShopSchema } from '@medsupply/validation';
+import { ShopStatus, UserStatus, UserRole } from '@medsupply/shared-types';
 import type { AuthRequest } from '../middlewares/auth';
 import { AuditLog } from '../models/AuditLog';
 import { securitySettings } from '../services/settingsService';
@@ -145,6 +146,207 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     res.json({ data: { user, accessToken, refreshToken } });
   } catch (error) {
     next(error);
+  }
+};
+
+/**
+ * A pharmacy registering itself, with nobody from the distributor involved.
+ *
+ * This was raised as inappropriate for a wholesale product — credit terms,
+ * licence checks and price lists are staff decisions — and building it anyway
+ * was the answer. Two facts from the existing code are what make it defensible
+ * rather than merely possible, and both are load-bearing:
+ *
+ *   1. `orderController` refuses a submission unless the shop is `ACTIVE`, so a
+ *      self-registered shop **must** be created `ACTIVE` or it can browse the
+ *      catalogue and never buy anything — a worse outcome than not offering
+ *      registration at all.
+ *   2. **Credit is checked at approval, not at submission**
+ *      (`approvalService.ts`). Every order this shop places still lands in a
+ *      manager's queue, and with a credit limit of zero a credit order is
+ *      refused there unless a manager overrides it with a written reason.
+ *
+ * So registration creates *work for a manager*, not financial exposure. The
+ * shop can trade prepaid from the first minute and a human decides everything
+ * else. Nothing in the request body can change that: the four commercial
+ * fields are written from constants below and are not read from `data`.
+ *
+ * Both records are created in one transaction. A user with no shop can sign in
+ * and reach a screen that says no shop is linked to the account, with no way to
+ * fix it; a shop with no owner is invisible to everybody. Half of this is worse
+ * than none of it.
+ */
+export const register = async (req: Request, res: Response, next: NextFunction) => {
+  const session = await mongoose.startSession();
+  try {
+    const data = RegisterShopSchema.parse(req.body);
+
+    const policy = await securitySettings();
+    if (data.password.length < policy.passwordMinLength) {
+      return res.status(400).json({
+        error: {
+          code: 'PASSWORD_TOO_SHORT',
+          message: `The password must be at least ${policy.passwordMinLength} characters`,
+        },
+      });
+    }
+
+    /*
+     * Which one is taken, not "something is taken".
+     *
+     * Both are unique indexes, so the database refuses a duplicate either way —
+     * but a message that does not say *which* field leaves somebody retyping an
+     * email address that was never the problem. The index remains the authority
+     * against a race; this is here so the usual case reads properly.
+     */
+    if (await User.findOne({ email: data.email })) {
+      return res.status(400).json({
+        error: {
+          code: 'EMAIL_IN_USE',
+          message: 'An account already exists for this email address. Sign in instead.',
+        },
+      });
+    }
+    if (await Shop.findOne({ primaryPhone: data.primaryPhone })) {
+      return res.status(400).json({
+        error: {
+          code: 'PHONE_IN_USE',
+          message: 'A shop is already registered with this phone number.',
+        },
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    let created: { userId: mongoose.Types.ObjectId; shop: InstanceType<typeof Shop> } | undefined;
+
+    await session.withTransaction(async () => {
+      const [user] = await User.create(
+        [
+          {
+            email: data.email,
+            passwordHash,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            role: UserRole.SHOP_OWNER,
+            status: UserStatus.ACTIVE,
+            /*
+             * Not forced. `forcePasswordChangeOnCreate` exists because a member
+             * of staff typing somebody else's first password means two people
+             * know it. Here the person chose it themselves and nobody else has
+             * ever seen it, so demanding they change it immediately would be a
+             * ritual with no threat behind it.
+             */
+            forcePasswordChange: false,
+          },
+        ],
+        { session },
+      );
+
+      const [shop] = await Shop.create(
+        [
+          {
+            name: data.shopName,
+            primaryPhone: data.primaryPhone,
+            email: data.email,
+            drugLicenceNumber: data.drugLicenceNumber,
+            ownerIds: [user!._id],
+            billingAddress: { ...data.address, isDefault: true },
+            // The same address for both. A pharmacy registering from a phone
+            // has one shop at one address, and asking twice on a small screen
+            // is how a form gets abandoned. More can be added afterwards.
+            deliveryAddresses: [{ ...data.address, isDefault: true }],
+            status: ShopStatus.ACTIVE,
+            // The four that are **not** read from the request. A customer does
+            // not set their own commercial terms.
+            creditLimit: 0,
+            paymentTermsDays: 0,
+            defaultDiscount: 0,
+            priceListId: null,
+            selfRegisteredAt: new Date(),
+          },
+        ],
+        { session },
+      );
+
+      /*
+       * Two records, and neither names an actor other than the person
+       * themselves — because there was not one. `createdBy` is deliberately
+       * left unset for the same reason: inventing an administrator here would
+       * make the audit trail claim a decision nobody took.
+       */
+      await AuditLog.create(
+        [
+          {
+            actorId: user!._id,
+            actorRole: UserRole.SHOP_OWNER,
+            action: 'USER_CREATED',
+            entityType: 'User',
+            entityId: user!._id,
+            after: { email: data.email, role: UserRole.SHOP_OWNER, selfRegistered: true },
+            ipAddress: req.ip,
+            userAgent: req.get('user-agent'),
+            correlationId: correlationId(),
+          },
+          {
+            actorId: user!._id,
+            actorRole: UserRole.SHOP_OWNER,
+            action: 'SHOP_SELF_REGISTERED',
+            entityType: 'Shop',
+            entityId: shop!._id,
+            after: {
+              name: shop!.name,
+              reference: shop!.reference,
+              primaryPhone: shop!.primaryPhone,
+              drugLicenceNumber: shop!.drugLicenceNumber,
+              // Written out rather than implied: this is the record that says
+              // no member of staff agreed to any of it.
+              creditLimit: 0,
+              paymentTermsDays: 0,
+              defaultDiscount: 0,
+              priceListId: null,
+            },
+            ipAddress: req.ip,
+            userAgent: req.get('user-agent'),
+            correlationId: correlationId(),
+          },
+        ],
+        { session, ordered: true },
+      );
+
+      created = { userId: user!._id, shop: shop! };
+    });
+
+    /*
+     * No session and no tokens. Registering is not signing in: the sign-in path
+     * is where lockout, `forcePasswordChange` and the wrong-application refusal
+     * live, and a second way in that skips all three is a second thing to keep
+     * correct. The client sends them to the sign-in screen with the address
+     * already typed.
+     */
+    res.status(201).json({
+      data: {
+        shop: { reference: created!.shop.reference, name: created!.shop.name },
+        email: data.email,
+      },
+    });
+  } catch (error) {
+    // The unique indexes are the real authority, and a race between the checks
+    // above and the insert lands here. `E11000` is a rejected request, not a
+    // server fault, so it must not become a 500 with a correlation id.
+    if ((error as { code?: number }).code === 11000) {
+      const field = Object.keys(
+        (error as { keyPattern?: Record<string, number> }).keyPattern ?? {},
+      );
+      return res.status(400).json({
+        error: {
+          code: field.includes('email') ? 'EMAIL_IN_USE' : 'PHONE_IN_USE',
+          message: 'Those details are already registered. Sign in instead.',
+        },
+      });
+    }
+    next(error);
+  } finally {
+    await session.endSession();
   }
 };
 

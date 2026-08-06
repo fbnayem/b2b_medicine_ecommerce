@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ReturnReason } from '@medsupply/shared-types';
 import { errorMessage } from '@medsupply/api-client';

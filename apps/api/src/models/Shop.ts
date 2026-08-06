@@ -50,6 +50,22 @@ const shopSchema = new mongoose.Schema(
     },
     orderBlockingReason: String,
     notes: String,
+    /**
+     * When this shop registered itself, if it did.
+     *
+     * Absent for every shop a member of staff created, which is the point: a
+     * self-registered shop has **had no conversation with anybody**. Its credit
+     * limit, payment terms, discount and price list are all at their defaults
+     * because a customer must not choose their own commercial terms, and this
+     * field is how the staff shop list can offer "self-registered, no terms
+     * set" as a filter rather than leaving a manager to discover the shop when
+     * an order turns up in the approval queue.
+     *
+     * A date rather than a boolean: "when" answers "has this been waiting a
+     * fortnight?", which is the question somebody working that list actually
+     * asks.
+     */
+    selfRegisteredAt: Date,
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true },

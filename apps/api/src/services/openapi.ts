@@ -18,6 +18,7 @@ import {
   CancellationRequestSchema,
   ChangePasswordSchema,
   DeliveryAddressSchema,
+  RegisterShopSchema,
   UpdateDeliveryAddressSchema,
   AdminUserUpdateSchema,
   ApprovalSchema,
@@ -171,6 +172,20 @@ export const OPERATIONS: Operation[] = [
     tag: 'Authentication',
   },
   {
+    /*
+     * No `roles`, which is how this document says "reachable without signing
+     * in" — and the only write in the API that is. It creates an ACTIVE shop
+     * with a credit limit of zero, no payment terms, no discount and no price
+     * list, so it can trade prepaid while every credit order it places is
+     * refused at approval until a manager sets terms deliberately.
+     */
+    method: 'post',
+    path: '/api/v1/auth/register',
+    summary: 'Register a pharmacy and its first owner, on prepaid terms only',
+    tag: 'Authentication',
+    body: RegisterShopSchema,
+  },
+  {
     method: 'post',
     path: '/api/v1/auth/logout',
     summary: 'End the current session',
@@ -227,7 +242,11 @@ export const OPERATIONS: Operation[] = [
     // said ALL_ROLES while the route said management-only — the drift the role
     // reconciliation assertion is being added to catch.
     roles: [...MANAGEMENT, UserRole.SALES],
-    query: ['status', 'territory', 'search', 'page', 'limit'],
+    // `awaitingTerms=true` narrows to the shops that registered themselves and
+    // still have no credit limit and no payment terms — the queue a manager
+    // works so that a self-registered customer is met deliberately rather than
+    // discovered as a refused order.
+    query: ['status', 'territory', 'search', 'awaitingTerms', 'page', 'limit'],
   },
   {
     method: 'get',

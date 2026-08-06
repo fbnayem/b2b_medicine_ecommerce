@@ -44,6 +44,11 @@ export interface Shop {
   status: ShopStatus;
   orderBlockingReason?: string;
   notes?: string;
+  /**
+   * When this shop registered itself, if it did. Absent for every shop a member
+   * of staff created — which is what the "no terms set yet" queue is built on.
+   */
+  selfRegisteredAt?: Date;
   createdBy?: string;
   createdAt: Date;
   updatedAt: Date;

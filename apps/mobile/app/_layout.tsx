@@ -1,6 +1,8 @@
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import { AppVariant } from '@medsupply/navigation';
+import { APP_VARIANT } from '../src/appVariant';
 import { useAuthStore } from '../src/store/useAuth';
 import { apiClient, refreshTokens } from '../src/api/client';
 import { useBranding } from '../src/settings/branding';
@@ -62,6 +64,15 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Protected guard={!isAuthenticated}>
             <Stack.Screen name="index" />
+            {/*
+              Registering is offered only in the Shop build. A rider or a
+              storekeeper is somebody the distributor employs and their account
+              is created for them; a register screen in those builds would
+              invite somebody to make an account nobody can use.
+            */}
+            <Stack.Protected guard={APP_VARIANT === AppVariant.SHOP}>
+              <Stack.Screen name="register" options={{ headerShown: false }} />
+            </Stack.Protected>
           </Stack.Protected>
           <Stack.Protected guard={isAuthenticated}>
             <Stack.Screen name="(protected)" />

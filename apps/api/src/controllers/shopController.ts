@@ -133,6 +133,27 @@ export const listShops = async (req: AuthRequest, res: Response, next: NextFunct
 
     if (typeof query.status === 'string') filter.status = query.status;
     if (typeof query.territory === 'string') filter.territory = query.territory;
+
+    /*
+     * The shops that registered themselves and have no terms yet.
+     *
+     * This is the half of self-registration that makes it safe. A shop can
+     * create itself, and it starts with a credit limit of zero, no payment
+     * terms, no discount and no price list — so it can trade prepaid and its
+     * first credit order is refused at approval. That is a manager's decision
+     * to make, and they can only make it if they can find the shop; without
+     * this filter they meet it for the first time as an order in the approval
+     * queue with a refusal attached.
+     *
+     * A **burn-down**, not a label: the moment somebody sets a credit limit or
+     * payment terms the shop drops off this list. The list shrinking is the
+     * work being done.
+     */
+    if (query.awaitingTerms === 'true') {
+      filter.selfRegisteredAt = { $ne: null };
+      filter.creditLimit = 0;
+      filter.paymentTermsDays = 0;
+    }
     if (typeof query.search === 'string' && query.search.trim()) {
       const term = containsFilter(query.search.trim());
       filter.$or = [{ name: term }, { primaryPhone: term }, { reference: term }];

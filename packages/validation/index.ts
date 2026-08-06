@@ -146,6 +146,37 @@ export const LoginSchema = z.object({
   password: z.string().min(8),
 });
 
+/**
+ * A pharmacy registering itself, with no member of staff involved.
+ *
+ * The smallest set of facts that makes the account **checkable by a human
+ * afterwards**, which is the whole safety argument: nothing here sets a credit
+ * limit, payment terms, a discount or a price list, because a customer must not
+ * be able to choose their own commercial terms. Those stay at their defaults —
+ * zero, zero, zero and none — and a manager sets them deliberately.
+ *
+ * `drugLicenceNumber` is **required** here although `CreateShopSchema` leaves it
+ * optional. A member of staff creating a shop has spoken to them; a stranger
+ * filling in a form has not, and the licence number is the one field that can be
+ * checked against a register.
+ *
+ * One address, not two. `CreateShopSchema` takes a billing address and a list of
+ * delivery addresses because an administrator entering a chain needs both; a
+ * pharmacy registering from a phone has one shop at one address, and asking the
+ * same question twice on a small screen is how a form gets abandoned. The
+ * handler uses it for both and the shop can add more later.
+ */
+export const RegisterShopSchema = z.object({
+  firstName: z.string().trim().min(2).max(60),
+  lastName: z.string().trim().min(2).max(60),
+  email: z.string().email(),
+  password: z.string().min(8).max(128),
+  shopName: z.string().trim().min(3).max(120),
+  primaryPhone: bdPhone,
+  drugLicenceNumber: z.string().trim().min(3).max(60),
+  address: AddressSchema.omit({ _id: true, isDefault: true }),
+});
+
 export const CreateUserSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
