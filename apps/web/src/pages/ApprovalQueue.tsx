@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { OrderStatus } from '@medsupply/shared-types';
 import type { Order, Shop } from '@medsupply/shared-types';
 import {
   DataTable,
@@ -14,26 +13,27 @@ import { useApiCollection } from '../lib/query';
 import { keys } from '../lib/queryKeys';
 import { useSavedFilter } from '../lib/savedFilter';
 import { useLanguage } from '../lib/useLanguage';
+import { approvalsQueue } from '../lib/workQueues';
 import { formatFinanceDateTime, formatMinor } from '../lib/finance';
-
-/** The states a manager triages, in the order they are worked. */
-const STATES = [
-  OrderStatus.SUBMITTED,
-  OrderStatus.UNDER_REVIEW,
-  OrderStatus.ON_HOLD,
-  OrderStatus.APPROVED,
-  OrderStatus.PARTIALLY_APPROVED,
-  OrderStatus.REJECTED,
-];
 
 export function ApprovalQueue() {
   const { t } = useLanguage();
-  const [status, setStatus] = useSavedFilter('approvals', '');
+  /*
+   * Opens on the orders that still need deciding, not on every order that has
+   * ever passed through here.
+   *
+   * The endpoint's default returns approved and rejected ones too, so this
+   * screen used to open showing three rows of which one was actually waiting —
+   * and the home screen, counting the same unfiltered request, said "3 orders
+   * waiting for your decision". Both are now the outstanding set, from the one
+   * constant in `workQueues.ts`, so the number and the list agree.
+   *
+   * Everything decided is still one tab away, and `useSavedFilter` means
+   * somebody who prefers that view keeps it.
+   */
+  const [status, setStatus] = useSavedFilter('approvals', approvalsQueue.outstanding);
 
-  const queue = useApiCollection<Order>(
-    keys.approvals.queue(status),
-    `/approvals/queue${status ? `?status=${status}` : ''}`,
-  );
+  const queue = useApiCollection<Order>(keys.approvals.queue(status), approvalsQueue.url(status));
 
   const columns: ReadonlyArray<Column<Order>> = [
     {
@@ -79,10 +79,15 @@ export function ApprovalQueue() {
       <div className="mb-4">
         <FilterTabs
           label={t('approvals.filterLabel')}
-          options={[
-            { value: '', label: t('approvals.allStatuses') },
-            ...STATES.map((value) => ({ value, label: t(`orderStatus.${value}`) })),
-          ]}
+          options={approvalsQueue.filters.map((value) => ({
+            value,
+            label:
+              value === ''
+                ? t('approvals.allStatuses')
+                : value === approvalsQueue.outstanding
+                  ? t('approvals.stillWaiting')
+                  : t(`orderStatus.${value}`),
+          }))}
           value={status}
           onChange={setStatus}
         />

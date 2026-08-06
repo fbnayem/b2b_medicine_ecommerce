@@ -12,6 +12,7 @@ import { useApiCollection } from '../lib/query';
 import { keys } from '../lib/queryKeys';
 import { useSavedFilter } from '../lib/savedFilter';
 import { useLanguage } from '../lib/useLanguage';
+import { pickingQueue } from '../lib/workQueues';
 
 interface PickingList {
   _id: string;
@@ -20,16 +21,21 @@ interface PickingList {
   orderId: { reference: string; shopId: { name: string } };
 }
 
-/** The order a storekeeper meets the work in, not the order the enum declares it. */
-const QUEUES = ['', 'PENDING', 'PICKING', 'PAUSED', 'PACKING', 'BLOCKED_DISCREPANCY', 'PACKED'];
-
 export function FulfilmentQueue() {
   const { t } = useLanguage();
-  const [status, setStatus] = useSavedFilter('fulfilment', '');
+  /*
+   * Opens on the work still to do, not on every picking list ever made.
+   *
+   * The endpoint's default returns packed ones too, so this screen opened
+   * showing fifteen rows of which one was outstanding — and the home screen,
+   * counting the same unfiltered request, said "15 orders to pick". Both now
+   * read the outstanding set from `workQueues.ts`.
+   */
+  const [status, setStatus] = useSavedFilter('fulfilment', pickingQueue.outstanding);
 
   const queue = useApiCollection<PickingList>(
     keys.fulfilment.queue(status),
-    `/fulfilment/queue${status ? `?status=${status}` : ''}`,
+    pickingQueue.url(status),
   );
 
   return (
@@ -44,9 +50,12 @@ export function FulfilmentQueue() {
       <div className="mb-4">
         <FilterTabs
           label={t('fulfilment.filter')}
-          options={QUEUES.map((value) => ({
+          options={pickingQueue.filters.map((value) => ({
             value,
-            label: t(`pickingStatus.${value || 'ALL'}`),
+            label:
+              value === pickingQueue.outstanding
+                ? t('pickingStatus.OUTSTANDING')
+                : t(`pickingStatus.${value || 'ALL'}`),
           }))}
           value={status}
           onChange={setStatus}

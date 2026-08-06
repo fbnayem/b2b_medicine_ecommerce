@@ -2,6 +2,7 @@ import { navItemsFor } from '@medsupply/navigation';
 import type { UserRole } from '@medsupply/shared-types';
 import { DeliveryStatus } from '@medsupply/shared-types';
 import { keys } from './queryKeys';
+import { approvalsQueue, pickingQueue } from './workQueues';
 
 /**
  * What is waiting for this person, as a number they can act on.
@@ -68,17 +69,31 @@ export interface HomeSignal {
 /**
  * Deliberately four, and deliberately all queues.
  *
- * Every one of these is a list whose *unfiltered length is itself the backlog*.
- * That is why there is no "Orders" or "Medicines" card here: their totals are
- * inventory of the system rather than work outstanding, and a number nobody can
- * act on trains people to stop reading the numbers that matter.
+ * Every one of these is a list whose length is a backlog somebody can shorten
+ * today. That is why there is no "Orders" or "Medicines" card here: their
+ * totals are inventory of the system rather than work outstanding, and a number
+ * nobody can act on trains people to stop reading the numbers that matter.
+ *
+ * **The filter is part of the request, not an afterthought.** This used to say
+ * that each of these was a list whose *unfiltered* length was the backlog, and
+ * for two of the four that was simply untrue: `/approvals/queue` returns
+ * approved and rejected orders as well as undecided ones, and
+ * `/fulfilment/queue` returns every picking list ever made. So the home screen
+ * reported 3 orders "waiting for your decision" when one was, and 15 "to pick"
+ * when one was — the rest had been decided and packed days earlier.
+ *
+ * The two that were right — packed-awaiting-handover and out-for-delivery —
+ * were right because their endpoints filter server-side, which is to say by
+ * accident of where the filter happened to live. `workQueues.ts` now names the
+ * outstanding set for the other two, and the screen each tile links to reads
+ * the same constant, so a number and the list behind it cannot drift apart.
  */
 const SIGNALS: readonly HomeSignal[] = [
   {
     id: 'approvals',
     navId: 'approvals',
-    key: keys.approvals.queue(''),
-    url: '/approvals/queue',
+    key: keys.approvals.queue(approvalsQueue.outstanding),
+    url: approvalsQueue.url(approvalsQueue.outstanding),
     labelKey: 'home.awaitingDecision',
     path: '/approvals',
     tone: 'info',
@@ -87,8 +102,8 @@ const SIGNALS: readonly HomeSignal[] = [
   {
     id: 'picking',
     navId: 'fulfilment',
-    key: keys.fulfilment.queue(''),
-    url: '/fulfilment/queue',
+    key: keys.fulfilment.queue(pickingQueue.outstanding),
+    url: pickingQueue.url(pickingQueue.outstanding),
     labelKey: 'home.toPick',
     path: '/fulfilment',
     tone: 'progress',

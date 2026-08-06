@@ -688,3 +688,19 @@ reads a decision rather than guesses at an intention.
   the project root, which is `apps/web`; the shared packages are a sibling of
   it, so without `watchWorkspaceSources` a change to any of them is invisible
   until the server restarts — and nothing on screen says so.
+
+## Phase 35 — work queues
+
+- **A queue endpoint's default is its history, and a home tile counts its
+  backlog.** Those are different sets and the difference is now written down:
+  `APPROVAL_AWAITING` / `APPROVAL_DECIDED` and `PICKING_OUTSTANDING` /
+  `PICKING_DONE`. Both halves, rather than only the one being counted, so a
+  status added later and classified as neither fails a test instead of silently
+  falling out of a number.
+- **A blocked pick list counts as outstanding.** It is not progressing, but a
+  queue that hides its stuck items is how they stay stuck.
+- **Both queue screens open on outstanding work, not on everything.** The
+  decided and packed rows stay one tab away and `useSavedFilter` remembers
+  anyone who prefers that view — but the number on the home screen and the list
+  it links to must agree on the first render, which is where somebody actually
+  reads them.

@@ -423,3 +423,11 @@ done
 One database per suite is required, not optional. Every suite drops its database in its `before` hook, and Node's test runner runs files concurrently, so pointing them all at one database makes them drop it out from under each other. With the in-memory server the question does not arise because each file gets its own instance.
 
 Verified on a real MongoDB 6.0 replica set: 71 passed, 0 failed.
+
+### The suites run one file at a time
+
+`--test-concurrency=1` is in the `test` and `test:integration` scripts, and it is load-bearing. `mongodb-memory-server` starts a real `mongod` and a real replica set per file; run eighteen of those at once and the operating system starts refusing them — `mongod` dies with `fassert() failure` and about eighteen tests fail with `WaitForPrimaryTimeoutError`. The failure looks like a bug in whatever happened to be running at the time, which is what makes it worth pinning here: it is a resource limit, not the code.
+
+## Phase 35 coverage
+
+- `workQueues.test.ts`: 10 web tests. The two halves of each queue — awaiting/decided, outstanding/done — must be **disjoint** and must together cover every status its endpoint can return, so a status added later and classified as neither fails here rather than falling silently out of a number on the home screen. Each tile's URL must equal the request its destination screen makes by default, which is the property that was false: both were unfiltered, and only the tile's _label_ claimed otherwise. Every tile must either carry a filter or name an endpoint that filters server-side, and `/fulfilment/ready` is on that list explicitly so a fifth tile added against an unfiltered endpoint has to justify itself.

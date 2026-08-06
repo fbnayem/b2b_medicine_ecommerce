@@ -1682,3 +1682,51 @@ guides on their first run.
 ### Next phase dependencies
 
 None.
+
+## Phase 35: A Number On The Home Screen Means What Its Words Say
+
+**Status:** COMPLETED
+
+### Scope and completed work
+
+The home screen said "3 orders waiting for your decision" when one was, and "15
+orders to pick" when one was. Both tiles counted the whole of an endpoint whose
+default returns a queue's history rather than its backlog, and every test passed
+throughout because nothing anywhere said what either number excluded.
+
+`APPROVAL_AWAITING` / `APPROVAL_DECIDED` and `PICKING_OUTSTANDING` /
+`PICKING_DONE` now name both halves of each queue in `@medsupply/shared-types`.
+`apps/web/src/lib/workQueues.ts` turns each into the request its tile makes and
+the filter its screen opens on, so the number and the list behind it read one
+string.
+
+`/fulfilment/queue` accepts a comma-separated status list, as
+`/approvals/queue` already did — "orders to pick" is five statuses and there was
+no way to ask for them together. `PickingList`'s schema enum now comes from the
+same constant rather than being written out a second time.
+
+### Measured
+
+Against the seeded database, after rebuilding and restarting the API:
+`approvals 3 → 1` and `picking 15 → 1`, which is what the orders page shows.
+
+### Testing
+
+`workQueues.test.ts`, 10 tests. The two halves of each queue must be disjoint
+and must together cover every status the endpoint serves, so a status added
+later and classified as neither fails here rather than vanishing from a count.
+Each tile's URL must equal the request its destination makes by default. Every
+tile must carry a filter or name an endpoint that filters itself.
+
+Web 332 (43 files), API 174 unit / 194 integration / 5 route coverage, mobile 113.
+
+### Known limitations
+
+- **The two tiles that were already right are right for a different reason.**
+  `/fulfilment/ready` and the deliveries tile filter server-side. They are named
+  explicitly in the test rather than made to match, because moving their filter
+  to the client would be a worse arrangement for the sake of symmetry.
+
+### Next phase dependencies
+
+None.

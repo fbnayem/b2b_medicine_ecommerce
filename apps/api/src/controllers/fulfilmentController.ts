@@ -46,9 +46,19 @@ async function permittedInvoice(req: AuthRequest) {
 }
 export async function queue(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const status = req.query.status ? String(req.query.status) : undefined;
+    /*
+     * A comma-separated list, not a single value.
+     *
+     * "Orders to pick" is five statuses — pending, being picked, paused, being
+     * packed, and blocked on a discrepancy — and there was no way to ask for
+     * them together. So the home screen asked for the whole table and counted
+     * it, which meant fourteen finished picks were reported as work waiting for
+     * a storekeeper. Approvals has taken a list since it was written; this
+     * matches it rather than inventing a second convention.
+     */
+    const status = req.query.status ? String(req.query.status).split(',') : undefined;
     const pickingQuery = PickingList.find();
-    if (status) pickingQuery.where('status').equals(status);
+    if (status) pickingQuery.where('status').in(status);
     const data = await pickingQuery
       .populate({ path: 'orderId', populate: { path: 'shopId', select: 'reference name' } })
       .sort({ createdAt: 1 })

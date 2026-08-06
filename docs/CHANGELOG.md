@@ -1,5 +1,52 @@
 # Changelog
 
+## Phase 35 — a number on the home screen means what its words say
+
+Asked for: "the order page and approve page are not showing the same data".
+
+### Two of the four tiles were counting finished work
+
+The home screen said **"3 orders waiting for your decision"** when one was; the
+other two had been approved and rejected days earlier. It said **"15 orders to
+pick"** when one was; fourteen were packed and gone.
+
+Neither tile was doing anything unreasonable. `homeSignals` said each signal
+reuses the URL of the screen it links to and claimed of every one that its
+_unfiltered_ length is itself the backlog. For deliveries and packed orders that
+is true — those endpoints filter server-side. For `/approvals/queue` and
+`/fulfilment/queue` it was false: both return a queue's **history**. Every test
+passed throughout, because nothing anywhere said what either number excluded.
+
+### What shipped
+
+`APPROVAL_AWAITING` / `APPROVAL_DECIDED` and `PICKING_OUTSTANDING` /
+`PICKING_DONE` in `@medsupply/shared-types`, with `workQueues.ts` on the web
+turning each into the request its tile makes **and** the filter its screen opens
+on. One string, two readers, so they cannot disagree.
+
+`/fulfilment/queue` now accepts a comma-separated status list, as
+`/approvals/queue` already did — "orders to pick" is five statuses and there was
+no way to ask for them together. `PickingList`'s schema enum now comes from the
+same constant instead of being written out a second time.
+
+Both queue screens open on outstanding work rather than on everything, with the
+decided and packed rows one tab away and `useSavedFilter` remembering anyone who
+prefers them.
+
+### Measured on live data
+
+`approvals 3 → 1`, `picking 15 → 1`, which is what the orders page shows.
+
+### The gate
+
+`workQueues.test.ts`, 10 tests. The two halves of each queue must be disjoint
+**and cover every status the endpoint serves**, so a seventh status added and
+classified as neither fails here rather than vanishing from a number somebody
+trusts. Each tile's URL must equal the request its destination makes by default.
+And every tile must carry a filter or name an endpoint that filters itself —
+`/fulfilment/ready` is on that list explicitly, so a fifth tile added against an
+unfiltered endpoint has to justify itself.
+
 ## Phase 34 — a product that explains itself
 
 Asked for: a short description under every box, and a fuller explanation at the

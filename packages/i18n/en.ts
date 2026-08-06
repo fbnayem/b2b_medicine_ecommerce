@@ -1333,6 +1333,7 @@ export const en = {
     title: 'Orders to approve',
     subtitle: 'Check stock, credit and licences before anything is set aside.',
     filterLabel: 'Which orders',
+    stillWaiting: 'Waiting for a decision',
     allStatuses: 'All',
     loading: 'Loading the queue',
     couldNotLoad: 'The queue could not be loaded.',
@@ -2234,6 +2235,7 @@ export const en = {
   /** The status of a picking list. Server-supplied strings, not a shared enum. */
   pickingStatus: {
     ALL: 'All',
+    OUTSTANDING: 'Still to pick',
     PENDING: 'Approved and waiting',
     PICKING: 'Being picked',
     PAUSED: 'Paused',

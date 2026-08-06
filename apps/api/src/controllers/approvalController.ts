@@ -3,6 +3,7 @@ import {
   ActivityEntityType,
   NotificationCategory,
   NotificationEvent,
+  APPROVAL_QUEUE,
   OrderStatus,
   RealtimeEvent,
   UserRole,
@@ -120,16 +121,16 @@ async function transition(req: AuthRequest, to: OrderStatus, version: number, no
 }
 export async function queue(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const status = req.query.status
-      ? String(req.query.status).split(',')
-      : [
-          OrderStatus.SUBMITTED,
-          OrderStatus.UNDER_REVIEW,
-          OrderStatus.ON_HOLD,
-          OrderStatus.APPROVED,
-          OrderStatus.PARTIALLY_APPROVED,
-          OrderStatus.REJECTED,
-        ];
+    /*
+     * `APPROVAL_QUEUE` rather than a list written out here.
+     *
+     * This default is deliberately broad — a manager wants to see what they
+     * recently decided as well as what is waiting — and the home screen used to
+     * count it and call the number "orders waiting for your decision". The
+     * split between the two halves now lives in `shared-types`, so the screen
+     * counting a subset of this list cannot fall out of step with it.
+     */
+    const status = req.query.status ? String(req.query.status).split(',') : [...APPROVAL_QUEUE];
     res.json({
       data: await Order.find()
         .where('status')

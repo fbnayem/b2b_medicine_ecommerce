@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PICKING_QUEUE } from '@medsupply/shared-types';
 
 const discrepancySchema = new mongoose.Schema(
   {
@@ -23,7 +24,7 @@ const schema = new mongoose.Schema(
     approvalId: { type: mongoose.Schema.Types.ObjectId, ref: 'OrderApproval', required: true },
     status: {
       type: String,
-      enum: ['PENDING', 'PICKING', 'PAUSED', 'PACKING', 'BLOCKED_DISCREPANCY', 'PACKED'],
+      enum: [...PICKING_QUEUE],
       default: 'PENDING',
       index: true,
     },

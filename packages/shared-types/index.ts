@@ -269,6 +269,62 @@ export const OrderStatus = {
 } as const;
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
 
+/**
+ * The approvals queue, split into work outstanding and work already done.
+ *
+ * Here rather than in either app because both need it and they must not drift:
+ * the server builds its default filter from `APPROVAL_QUEUE` below, and the web
+ * counts `APPROVAL_AWAITING` on the home screen. When those were two separate
+ * lists the home screen reported **"3 orders waiting for your decision"** while
+ * one was waiting — the other two had been approved and rejected days before,
+ * and were being counted because the endpoint returns them and nobody had
+ * written down that it does.
+ */
+export const APPROVAL_AWAITING = [
+  OrderStatus.SUBMITTED,
+  OrderStatus.UNDER_REVIEW,
+  OrderStatus.ON_HOLD,
+] as const;
+
+/** Decided. Still worth showing on the screen; never counted as a backlog. */
+export const APPROVAL_DECIDED = [
+  OrderStatus.APPROVED,
+  OrderStatus.PARTIALLY_APPROVED,
+  OrderStatus.REJECTED,
+] as const;
+
+/** Everything the approvals queue serves when no filter is asked for. */
+export const APPROVAL_QUEUE = [...APPROVAL_AWAITING, ...APPROVAL_DECIDED] as const;
+
+/**
+ * Picking-list statuses, split the same way.
+ *
+ * `BLOCKED_DISCREPANCY` is outstanding: it is stuck rather than finished, and a
+ * storekeeper's queue that hides the stuck ones is how they stay stuck.
+ */
+export const PickingListStatus = {
+  PENDING: 'PENDING',
+  PICKING: 'PICKING',
+  PAUSED: 'PAUSED',
+  PACKING: 'PACKING',
+  BLOCKED_DISCREPANCY: 'BLOCKED_DISCREPANCY',
+  PACKED: 'PACKED',
+} as const;
+export type PickingListStatus = (typeof PickingListStatus)[keyof typeof PickingListStatus];
+
+export const PICKING_OUTSTANDING = [
+  PickingListStatus.PENDING,
+  PickingListStatus.PICKING,
+  PickingListStatus.PAUSED,
+  PickingListStatus.PACKING,
+  PickingListStatus.BLOCKED_DISCREPANCY,
+] as const;
+
+/** Finished — the order has left the warehouse's hands. */
+export const PICKING_DONE = [PickingListStatus.PACKED] as const;
+
+export const PICKING_QUEUE = [...PICKING_OUTSTANDING, ...PICKING_DONE] as const;
+
 export const PaymentMethod = {
   CASH: 'CASH',
   BANK_TRANSFER: 'BANK_TRANSFER',

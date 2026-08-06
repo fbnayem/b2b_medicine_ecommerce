@@ -1217,6 +1217,7 @@ export const bn: Catalogue = {
     title: 'অনুমোদনের অপেক্ষায় অর্ডার',
     subtitle: 'কিছু সরিয়ে রাখার আগে স্টক, ক্রেডিট ও লাইসেন্স দেখে নিন।',
     filterLabel: 'কোন অর্ডার',
+    stillWaiting: 'সিদ্ধান্তের অপেক্ষায়',
     allStatuses: 'সবগুলি',
     loading: 'তালিকা লোড হচ্ছে',
     couldNotLoad: 'তালিকাটি লোড করা যায়নি।',
@@ -2086,6 +2087,7 @@ export const bn: Catalogue = {
 
   pickingStatus: {
     ALL: 'সবগুলি',
+    OUTSTANDING: 'এখনো তুলতে হবে',
     PENDING: 'অনুমোদিত, অপেক্ষায়',
     PICKING: 'বাছাই চলছে',
     PAUSED: 'থামানো',
