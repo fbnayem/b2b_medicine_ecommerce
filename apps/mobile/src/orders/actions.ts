@@ -49,31 +49,34 @@ export const TRACKABLE: readonly string[] = [
   OrderStatus.DELIVERY_FAILED,
 ];
 
-/** A return is raised against an invoice, so there has to be one. */
-export const RETURNABLE: readonly string[] = [
-  OrderStatus.DELIVERED,
-  OrderStatus.PARTIALLY_DELIVERED,
-];
-
 export interface OrderActions {
   /** Always. Ordering the same things again is the commonest thing a shop does. */
   reorder: boolean;
   askToCancel: boolean;
-  invoice: boolean;
   track: boolean;
-  raiseReturn: boolean;
 }
 
-export function actionsFor(order: Pick<Order, 'status'> & { invoiceId?: unknown }): OrderActions {
+/**
+ * Deliberately no "see the invoice" and no "send this back".
+ *
+ * Both need an invoice id and **`Order` does not carry one** — the link is held
+ * the other way round, on `Invoice.orderId`, and `GET /orders/{id}` returns the
+ * order alone. The web client has the same shape and answers it the same way:
+ * every invoice link in `apps/web` starts from the account, a delivery or a pick
+ * list, and `ReturnRequest` opens with a picker over `GET /finance/my/invoices`.
+ *
+ * So invoices and returns are reached from the invoice, which is where a
+ * pharmacy looks for them anyway — they file by invoice, not by order. Adding
+ * `GET /fulfilment/invoices/by-order/{id}` to put one button here would be a new
+ * endpoint, a new waiver and a regenerated specification, for a path the product
+ * already has.
+ */
+export function actionsFor(order: Pick<Order, 'status'>): OrderActions {
   const status = String(order.status);
   return {
     reorder: true,
     askToCancel: CANCELLABLE.includes(status),
-    // The invoice is the thing that exists, not a status that implies it —
-    // a partially delivered order still has one, and a cancelled one may too.
-    invoice: Boolean(order.invoiceId),
     track: TRACKABLE.includes(status),
-    raiseReturn: RETURNABLE.includes(status) && Boolean(order.invoiceId),
   };
 }
 

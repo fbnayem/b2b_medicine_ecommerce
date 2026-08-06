@@ -26,6 +26,49 @@ describe('the Bangla catalogue', () => {
     expect(catalogueKeys(bn).sort()).toEqual(catalogueKeys(en).sort());
   });
 
+  it('spells Bangla with characters that exist', () => {
+    /*
+     * Found the hard way. A string went in with **U+09C9**, which is
+     * unassigned in the Bengali block — `রওনা` became `র৉না`, and what a
+     * pharmacy owner would have seen is an empty box in the middle of a word.
+     *
+     * Nothing else could catch it. It is a valid string, the key resolves, the
+     * value is not English, and the type is `string`. Every other rule in this
+     * file passed.
+     *
+     * The rule is deliberately narrow: only the Bengali block, and only the
+     * codepoints Unicode itself has never assigned. That makes it a fact about
+     * the script rather than an opinion about the spelling, so it cannot go
+     * stale and cannot argue with a native speaker.
+     */
+    const UNASSIGNED = new Set([
+      0x0984, 0x098d, 0x098e, 0x0991, 0x0992, 0x09a9, 0x09b1, 0x09b3, 0x09b4, 0x09b5, 0x09ba,
+      0x09bb, 0x09c5, 0x09c6, 0x09c9, 0x09ca, 0x09cf, 0x09d0, 0x09d1, 0x09d2, 0x09d3, 0x09d4,
+      0x09d5, 0x09d6, 0x09d8, 0x09d9, 0x09da, 0x09db, 0x09de, 0x09e4, 0x09e5,
+    ]);
+
+    const broken: string[] = [];
+    for (const path of catalogueKeys(bn)) {
+      const value = path
+        .split('.')
+        .reduce<unknown>((node, key) => (node as never)?.[key], bn as object);
+      if (typeof value !== 'string') continue;
+      for (const character of value) {
+        const point = character.codePointAt(0)!;
+        if (UNASSIGNED.has(point)) {
+          broken.push(`${path} contains U+${point.toString(16).toUpperCase().padStart(4, '0')}`);
+          break;
+        }
+      }
+    }
+
+    expect(
+      broken,
+      'These hold a codepoint Unicode has never assigned in the Bengali block. Each renders ' +
+        'as an empty box in the middle of a word, and no other rule here can see it.',
+    ).toEqual([]);
+  });
+
   it('actually translates the words a user reads', () => {
     // A Bangla catalogue that is a copy of the English one type-checks
     // perfectly and helps nobody. Proper nouns and the app name legitimately

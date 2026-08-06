@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { getMyInvoices } from '../../src/finance/api';
 import { errorMessage } from '@medsupply/api-client';
 import { formatFinanceDate } from '../../src/finance/date';
@@ -9,7 +10,7 @@ import { useLanguage } from '../../src/i18n/useLanguage';
 import {
   Badge,
   Button,
-  Card,
+  CardLink,
   EmptyState,
   ErrorState,
   ListRow,
@@ -102,7 +103,21 @@ export default function InvoicesScreen() {
         renderItem={({ item }) => {
           const overdue = item.amountDueMinor > 0 && new Date(item.dueDate).getTime() < Date.now();
           return (
-            <Card>
+            /*
+             * Tappable. This list showed a reference and a balance and went
+             * nowhere, so the document itself — which batch, which expiry, what
+             * was charged, and the lines a return is raised against — was
+             * reachable only from a desktop.
+             */
+            <CardLink
+              accessibilityLabel={item.reference}
+              onPress={() =>
+                router.push({
+                  pathname: '/(protected)/invoice-detail',
+                  params: { id: item._id },
+                })
+              }
+            >
               <View
                 style={{
                   flexDirection: 'row',
@@ -145,7 +160,7 @@ export default function InvoicesScreen() {
                 value={formatMoneyMinor(item.amountDueMinor)}
                 numeric
               />
-            </Card>
+            </CardLink>
           );
         }}
       />

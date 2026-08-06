@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { DeliveryStatus } from '@medsupply/shared-types';
+import { DeliveryStatus, UserRole } from '@medsupply/shared-types';
 import type { Delivery } from '@medsupply/shared-types';
 import { apiClient } from '../../../src/api/client';
 import { formatFinanceDate } from '../../../src/finance/date';
@@ -12,6 +12,8 @@ import {
   syncDeliveryQueue,
 } from '../../../src/delivery/offlineQueue';
 import { useLanguage } from '../../../src/i18n/useLanguage';
+import { useAuthStore } from '../../../src/store/useAuth';
+import { CustomerDeliveries } from '../../../src/delivery/CustomerDeliveries';
 import { Badge, Button, CardLink, EmptyState, Screen, StatusPill } from '../../../src/components';
 import { colour, layout } from '../../../src/theme';
 
@@ -26,6 +28,22 @@ const activeStatuses = [
 ] as DeliveryStatus[];
 
 export default function DeliveriesScreen() {
+  /*
+   * Two audiences, one route.
+   *
+   * Everything below this line is a rider's working screen — their round, their
+   * offline cache, their queue of unsynced actions. A shop owner reached it
+   * from their own menu and got all of it. In the shipped applications only one
+   * branch is ever taken, because a build admits one set of roles: the Shop
+   * application only ever renders the customer's list, and the Rider
+   * application only ever renders the rider's.
+   */
+  const role = useAuthStore((state) => state.user?.role);
+  if (role === UserRole.SHOP_OWNER) return <CustomerDeliveries />;
+  return <RiderDeliveries />;
+}
+
+function RiderDeliveries() {
   const { t } = useLanguage();
   const [data, setData] = useState<Delivery[]>([]);
   const [refreshing, setRefreshing] = useState(false);

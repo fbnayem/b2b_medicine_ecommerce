@@ -89,8 +89,16 @@ export default function ProtectedLayout() {
 
         <Stack.Protected guard={isOwner}>
           <Stack.Screen name="invoices" options={{ title: t('screens.invoices') }} />
+          <Stack.Screen name="invoice-detail" options={{ title: t('screens.invoice') }} />
           <Stack.Screen name="payments" options={{ title: t('screens.paymentHistory') }} />
           <Stack.Screen name="statement" options={{ title: t('screens.accountStatement') }} />
+          {/*
+            The customer's read-only view of a delivery, and deliberately not
+            `delivery-detail` — that one is the rider's working screen, with the
+            buttons that move a delivery along and an offline action queue
+            behind them.
+          */}
+          <Stack.Screen name="delivery-track" options={{ title: t('screens.whereIsIt') }} />
         </Stack.Protected>
         <Stack.Protected guard={isManager}>
           <Stack.Screen name="overdue-shops" options={{ title: t('screens.overdueShops') }} />
