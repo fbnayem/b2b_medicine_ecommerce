@@ -661,3 +661,14 @@ reads a decision rather than guesses at an intention.
   `DELIVERY_REQUIRED_PROOFS` asks for — an OTP sent to the shop owner and read
   back. A seed that forged one would be creating exactly the unaccountable
   record the audit rules exist to prevent.
+- **The home screen's charts ask for a rolling thirty days; every other report
+  defaults to month-to-date.** The two differ deliberately. A report screen
+  prints the period it is showing and offers a picker, so month-to-date is a
+  defensible default there. The home charts show neither, and month-to-date
+  answers "how is trade going" worst on the day it is asked most: on the first
+  of a month it is one day, and one point is not a trend. Thirty days is long
+  enough to show a direction and short enough that a day is still a readable
+  point at that chart's size.
+- **Receivables ageing is as-of, not windowed**, and stays that way. What a shop
+  owes today does not depend on which period a sales chart happens to be
+  showing, so changing the chart's window must not change the debt.

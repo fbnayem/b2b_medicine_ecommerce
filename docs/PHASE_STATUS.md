@@ -1529,12 +1529,88 @@ rather than duplicates.
   one is not something a seed should do.
 - **No returns, price lists or free-goods offers are seeded**, so those three
   screens still open on an empty state.
-- **The sales chart shows only the current month** because the report defaults
+- ~~**The sales chart shows only the current month** because the report defaults
   to it; the older invoices are visible in the ageing card and on the analytics
-  screen with a wider range.
+  screen with a wider range.~~ **Fixed in Phase 33.**
 - **The end-to-end database is never dropped**, so records created by browser
   specs accumulate across runs. The seed is now idempotent against that, but
   the accumulation itself is untouched.
+
+### Next phase dependencies
+
+None.
+
+## Phase 33: A Chart That Is Honest About The First Of The Month
+
+**Status:** COMPLETED
+
+### Scope and completed work
+
+Phase 32 filled the database and the home screen still drew a flat line. The
+report was asked for the wrong period.
+
+`scopedRange` defaults every report to **month-to-date**. That is right for the
+analytics screen, which prints the period it is showing and offers a picker. It
+is wrong for a fixed glance that shows neither, and it fails worst on the day
+the question matters most: **on the first of a month, month-to-date is one day**,
+and one point is not a trend.
+
+Measured against the same seeded database on 6 August:
+
+|                     | month-to-date           | rolling 30 days               |
+| ------------------- | ----------------------- | ----------------------------- |
+| points on the chart | 6, of which 3 non-zero  | 30, of which 12 non-zero      |
+| net sales           | ৳13,410                 | ৳62,885                       |
+| "selling most"      | Cef-3, Amoxin, Voltalin | Insulet 30/70, Roceph, Etorix |
+
+Nearly four fifths of the month's trade sat outside the window, and the
+best-sellers list — which reads as a considered ranking — was drawn from three
+days of trade.
+
+- **`rollingRange(days)`** in `pages/reportRange.ts`, computed on the business
+  calendar so a reader west of Greenwich gets Dhaka's date.
+- **`HomeCharts` asks for thirty days explicitly** rather than taking the
+  server's default. The analytics screen is unchanged.
+- **Receivables were never affected and are unchanged.** `receivablesAgeing` is
+  as-of rather than windowed, so a five-week-old unpaid invoice ages correctly
+  whatever period the sales chart shows. Both windows return the same ৳35,089
+  outstanding and ৳8,500 overdue, which is how that was confirmed rather than
+  assumed.
+
+### What was not a defect
+
+The same screen rendered `home.whoOwesUs` and `home.bestSellers` as raw keys,
+and no code was wrong. The keys exist in `en.ts` and `bn.ts`, and
+`catalogueKeys.test.ts` proves every key a screen uses resolves to a string.
+
+The dev server answering the browser had been running since **two days before
+those keys were written**, and was serving a 336,170-byte transform of a
+336,880-byte file. No test can catch that: the source was never wrong, only the
+process holding a copy of it. This is the third investigation this project has
+spent on a stale or truncated dev-server module, so the diagnostic is recorded
+rather than the fix: **when the browser disagrees with the source, fetch the
+module the browser is being served before reading the code.**
+
+### Testing
+
+Web 307 (39 files, six of them new for `rollingRange` — month ends, a year end,
+a leap February, a clock behind Dhaka's, and a one-day window), browser 128 with
+accessibility still at strict zero, API 170 unit / 194 integration / 5 route
+coverage, mobile 93.
+
+The integration suite fails 18 tests when `node --test` runs its files
+concurrently — `WaitForPrimaryTimeoutError` from `mongodb-memory-server`, which
+is contention over replica-set election and not a code failure. Run it with
+`--test-concurrency=1` and it is 194/194.
+
+### Known limitations
+
+- **The analytics screen still defaults to month-to-date**, which is deliberate:
+  it shows the period and offers a picker. Only the fixed glance was changed.
+- **`defaultRange` in `reportService.ts` has no caller.** The month-to-date
+  default is implemented a second time in `reportController.scopedRange`, which
+  is the one that actually runs. The dead copy is left untouched here rather
+  than removed in a change about charts.
 
 ### Next phase dependencies
 

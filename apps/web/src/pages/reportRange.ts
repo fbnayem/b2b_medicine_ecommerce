@@ -24,6 +24,25 @@ function today() {
   return new Date(Date.now() + 6 * 3_600_000).toISOString().slice(0, 10);
 }
 
+/**
+ * A window of `days` ending today, for a screen that shows a trend without
+ * offering a way to change the period.
+ *
+ * The server defaults every report to month-to-date, which is right where the
+ * period is on screen next to a picker. It is wrong for a fixed glance: on the
+ * first of a month month-to-date is a single day, and no trend can be read from
+ * one point. `days` counts inclusively, so 30 means today and the 29 before it.
+ */
+export function rollingRange(days: number): { from: string; to: string } {
+  const to = today();
+  // Parsed back as UTC midnight rather than local, so subtracting whole days
+  // cannot land on a different date for a reader west of Greenwich.
+  const from = new Date(Date.parse(`${to}T00:00:00.000Z`) - (days - 1) * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  return { from, to };
+}
+
 export function useReportRange(): ReportRange {
   const to = today();
   const from = `${to.slice(0, 8)}01`;

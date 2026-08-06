@@ -1,5 +1,56 @@
 # Changelog
 
+## Phase 33 — a chart that is honest about the first of the month
+
+Phase 32 filled the database and the home screen still drew a flat line. Two
+separate causes, and only one of them was in the code.
+
+### The window
+
+The charts took the server's default range. `scopedRange` defaults every report
+to **month-to-date**, which is the right default for the analytics screen — it
+prints the period it is showing and offers a picker to change it — and the wrong
+one for a fixed glance that shows neither.
+
+It fails worst exactly when the question is asked most. **On the first of a
+month, month-to-date is a single day**, and no trend can be drawn through one
+point. Measured against the same seeded database on the sixth:
+
+|                     | month-to-date           | rolling 30 days               |
+| ------------------- | ----------------------- | ----------------------------- |
+| points on the chart | 6, of which 3 non-zero  | 30, of which 12 non-zero      |
+| net sales           | ৳13,410                 | ৳62,885                       |
+| "selling most"      | Cef-3, Amoxin, Voltalin | Insulet 30/70, Roceph, Etorix |
+
+Nearly four fifths of the month's trade was outside the window, and the
+best-sellers list — which reads as a considered ranking — was drawn from three
+days. The home charts now ask for a rolling thirty days explicitly, through a
+new `rollingRange` helper tested against month ends, a year end, a leap
+February and a reader whose clock is behind Dhaka's.
+
+The cost is one cache entry: the range is part of the query key, so opening the
+home screen and then the analytics screen now makes two requests where it made
+one. A chart that is correct on the 1st is worth more than that.
+
+Receivables were never affected and are unchanged — `receivablesAgeing` is
+**as-of**, not windowed, so a five-week-old unpaid invoice ages correctly no
+matter what period the sales chart shows.
+
+### The other cause was not a defect
+
+The same screen showed `home.whoOwesUs` and `home.bestSellers` as raw keys.
+Every gate that could have caught it was already green and right to be: the keys
+exist in `en.ts` and in `bn.ts`, and `catalogueKeys.test.ts` proves every key a
+screen uses resolves to a string.
+
+The dev server serving the page had been running since **two days before those
+keys were written**, and was answering with a 336,170-byte transform of a
+336,880-byte file. No test can catch that, because the source was never wrong —
+only the process holding a copy of it. Recorded here because it is the third
+time this project has spent an investigation on a stale or truncated dev-server
+module, and the pattern is worth naming: **when the browser disagrees with the
+source, fetch the module the browser is being served before reading the code.**
+
 ## Phase 32 — demo data worth testing against
 
 The seed parked one order at each state a screen exists for. That is enough to
