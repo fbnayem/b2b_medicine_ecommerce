@@ -13,7 +13,7 @@
  * means the arithmetic can be tested with no device and no mocking.
  */
 
-export type QueueKind = 'delivery' | 'stocktake';
+export type QueueKind = 'delivery' | 'stocktake' | 'completion';
 
 export type QueuedAction = {
   /** The idempotency key, which is also what makes an action unique here. */

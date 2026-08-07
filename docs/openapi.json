@@ -14327,6 +14327,7 @@
                     "type": "string",
                     "pattern": "^(\\+8801|01)[3-9]\\d{8}$"
                   },
+                  "deliveredAt": {},
                   "otp": {
                     "type": "string",
                     "pattern": "^\\d{6}$"

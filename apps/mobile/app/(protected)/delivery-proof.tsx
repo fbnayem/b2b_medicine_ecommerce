@@ -11,6 +11,9 @@ import { errorMessage } from '@medsupply/api-client';
 import { humaniseEnum } from '@medsupply/utilities';
 import { neutral } from '@medsupply/design-tokens';
 import { apiClient } from '../../src/api/client';
+import { queueCompletion } from '../../src/delivery/offlineQueue';
+import { canCompleteOffline } from '../../src/offline/completion';
+import { holdProof, releaseProof } from '../../src/offline/proofFiles';
 import { createFinancialIdempotencyKey } from '../../src/finance/idempotency';
 import {
   deliveryCollectionMethods,
@@ -240,23 +243,40 @@ export default function DeliveryProofScreen() {
         paths.length && signatureRef.current
           ? await captureRef(signatureRef, { format: 'png', result: 'base64', quality: 0.9 })
           : undefined;
+
+      /*
+       * On disk before anything is sent.
+       *
+       * Not an optimisation — it is what makes the completion survivable. The
+       * request is about to be attempted, and if it cannot reach the server the
+       * evidence has to already be somewhere that outlives this screen. Written
+       * to `Paths.document` rather than the cache, because the operating system
+       * may reclaim a cache and proof waiting for signal is not a copy of
+       * anything the server holds.
+       */
+      const held = {
+        photo: photo ? holdProof(delivery.reference, 'photo', photo, 'image/jpeg') : undefined,
+        signature: signature
+          ? holdProof(delivery.reference, 'signature', signature, 'image/png')
+          : undefined,
+        payment: paymentPhoto
+          ? holdProof(delivery.reference, 'payment', paymentPhoto, 'image/jpeg')
+          : undefined,
+      };
+
       const body = {
         receiverName: receiverName.trim(),
         receiverPhone,
         otp: otp || undefined,
-        signature: signature
+        signature: held.signature
           ? {
-              fileName: `${delivery.reference}-signature.png`,
-              mimeType: 'image/png',
-              base64Data: signature,
+              fileName: held.signature.fileName,
+              mimeType: held.signature.mimeType,
+              base64Data: signature!,
             }
           : undefined,
-        photograph: photo
-          ? {
-              fileName: `${delivery.reference}-photo.jpg`,
-              mimeType: 'image/jpeg',
-              base64Data: photo,
-            }
+        photograph: held.photo
+          ? { fileName: held.photo.fileName, mimeType: held.photo.mimeType, base64Data: photo! }
           : undefined,
         gps,
         notes: notes || undefined,
@@ -274,6 +294,8 @@ export default function DeliveryProofScreen() {
           ...body,
         });
         const payment = response.data.meta?.payment;
+        // The server has it, so the phone does not need it.
+        Object.values(held).forEach(releaseProof);
         toast.success(
           payment
             ? t('delivery.completedWithPayment', {
@@ -286,9 +308,44 @@ export default function DeliveryProofScreen() {
         router.replace('/(protected)/(tabs)/deliveries');
       } catch (caught) {
         const status = (caught as ApiFailure).response?.status ?? 0;
-        if (!(caught as ApiFailure).response || status >= 500) {
-          setError(t('delivery.keepOpenAndRetry'));
+        const unreachable = !(caught as ApiFailure).response || status >= 500;
+        /*
+         * No signal is not a failure to report — it is the ordinary condition
+         * of the job, and the rider is standing at a counter with somebody
+         * waiting. This used to say "keep this screen open and try again",
+         * which asks a person to stand still until a network improves.
+         *
+         * The photograph and the signature are already on disk; what is queued
+         * is where they are, plus the time it is now. The one thing that cannot
+         * be held is a delivery whose proof requires an OTP: the code lives on
+         * the server and there is no offline answer to it.
+         */
+        if (unreachable && canCompleteOffline(delivery.proofRequirements)) {
+          // The bytes stay on disk; the queue carries where they are, so
+          // `AsyncStorage` holds a few hundred bytes rather than megabytes.
+          const { signature: _s, photograph: _p, paymentProof: _a, ...withoutFiles } = body;
+          await queueCompletion(
+            {
+              _id: delivery._id,
+              version: delivery.version,
+              proofRequirements: delivery.proofRequirements,
+            },
+            { idempotencyKey: completionKey.current, ...withoutFiles },
+            held,
+          );
+          toast.info(t('delivery.completionSavedOffline'));
+          setError('');
+          router.replace('/(protected)/(tabs)/deliveries');
+        } else if (unreachable) {
+          setError(t('delivery.otpNeedsSignal'));
         } else {
+          /*
+           * Understood and refused, so the evidence is not worth keeping: the
+           * rider is about to change something and try again, and a discarded
+           * photograph left in `Paths.document` is a file nothing will ever
+           * delete.
+           */
+          Object.values(held).forEach(releaseProof);
           setError(errorMessage(caught, language, t('delivery.completionRejected')));
         }
       }

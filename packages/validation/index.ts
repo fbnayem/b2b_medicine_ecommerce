@@ -616,10 +616,42 @@ const paymentAttachmentSchema = z.object({
   base64Data: z.string().min(8).max(2_800_000),
 });
 
+/**
+ * How far in the past a delivery may claim to have happened.
+ *
+ * A rider works where there is no signal, so a completion may be recorded at the
+ * shop door and arrive hours later — and if the server stamps it on arrival, the
+ * record says the delivery happened when the signal came back rather than when
+ * the customer signed for it. So the client may say when.
+ *
+ * That is a **client-supplied timestamp on a financial record**, which is
+ * back-dating unless it is bounded. Twelve hours is longer than any round and
+ * shorter than a shift boundary, so a queue that flushes the next morning is
+ * refused rather than quietly dating yesterday's cash to today. The future is
+ * allowed two minutes, which is clock skew rather than intent.
+ */
+export const QUEUED_COMPLETION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+export const QUEUED_COMPLETION_MAX_SKEW_MS = 2 * 60 * 1000;
+
+const deliveredAt = z.coerce
+  .date()
+  .refine((value) => value.getTime() <= Date.now() + QUEUED_COMPLETION_MAX_SKEW_MS, {
+    message: 'A delivery cannot be recorded as happening in the future',
+  })
+  .refine((value) => value.getTime() >= Date.now() - QUEUED_COMPLETION_MAX_AGE_MS, {
+    message: 'This completion is too old to accept; the office must record it',
+  });
+
 export const DeliveryCompletionSchema = deliveryActionBase
   .extend({
     receiverName: z.string().trim().min(2).max(120),
     receiverPhone: bdPhone,
+    /**
+     * When the rider finished, if they were not online at the time. Absent on
+     * every completion sent from a handset with signal, which is the ordinary
+     * case and stays stamped by the server.
+     */
+    deliveredAt: deliveredAt.optional(),
     otp: z
       .string()
       .regex(/^\d{6}$/)

@@ -58,6 +58,12 @@ type CompletionInput = ActionInput & {
     capturedAt: Date;
   };
   notes?: string;
+  /**
+   * When the rider finished, present only when they were away from signal at
+   * the time. `DeliveryCompletionSchema` bounds it; its presence is also what
+   * makes the audit record say the completion arrived queued.
+   */
+  deliveredAt?: Date;
   deliveredPackageCount: number;
   noPaymentCollected: boolean;
   collectedAmountMinor: number;
@@ -687,6 +693,19 @@ export async function completeDelivery(id: string, input: CompletionInput, actor
         input.deliveredPackageCount === pack.packageCount
           ? DeliveryStatus.DELIVERED
           : DeliveryStatus.PARTIALLY_DELIVERED;
+      /*
+       * When the rider actually finished, which is not always now.
+       *
+       * A round goes where the signal does not, so a completion can be recorded
+       * at the shop door and arrive hours later. Stamping it on arrival made the
+       * record say the delivery happened when the connection came back — and
+       * the money with it, so a collection taken at two in the afternoon was
+       * dated to whenever the rider next found a bar of signal.
+       *
+       * `DeliveryCompletionSchema` bounds what a client may claim: no further
+       * ahead than clock skew, no further back than twelve hours.
+       */
+      const finishedAt = input.deliveredAt ?? new Date();
       delivery.proof = {
         receiverName: input.receiverName,
         receiverPhone: input.receiverPhone,
@@ -696,7 +715,7 @@ export async function completeDelivery(id: string, input: CompletionInput, actor
         gps: input.gps,
         notes: input.notes,
         deliveredPackageCount: input.deliveredPackageCount,
-        deliveredAt: new Date(),
+        deliveredAt: finishedAt,
       };
       delivery.paymentCollection = {
         amountMinor: input.collectedAmountMinor,
@@ -727,7 +746,9 @@ export async function completeDelivery(id: string, input: CompletionInput, actor
             amountMinor: input.collectedAmountMinor,
             method: input.collectionMethod as Exclude<PaymentMethod, 'CREDIT' | 'ADVANCE_BALANCE'>,
             transactionReference: input.transactionReference,
-            collectedAt: new Date(),
+            // The same instant the proof carries: the cash changed hands when
+            // the customer signed, not when the handset reconnected.
+            collectedAt: finishedAt,
             notes: input.notes,
             paymentProof: input.paymentProof,
             idempotencyKey: `delivery-collection:${delivery._id}`,
@@ -760,7 +781,22 @@ export async function completeDelivery(id: string, input: CompletionInput, actor
         at: new Date(),
       });
       await order.save({ session });
-      await audit('DELIVERY_CONFIRMED', delivery, actor, session);
+      /*
+       * A queued completion is a different kind of record and says so.
+       *
+       * `GET /admin/audit/actions` is built from the distinct actions in the
+       * collection, so this becomes a filter on the audit screen without any
+       * further plumbing: somebody reconciling a day's cash can ask for exactly
+       * the completions that were recorded away from signal, and see how long
+       * each one sat before it arrived.
+       */
+      await audit(
+        input.deliveredAt ? 'DELIVERY_CONFIRMED_OFFLINE' : 'DELIVERY_CONFIRMED',
+        delivery,
+        actor,
+        session,
+        input.deliveredAt ? { recordedAt: finishedAt, arrivedAt: new Date() } : undefined,
+      );
       await announce({
         delivery,
         event: NotificationEvent.DELIVERY_COMPLETED,

@@ -1261,23 +1261,55 @@ test('payments, delivery collections, receipts, reversal, statements and permiss
   });
   const onePixelPng =
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+  /*
+   * Finished at the shop door two hours ago, sent when the signal came back.
+   *
+   * A rider works where there is no reception, so this is the ordinary case
+   * rather than the unusual one, and the record has to say when the customer
+   * signed rather than when the handset reconnected — otherwise a collection
+   * taken at two in the afternoon is dated to four.
+   */
+  const finishedAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
   const completion = {
     version: 0,
     idempotencyKey: 'finance-delivery-complete-1',
     receiverName: 'Account Receiver',
     receiverPhone: '01700000001',
+    deliveredAt: finishedAt.toISOString(),
     deliveredPackageCount: 1,
     noPaymentCollected: false,
     collectedAmountMinor: 25,
     collectionMethod: PaymentMethod.CASH,
     paymentProof: { fileName: 'cash-proof.png', mimeType: 'image/png', base64Data: onePixelPng },
   };
-  const complete = () =>
+  const completeWith = (body: Record<string, unknown>) =>
     fetch(`${base}/api/v1/deliveries/${collectionDelivery._id}/complete`, {
       method: 'POST',
       headers: authorization(driver._id),
-      body: JSON.stringify(completion),
+      body: JSON.stringify(body),
     });
+  const complete = () => completeWith(completion);
+
+  /*
+   * **The bound, before the accepted case.** A client-supplied timestamp on a
+   * financial record is back-dating unless it is bounded, and both of these
+   * must be refused while the delivery is still completable — so a pass here
+   * cannot be an artefact of the record having already moved on.
+   */
+  const fromTheFuture = await completeWith({
+    ...completion,
+    idempotencyKey: 'finance-delivery-future',
+    deliveredAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+  });
+  assert.equal(fromTheFuture.status, 400);
+  const tooOld = await completeWith({
+    ...completion,
+    idempotencyKey: 'finance-delivery-stale',
+    deliveredAt: new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString(),
+  });
+  assert.equal(tooOld.status, 400);
+  assert.equal(await Payment.countDocuments({ deliveryId: collectionDelivery._id }), 0);
+
   const completed = await complete();
   const completedBody = (await completed.json()) as {
     meta: { payment?: { reference: string; status: string }; idempotentReplay: boolean };
@@ -1290,6 +1322,25 @@ test('payments, delivery collections, receipts, reversal, statements and permiss
   assert.equal(await PaymentAttachment.countDocuments(), 1);
   const collectionPayment = await Payment.findOne({ deliveryId: collectionDelivery._id });
   assert.ok(collectionPayment);
+
+  /*
+   * The proof and the money carry the time the rider finished, not the time the
+   * request arrived — and the audit says the completion came in queued, so
+   * somebody reconciling a day's cash can filter for exactly these and see how
+   * long each one sat. `GET /admin/audit/actions` is built from the distinct
+   * actions in the collection, so the filter needs no further plumbing.
+   */
+  const completedDelivery = await Delivery.findById(collectionDelivery._id);
+  assert.equal(completedDelivery?.proof?.deliveredAt?.toISOString(), finishedAt.toISOString());
+  assert.equal(collectionPayment.collectedAt?.toISOString(), finishedAt.toISOString());
+  const queuedAudit = await AuditLog.findOne({
+    entityId: collectionDelivery._id,
+    action: 'DELIVERY_CONFIRMED_OFFLINE',
+  });
+  assert.ok(queuedAudit, 'a queued completion is audited as one');
+  const when = queuedAudit.before as { recordedAt: Date; arrivedAt: Date };
+  assert.equal(new Date(when.recordedAt).toISOString(), finishedAt.toISOString());
+  assert.ok(new Date(when.arrivedAt).getTime() > new Date(when.recordedAt).getTime());
   const postedCollection = await fetch(`${base}/api/v1/payments/${collectionPayment._id}/post`, {
     method: 'POST',
     headers: authorization(manager._id),

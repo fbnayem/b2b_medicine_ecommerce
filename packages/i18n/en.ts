@@ -2179,8 +2179,17 @@ export const en = {
     badPackageCount: 'Enter how many boxes were handed over — at least one.',
     proofFilesFailed: 'The proof could not be prepared.',
     completionRejected: 'The delivery was not accepted.',
-    keepOpenAndRetry:
-      'The server has to confirm this. Keep this screen open, reconnect, and tap Confirm again — the same request will be retried, so it cannot post twice.',
+    completionSavedOffline:
+      'Saved on this phone, with the time you finished. It will be sent the moment there is signal, and the money is recorded as taken now — not when it arrives.',
+    /**
+     * The one delivery that genuinely cannot be finished away from signal: the
+     * code was sent to the customer's phone and only the server knows it.
+     */
+    otpNeedsSignal:
+      'This delivery needs the six-digit code, and only the server can check it. Move to where there is signal and tap Confirm again — nothing you have entered is lost.',
+    // `keepOpenAndRetry` lived here and asked a rider to stand at a counter
+    // until the network improved. A completion is now held on the phone, so
+    // there is nothing to wait for and nothing to say.
     completedWithPayment: 'Delivered. Collection {{reference}} is {{status}}.',
     completedNoPayment: 'Delivered. No money was taken.',
     title: 'Deliveries',
