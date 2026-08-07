@@ -239,6 +239,26 @@ export const en = {
     },
   },
 
+  /**
+   * A rider's home, which was a notifications button and a list of links.
+   *
+   * The words are the ones used on a round: a stop, not a "delivery task"; cash
+   * "handed in", not "remitted".
+   */
+  riderHome: {
+    loading: 'Working out where you are up to',
+    nextStop: 'Next stop',
+    stopOf: 'Stop {{position}} of {{total}}',
+    openStop: 'Open this stop',
+    roundDone: 'Every stop is done',
+    fact: {
+      unsent: '{{count}} not sent yet — the office cannot see them',
+      carrying: 'collected and not handed in',
+      remaining: '{{count}} stops left today',
+      toReturn: '{{count}} loads to take back to the warehouse',
+    },
+  },
+
   /** What each section is *for*, in the words of the person who uses it. */
   purpose: {
     orders: 'Track what has been ordered and where each order has reached.',

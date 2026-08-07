@@ -26,20 +26,12 @@ export async function startTrip(tripId: string, version: number): Promise<Trip> 
   return (await apiClient.post(`/trips/${tripId}/start`, { version })).data.data as Trip;
 }
 
-/**
- * Today's round, if there is one.
+/*
+ * `currentTrip` and `orderedStops` moved to `home/round.ts`.
  *
- * A rider has at most one round they are working. Picking it here rather than
- * on the screen means the screen has one job — showing the stops in order.
+ * Both are pure and neither belongs beside a transport module: importing them
+ * dragged in `apiClient`, and through it `react-native`, whose Flow sources the
+ * test bundler cannot parse — so every consumer had to mock a network client to
+ * ask which stop comes next. `trips.test.ts` did exactly that, and so would the
+ * home screen's own tests.
  */
-export function currentTrip(trips: readonly Trip[]): Trip | undefined {
-  return (
-    trips.find((trip) => trip.status === 'IN_PROGRESS') ??
-    trips.find((trip) => trip.status === 'PLANNED')
-  );
-}
-
-/** The stops, in the sequence the office planned them. */
-export function orderedStops(trip: Trip) {
-  return [...trip.stops].sort((left, right) => left.sequence - right.sequence);
-}

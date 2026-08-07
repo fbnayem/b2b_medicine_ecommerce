@@ -13,6 +13,7 @@ import { MOBILE_ROUTE, destinationsFor } from '../../../src/navigation/routes';
 import { colour, layout } from '../../../src/theme';
 import { useLanguage } from '../../../src/i18n/useLanguage';
 import { CustomerHome } from '../../../src/home/CustomerHome';
+import { RiderHome } from '../../../src/home/RiderHome';
 import { StaffHome } from '../../../src/home/StaffHome';
 
 const emptyUnread: UnreadNotificationSummary = {
@@ -151,28 +152,33 @@ export default function DashboardScreen() {
     </>
   );
 
+  const withSignOut = (
+    <>
+      {menu}
+      {signOut}
+    </>
+  );
+
   /*
-   * Three homes, one menu.
+   * Three applications, three homes, one menu.
    *
-   * A rider keeps the plain list: their five tabs already carry the whole of
-   * their day, and a "what is waiting on you" panel above a round they are
-   * halfway through is a second answer to a question the tab bar has answered.
+   * The rider's branch used to be the plain list, defended on the grounds that
+   * their five tabs already carried the whole of their day. The tabs carry the
+   * *lists*: they do not say where the next stop is, how much cash is in the
+   * bag, or what this handset has failed to send. `RiderHome` answers those
+   * three, and it is the same argument that removed the signpost for a pharmacy
+   * in Phase 37 and for staff in Phase 39.
    */
   if (role === UserRole.SHOP_OWNER) return <CustomerHome menu={menu} />;
-  if (role && role !== UserRole.DELIVERY_PERSON) {
-    return (
-      <StaffHome
-        role={role}
-        menu={
-          <>
-            {menu}
-            {signOut}
-          </>
-        }
-      />
-    );
-  }
+  if (role === UserRole.DELIVERY_PERSON) return <RiderHome menu={withSignOut} />;
+  if (role) return <StaffHome role={role} menu={withSignOut} />;
 
+  /*
+   * No role yet — the moment between a session restoring and the profile
+   * arriving. The menu is empty because it is built from the role, so this is
+   * the notifications button and nothing else, which is honest about how much
+   * is known.
+   */
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Pressable
@@ -191,13 +197,6 @@ export default function DashboardScreen() {
             : translatedOr(t, 'navItem.notifications', 'Notifications')}
         </Text>
       </Pressable>
-
-      {/*
-        The same menu the other two applications render under their summary. It
-        was written out twice in this file, so a destination added to one branch
-        was invisible to the other half of the roles.
-      */}
-      {menu}
       {signOut}
     </ScrollView>
   );

@@ -3,7 +3,8 @@ import { Linking, RefreshControl, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { Trip } from '@medsupply/shared-types';
 import { errorMessage } from '@medsupply/api-client';
-import { currentTrip, fetchMyTrips, orderedStops, startTrip } from '../../src/delivery/trips';
+import { fetchMyTrips, startTrip } from '../../src/delivery/trips';
+import { currentTrip, orderedStops } from '../../src/home/round';
 import { formatFinanceDate } from '../../src/finance/date';
 import { useLanguage } from '../../src/i18n/useLanguage';
 import {
