@@ -60,6 +60,14 @@ const PUSHED: Record<string, string> = {
   'purchase-orders': '/(protected)/purchase-orders',
   'purchase-order-new': '/(protected)/purchase-order-new',
   'purchase-order-detail': '/(protected)/purchase-order-detail',
+  'price-lists': '/(protected)/price-lists',
+  'price-list-new': '/(protected)/price-lists',
+  'price-list-detail': '/(protected)/price-list-detail',
+  schemes: '/(protected)/schemes',
+  // The offer screen doubles as the form for a new one: an offer is four
+  // fields, and a separate screen for four fields is a push nobody needs.
+  'scheme-new': '/(protected)/scheme-detail',
+  'scheme-detail': '/(protected)/scheme-detail',
   shops: '/(protected)/shops',
   'shop-detail': '/(protected)/shop-detail',
   'shop-ledger': '/(protected)/shop-ledger',
@@ -106,13 +114,6 @@ export const NO_MOBILE_SCREEN: ReadonlySet<string> = new Set([
   // fields including the credit terms, and a phone is the wrong place to set a
   // credit limit for somebody standing in front of you.
   'shop-new',
-  // Slice 7 — pricing
-  'price-lists',
-  'price-list-new',
-  'price-list-detail',
-  'schemes',
-  'scheme-new',
-  'scheme-detail',
   // Slice 8 — reports
   'analytics-sales',
   'analytics-returns',
