@@ -13,6 +13,7 @@ import { MOBILE_ROUTE, destinationsFor } from '../../../src/navigation/routes';
 import { colour, layout } from '../../../src/theme';
 import { useLanguage } from '../../../src/i18n/useLanguage';
 import { CustomerHome } from '../../../src/home/CustomerHome';
+import { StaffHome } from '../../../src/home/StaffHome';
 
 const emptyUnread: UnreadNotificationSummary = {
   total: 0,
@@ -102,6 +103,23 @@ export default function DashboardScreen() {
    * account menu, and two sign-out buttons two taps apart is a question about
    * whether they do the same thing.
    */
+  /*
+   * A shop owner signs out from their account screen, which is where anybody
+   * looks for it. Staff and riders have no such screen, so it stays here — one
+   * button, shared by both branches, calling the sequence that unregisters the
+   * push token while the credential authorising it is still valid.
+   */
+  const signOut = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('security.signOutThisTitle')}
+      style={styles.signOut}
+      onPress={() => void leaveSession()}
+    >
+      <Text style={styles.signOutText}>{t('common.signOut')}</Text>
+    </Pressable>
+  );
+
   const menu = (
     <>
       {groups.map(({ group, items }) => (
@@ -145,24 +163,30 @@ export default function DashboardScreen() {
     </>
   );
 
+  /*
+   * Three homes, one menu.
+   *
+   * A rider keeps the plain list: their five tabs already carry the whole of
+   * their day, and a "what is waiting on you" panel above a round they are
+   * halfway through is a second answer to a question the tab bar has answered.
+   */
   if (role === UserRole.SHOP_OWNER) return <CustomerHome menu={menu} />;
+  if (role && role !== UserRole.DELIVERY_PERSON) {
+    return (
+      <StaffHome
+        role={role}
+        menu={
+          <>
+            {menu}
+            {signOut}
+          </>
+        }
+      />
+    );
+  }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.greeting}>
-          {t('dashboard.welcome', { name: user?.firstName ?? '' })}
-        </Text>
-        {/*
-          Was a second English `Record<UserRole, string>` in this file. The
-          catalogue's is the same shape in both languages, so a new role is a
-          compile error there — which is how a private copy goes stale without
-          anybody noticing. This screen rendered `DELIVERY_PERSON` before either
-          existed.
-        */}
-        <Text style={styles.role}>{role ? t(`roles.${role}`) : ''}</Text>
-      </View>
-
       <Pressable
         style={styles.action}
         accessibilityRole="button"
@@ -181,20 +205,12 @@ export default function DashboardScreen() {
       </Pressable>
 
       {/*
-        The same menu the Shop application renders under its summary. It was
-        written out twice in this file, so a destination added to one branch
+        The same menu the other two applications render under their summary. It
+        was written out twice in this file, so a destination added to one branch
         was invisible to the other half of the roles.
       */}
       {menu}
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('security.signOutThisTitle')}
-        style={styles.signOut}
-        onPress={() => void leaveSession()}
-      >
-        <Text style={styles.signOutText}>{t('common.signOut')}</Text>
-      </Pressable>
+      {signOut}
     </ScrollView>
   );
 }

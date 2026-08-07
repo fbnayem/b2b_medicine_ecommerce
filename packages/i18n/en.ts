@@ -210,6 +210,35 @@ export const en = {
     nothingSoldYet: 'Nothing has sold in this period yet.',
   },
 
+  /**
+   * The staff home screen.
+   *
+   * Every line is a count of things with somebody at the other end of them, so
+   * the words say who is waiting rather than what the record is called. "2
+   * picking lists stopped" and not "2 discrepancies": the second is the name of
+   * a database field and the first is a storekeeper standing still.
+   */
+  staffHome: {
+    waitingOnYou: 'Waiting on you',
+    everythingElse: 'Everything else',
+    loading: 'Checking what needs you',
+    couldNotLoad: 'That could not be checked just now. Pull down to try again.',
+    nothingWaiting: 'Nothing is waiting on you',
+    nothingWaitingBody: 'Anything that needs a decision will appear here first.',
+    overdueAmount: '{{amount}} past its due date',
+    block: {
+      approvals: '{{count}} orders waiting for your decision',
+      cancellations: '{{count}} customers have asked to cancel',
+      discrepancies: '{{count}} picking lists stopped, waiting on you',
+      overdue: '{{count}} customers are behind on payment',
+      picking: '{{count}} orders to pick',
+      counting: '{{count}} stock counts still open',
+      arriving: '{{count}} purchase orders due in',
+      customers: '{{count}} customers in your area',
+      openOrders: '{{count}} of your orders are still moving',
+    },
+  },
+
   /** What each section is *for*, in the words of the person who uses it. */
   purpose: {
     orders: 'Track what has been ordered and where each order has reached.',
