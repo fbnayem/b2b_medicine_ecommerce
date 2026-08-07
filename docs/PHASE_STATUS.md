@@ -1923,22 +1923,25 @@ outstanding since Phase 36, and the coverage measurement for Manage and Rider.
 
 ### Not done
 
-**Seventeen endpoints are still reached by no client.** They are staff and
-administrator work, not customer work, and building them is a phase rather than
-a loose end:
+**Thirteen endpoints are reached by no client** — a figure corrected in Phase
+39 and hand-verified there. The list published here first said seventeen and
+named `discrepancies/resolve` among them; both were wrong, and `ASSUMPTIONS.md`
+under Phase 39 records why the matcher produced them. They are administrator
+plumbing rather than customer or floor work:
 
-|                |                                                                                                                                                                                             |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Inventory      | `GET /inventory/batches/{id}`, `POST /inventory/allocations/reserve`, `GET /purchasing/recall/batches` (the search behind the trace, which does have a screen)                              |
-| Fulfilment     | `POST /fulfilment/picking/{id}/discrepancies/resolve` — a storekeeper can _report_ a discrepancy and nobody can decide it from any screen                                                   |
-| Finance        | `GET /finance/shops/{id}/ledger`, `POST /finance/adjustments`, `GET /finance/reconciliation/{id}`, `POST /finance/reconciliation/{id}/repair`, `POST /finance/credit-reservations/backfill` |
-| Administration | `GET /admin/audit`, `GET /admin/runtime`, `POST /shops/{id}/assign-owner`, `POST /shops/{id}/assign-manager`                                                                                |
-| Notifications  | `GET /notifications/{id}/deliveries`, `POST /notifications/test`                                                                                                                            |
-| Reports        | `GET /reports/orders`, `GET /reports/stock-movements`                                                                                                                                       |
+|                |                                                                                                                                                           |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inventory      | `POST /inventory/allocations/reserve` — called internally by the approval flow; no screen should reserve stock outside an approval                        |
+| Finance        | `POST /finance/adjustments`, `GET /finance/reconciliation/{id}`, `POST /finance/reconciliation/{id}/repair`, `POST /finance/credit-reservations/backfill` |
+| Administration | `GET /admin/runtime`, `POST /shops/{id}/assign-owner`, `POST /shops/{id}/assign-manager`                                                                  |
+| Notifications  | `GET /notifications/{id}/deliveries`, `POST /notifications/test`                                                                                          |
 
-The one worth pulling forward is **`discrepancies/resolve`**: reporting a
-shortfall is wired and deciding it is not, so a picking list can be stopped by a
-discrepancy that no screen can clear.
+**Corrected in Phase 39:** `GET /inventory/batches/{id}`, `GET /reports/orders`
+and `GET /reports/stock-movements` now have mobile screens. `GET /admin/audit`,
+`GET /finance/shops/{id}/ledger`, `GET /purchasing/recall/batches` and
+`POST /fulfilment/picking/{id}/discrepancies/resolve` were **never** unreached —
+web calls all four, and the sentence above claiming a discrepancy could be
+decided from no screen was simply false.
 
 Also outstanding, unchanged: **nothing has been built into a binary** — Android
 can be built from a workstation or on EAS, iOS needs macOS or an EAS cloud build
@@ -1950,3 +1953,70 @@ on the catalogue**, which needs `GET /inventory/medicines/categories`.
 `GET /inventory/medicines/categories` for an honest catalogue filter. A store
 account, an `EAS_PROJECT_ID` and the distributor's legal details before any
 submission — the checklist is at the end of `docs/STORE_LISTINGS.md`.
+
+## Phase 39: MedSupply Manage — The Staff Application
+
+**Asked for:** plan the second application, then complete it. **Full parity**
+was chosen over a warehouse-first scope.
+
+**Started from a measurement.** A manager may reach 35 destinations in the
+shared navigation manifest; the phone offered 13. A storekeeper 8 of 16, a rep
+5 of 10 — and there was no screen file for the difference.
+
+### Shipped
+
+|                                           |                                                                                                                                           |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **The spine**                             | `MOBILE_ROUTE` replaces a filter that could only ever offer a tab. `NO_MOBILE_SCREEN` names what is missing and counts down: **40 → 2**.  |
+| **A staff home that says who is waiting** | Orders to approve, cancellation requests, stopped picking lists, overdue money — in that order, and never as a nought.                    |
+| **Counting stock from the aisle**         | The most phone-shaped job in the building, previously web-only. Offline queue, blind sheet, zero as a real answer.                        |
+| **Booking a delivery in at the door**     | Batch number and expiry read off the carton. An expired batch is refused; a short delivery has to say why.                                |
+| **Recall and the controlled register**    | A batch traced from a manufacturer's notice, with every affected shop's number a tap. The prescription return an inspector asks for.      |
+| **Customers, and their money**            | List, detail, ledger, statement — and the summary opened to a sales representative, scoped by territory in the controller.                |
+| **Pricing**                               | Price lists and free-goods offers, read by a rep at a counter and edited one line at a time.                                              |
+| **Reports**                               | Ten shared destinations on two screens. `GET /reports/orders` and `GET /reports/stock-movements` had no caller on any client.             |
+| **The blocked decisions**                 | Answering a cancellation request; deciding a discrepancy that has stopped a picking list. Both left somebody standing still.              |
+| **Administration**                        | People, the audit log, the activity feed, the medicine form, recording a payment, and the rounds — readable, and callable off.            |
+| **A delete for a staff-added address**    | Phase 38 gave staff an add and nothing else. The end-to-end suite found it by filling a shop to the twenty-address cap one run at a time. |
+
+### The judgement calls
+
+- **Two destinations stay on the desktop**, written into `NO_MOBILE_SCREEN`
+  rather than silently skipped. Creating a customer is fourteen fields including
+  their credit limit; planning a round is a drag on a monitor. Both say why in
+  the file.
+- **The price-list editor is not the desktop grid made small.** Two hundred rows
+  on a six-inch screen is a list nobody audits before pressing save.
+- **The reports say the breakdown is on the web application.** A phone that
+  pretends to be a dashboard is a phone somebody decides from without the detail.
+- **A rep sees a customer's summary and not their ledger.** The ledger is the
+  document a conversation about money is had from, and that conversation is a
+  manager's.
+
+### Corrections to Phase 38
+
+Two published claims were wrong and are fixed above: the count of endpoints
+reached by no client was seventeen and is **thirteen**, and the claim that a
+picking discrepancy could be decided from no screen was false. Both came from a
+matcher whose path regex excluded parentheses and whose segment comparison was
+strict. The corrected list was checked by hand.
+
+### Not done
+
+- **The web ledger prints a raw enum** — `type.replaceAll('_', ' ')`. Fixing it
+  needs a catalogue namespace over `LedgerTransactionType`.
+- **Thirteen endpoints are still reached by no client**, all administrator
+  plumbing: ledger adjustments, reconciliation and its repair, the
+  credit-reservation backfill, notification test sends, `GET /admin/runtime`,
+  owner and manager assignment, `POST /inventory/allocations/reserve`.
+- **The Rider application has not had a phase.** The queue generalised here is
+  the piece it shares, which makes that phase smaller rather than larger.
+- **Nothing has been built into a binary**, and the store submission checklist
+  at the end of `docs/STORE_LISTINGS.md` is untouched.
+- **No category filter on the catalogue**, which still needs
+  `GET /inventory/medicines/categories`.
+
+### Next phase dependencies
+
+The Rider application. `GET /inventory/medicines/categories`. A store account,
+an `EAS_PROJECT_ID` and the distributor's legal details before any submission.

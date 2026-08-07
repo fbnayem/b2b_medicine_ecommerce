@@ -521,3 +521,45 @@ test('the staff route keeps the one-default invariant, and records who did it', 
   assert.equal(record?.actorId?.toString(), manager._id.toString());
   assert.equal(record?.actorRole, UserRole.MANAGER);
 });
+
+test('staff can take an address off again, which they could not', async () => {
+  /*
+   * Phase 38 gave staff an add and nothing else, so a manager who mistyped an
+   * address could add another and never remove the first — a list that grew in
+   * one direction only. The browser test that adds one on every run reached the
+   * twenty-address ceiling having never undone what it did, which is how the
+   * asymmetry surfaced.
+   */
+  const created = await post(`/api/v1/shops/${shopId}/addresses`, manager, address('Temporary'));
+  assert.equal(created.status, 201);
+  const added = (await stored()).find((entry) => entry.label === 'Temporary')!;
+  assert.ok(added, 'the address to remove was not created');
+
+  const removed = await remove(`/api/v1/shops/${shopId}/addresses/${added._id}`, manager);
+  assert.equal(removed.status, 200, JSON.stringify(removed.body));
+  assert.ok(
+    !(await stored()).some((entry) => entry.label === 'Temporary'),
+    'the address is still on the shop',
+  );
+});
+
+test('removing the default promotes another, rather than leaving none', async () => {
+  // The invariant the whole address design rests on, asserted through the staff
+  // route as well as the customer's: exactly one default, always.
+  const list = await stored();
+  const current = list.find((entry) => entry.isDefault)!;
+  assert.ok(current, 'the shop had no default to remove');
+
+  const removed = await remove(`/api/v1/shops/${shopId}/addresses/${current._id}`, manager);
+  assert.equal(removed.status, 200, JSON.stringify(removed.body));
+
+  const after = await stored();
+  assert.ok(after.length > 0);
+  assert.ok(hasSoleDefault(after), 'the shop was left with two defaults or none');
+});
+
+test('a representative may not remove an address for a customer outside their area', async () => {
+  const list = await stored();
+  const refused = await remove(`/api/v1/shops/${shopId}/addresses/${list[0]!._id}`, farRep);
+  assert.equal(refused.status, 403);
+});

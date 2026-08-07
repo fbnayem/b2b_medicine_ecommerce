@@ -1,5 +1,117 @@
 # Changelog
 
+## Phase 39 — MedSupply Manage, the staff application
+
+Asked for: plan the second application, then complete it. Full parity chosen.
+
+### The measurement
+
+**A manager may reach 35 destinations in the shared navigation manifest. The
+phone offered 13.** A storekeeper 8 of 16, a sales rep 5 of 10.
+
+The mechanism was one line. The home menu was built from
+`navItemsFor(role).filter((item) => TAB_ROUTE_FILE[item.id])`, and that map
+names the seventeen files which are a **tab for somebody** — so the menu could
+only ever offer a destination that happened to be a tab, and everything reached
+by pushing was invisible. There was no screen file for any of them either.
+
+One map doing two jobs, and the second — deciding what the whole application
+offers — is not one it can do. `MOBILE_ROUTE` now decides where anything is, and
+may map several shared ids onto one screen with a parameter: seven analytics
+destinations become one screen with a chip row, without the manifest having to
+describe a layout web does not have.
+
+`NO_MOBILE_SCREEN` is the honest half — forty destinations named as missing,
+with a ceiling that only comes down. **It ends this phase at two**, and both say
+why in the file.
+
+### What a warehouse can now do from the floor
+
+|                                     |                                                                                                                                                                              |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Count stock**                     | The most phone-shaped job in the building, and it was web-only: a sheet printed, walked, pencilled and typed up afterwards. Two transcriptions and a chance to lose an hour. |
+| **Book a delivery in**              | At the goods-in door, with the batch number and the expiry read off the carton rather than written on paper for later.                                                       |
+| **Trace a batch**                   | A recall is somebody standing in front of shelves with a manufacturer's notice. It ends in telephone calls, and now the device that traces the batch makes them.             |
+| **Produce the controlled register** | What an inspector asks for, in the stockroom rather than back at a desk.                                                                                                     |
+| **See where a batch's units are**   | `GET /inventory/batches/{id}` had no caller on any client. "400 on hand" is not "400 you may sell", and the gap is where stock gets promised twice.                          |
+
+Counting goes to a **queue**, not the network. A warehouse aisle between steel
+racking is worse for signal than the lane a rider is in and the cost of losing
+the work is higher, so the rider's queue is now shared: one action per line,
+each with its own idempotency key, so a refusal loses one count and not a rack.
+
+The sheet stays blind while it is open, and **zero is a real answer** — "there
+are none on that shelf" is exactly the finding a count exists to make.
+
+### The two decisions somebody was waiting on
+
+A customer asks to cancel and the request sat on the order screen as a warning
+nobody with a phone could answer. A storekeeper reports a picking discrepancy,
+the list stops, and restarting it needed somebody to reach a desk. Both
+endpoints existed. Neither had a caller here.
+
+### A representative at a counter
+
+The three figures that decide whether to take an order — owed, overdue, credit
+left — were management-only, so the answer to "can I take this" was a telephone
+call to the office. `GET /finance/shops/{id}/summary` now admits `SALES`, scoped
+by the same territory rule the customer list and detail apply, and the check is
+in the **controller** rather than only on the route: a rep who may read _a_
+summary must not thereby read _every_ summary by pasting an identifier.
+
+The ledger, the invoices and the statement stay closed to them. Widening the
+ledger route fails three tests.
+
+### The corrections this phase owes
+
+The Phase 38 endpoint sweep was wrong twice. Its path regex excluded parentheses,
+so any template containing a call was truncated and reported unreachable; and
+segment counts were compared strictly, so `/fulfilment/picking/${id}/${path}`
+never matched a five-segment entry.
+
+Between them those invented four gaps. **The published claim that a picking
+discrepancy could be decided from no screen was false** — web has done it since
+the fulfilment phase. The corrected figure is thirteen, checked by hand rather
+than by the matcher that got it wrong twice, and `PHASE_STATUS.md` now says so.
+
+### What stayed on the desktop, and why
+
+Creating a customer is fourteen fields including their credit limit, and a phone
+is the wrong place to set one while somebody is standing in front of you.
+Planning a round is a drag on a monitor — though **calling one off**, the action
+that matters when a van breaks down, is here.
+
+Two more are shaped rather than skipped. The price-list editor finds one line
+and changes one price: two hundred rows on a six-inch screen is a list nobody
+can audit before pressing save, on the document that decides what forty
+customers are charged. The reports are a few headline figures and one list each,
+and the screen says the breakdown is on the web application.
+
+### The one the end-to-end suite found
+
+The browser test that adds a delivery address failed on the last run, and was
+right to. Tier 5 promises each test undoes what it did; this one had appended an
+address on every run since it was written, against a database seeded once.
+Twenty had accumulated, and the cap refused the twenty-first.
+
+The cap did not cause it — it made it visible. The test now removes what it
+adds, and **staff gained a delete**: Phase 38 gave them an add and nothing
+else, so a manager who mistyped an address could add another and never remove
+the first.
+
+### Found, recorded, not fixed
+
+**The web ledger prints a raw enum** — `type.replaceAll('_', ' ').toLowerCase()`,
+a database word shown to a person, which is the defect the status pills removed
+everywhere else. The mobile ledger shows the server's own description.
+
+### Numbers
+
+Mobile 298 logic tests and 33 render, from 235 and 33. API 182 unit and 238
+integration + 5 coverage, from 182 and 231. Web 334. 129 end-to-end with
+accessibility at strict zero. Typecheck clean across 14 packages, lint zero
+errors.
+
 ## Phase 38 — The documents, and the endpoints nothing reached
 
 Asked for: complete the full task — the endpoint gaps left over from Phase 37,

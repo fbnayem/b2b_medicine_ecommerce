@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { TEST_IDS, expectPageRendered, signIn } from './fixtures';
+import { E2E_PASSWORD, ROLES, TEST_IDS, expectPageRendered, signIn } from './fixtures';
 
 /**
  * Choosing a record, and making the one that is not there.
@@ -24,6 +24,32 @@ const stamp = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
 async function search(page: Page, label: RegExp, term: string, choose: RegExp) {
   await page.getByRole('combobox', { name: label }).fill(term);
   await page.getByRole('option', { name: choose }).first().click();
+}
+
+const API = process.env.E2E_API_URL ?? 'http://127.0.0.1:5100';
+
+/**
+ * Undoes an address this file created, through the API a manager would use.
+ *
+ * Signing in again rather than reaching into the page for its token: the token
+ * lives in memory in a store this test has no handle on, and a test that
+ * scrapes one is a test that breaks the day the store changes shape.
+ */
+async function removeAddress(page: Page, addressId: string) {
+  const signedIn = await page.request.post(`${API}/api/v1/auth/login`, {
+    data: { email: ROLES.manager.email, password: E2E_PASSWORD },
+  });
+  const token = (await signedIn.json()).data.accessToken as string;
+  const header = { authorization: `Bearer ${token}` };
+
+  const found = await page.request.get(`${API}/api/v1/shops?search=Shafin`, { headers: header });
+  const shopId = (await found.json()).data[0]._id as string;
+
+  const removed = await page.request.delete(
+    `${API}/api/v1/shops/${shopId}/addresses/${addressId}`,
+    { headers: header },
+  );
+  expect(removed.ok(), 'the address this test added was left behind').toBeTruthy();
 }
 
 test('a purchase order is raised with a supplier that did not exist when it started', async ({
@@ -130,6 +156,19 @@ test('a delivery address can be added while taking an order, which nothing could
   await expect(picker).toHaveValue(/^[a-f0-9]{24}$/);
   // ...and the one that was already there survived.
   await expect(picker.locator('option', { hasText: /Shafin Pharmacy/ })).toHaveCount(1);
+
+  /*
+   * And it is taken away again.
+   *
+   * Tier 5's contract is that each test undoes what it did, and this one never
+   * has: it appended an address on every run, against a database seeded once.
+   * That was invisible until a shop may keep at most twenty of them — a cap
+   * added with the customer's own address routes — at which point the test
+   * began failing on a rule it had been walking towards for several phases.
+   *
+   * The cap did not cause it. It made it visible, which is what a cap is for.
+   */
+  await removeAddress(page, await picker.inputValue());
 });
 
 test('a manager is not offered a customer they may not create', async ({ page }) => {

@@ -6,6 +6,7 @@ import {
   getShop,
   listShops,
   removeMyAddress,
+  removeShopAddress,
   updateMyAddress,
   updateShop,
   assignOwner,
@@ -83,6 +84,11 @@ router.get(
  * counter, which is exactly where an address turns out to be missing.
  */
 router.post('/:id/addresses', requireRole(shopReaders as UserRole[]), addShopAddress);
+router.delete(
+  '/:id/addresses/:addressId',
+  requireRole(shopReaders as UserRole[]),
+  removeShopAddress,
+);
 
 router.patch('/:id', requireRole(adminRoles as UserRole[]), updateShop);
 router.post('/:id/assign-owner', requireRole(adminRoles as UserRole[]), assignOwner);

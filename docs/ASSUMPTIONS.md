@@ -880,8 +880,12 @@ A segment-aware pass — where `{}` on either side matches one segment, and a re
 is satisfied wherever its path appears because both clients fetch through hooks
 that hide the verb — gives **22**, of which four are infrastructure (`/health/*`,
 `/metrics`, `/docs/openapi.json`) and one is a false negative (`/auth/refresh`,
-built from a base-URL variable). The remaining seventeen are staff and
-administrator endpoints, listed in `PHASE_STATUS.md`.
+built from a base-URL variable). The remaining seventeen were reported as staff and
+administrator endpoints. **Four of those seventeen were matcher artefacts** —
+`admin/audit`, `finance/shops/{}/ledger`, `purchasing/recall/batches` and
+`fulfilment/picking/{}/discrepancies/resolve` are all called by web. Phase 39
+checked the list by hand and corrected it to thirteen; the reasoning is under
+its own heading below.
 
 **The looser rule is for auditing, not for gating.** `callers.test.ts` keeps the
 strict method check, because the near-miss it was built for — `GET /returns`
@@ -966,3 +970,127 @@ data-deletion route, because a distributor holding a trade customer's purchase
 records has record-keeping duties a delete button cannot override; and keeping
 Manage and Rider on private or internal tracks, because a public listing for
 either invites installs from people who then cannot sign in.
+
+## Phase 39 — MedSupply Manage, the staff application
+
+### The measurement, and why it was findable
+
+A manager may reach 35 destinations in the shared navigation manifest; the
+mobile home offered 13. A storekeeper 8 of 16, a sales rep 5 of 10.
+
+The mechanism was one line. `dashboard.tsx` built its menu from
+`navItemsFor(role).filter((item) => TAB_ROUTE_FILE[item.id])`, and that map
+names the seventeen files which are a **tab for somebody**. So the menu could
+only ever offer a destination that happened to be a tab, and everything reached
+by pushing was invisible — and had no screen file either.
+
+One map doing two jobs. `TAB_ROUTE_FILE` goes back to naming tab files;
+`src/navigation/routes.ts` decides where anything is, and may map several shared
+ids onto one screen with a parameter — which is how seven analytics
+destinations become one screen with a chip row without the manifest having to
+describe a layout web does not have.
+
+**`NO_MOBILE_SCREEN` is the honest half.** Forty destinations named as missing
+with a ceiling that only comes down, rather than a map with dead routes in it.
+Pushing a route with no file behind it is a blank screen with a back button,
+which reads as a broken application rather than a missing feature. It ends this
+phase at **two**.
+
+### The two corrections this phase owes
+
+The Phase 38 endpoint sweep was wrong twice, and both are fixed in
+`PHASE_STATUS.md`:
+
+- The path-literal regex excluded `(` and `)`, so any template containing a call
+  was truncated and reported unreachable.
+- Segment counts were compared strictly, so a client writing
+  `/fulfilment/picking/${id}/${path}` never matched a five-segment
+  specification entry.
+
+Between them those produced four false gaps. The published claim that a picking
+discrepancy could be decided from no screen was **false** — `FulfilmentWork.tsx`
+has done it since the fulfilment phase. The corrected figure is thirteen, and
+every entry was checked by hand rather than by the matcher that got it wrong
+twice.
+
+### What belongs on a phone, and what does not
+
+Full parity was the instruction and full parity is what was built, with two
+exceptions written into `NO_MOBILE_SCREEN` rather than silently skipped:
+
+- **Creating a customer** is fourteen fields including the credit limit, the
+  payment terms, the discount and the price list. A phone is the wrong place to
+  set somebody's credit limit while they are standing in front of you. Reading,
+  opening and suspending a customer are all here.
+- **Planning a round** means choosing from a list of plannable deliveries and
+  putting them in an order — a drag on a monitor. The rounds already planned are
+  readable, and **calling one off**, the action that matters when a van breaks
+  down, is on the list screen.
+
+Two more are shaped rather than skipped. The **price-list editor** finds one
+line and changes one price, and the whole list is never on screen at once: two
+hundred rows on a six-inch screen is a list nobody can audit before pressing
+save, on the document that decides what forty customers are charged. The
+**reports** are reduced to a few headline figures and one list each, and the
+screen says the breakdown is on the web application — a phone that pretends to
+be a dashboard is a phone somebody decides from without the detail.
+
+### Counting stock
+
+- **Every count goes to a queue, not to the network.** A warehouse aisle between
+  steel racking is worse for reception than the lane a rider is in, and the cost
+  of losing the work is an hour rather than one tap repeated. The rider's queue
+  moved to `src/offline/queueCore.ts` and gained a `kind`; one action per line,
+  each with its own idempotency key, so a refusal loses one count and not a rack.
+- **The sheet stays blind while it is open.** The server strips `systemQuantity`
+  until counting finishes. The screen agrees with that and — more usefully —
+  never keeps an expected figure it saw earlier in state, which is how a screen
+  quietly un-blinds a count the server correctly protected.
+- **Zero is a real answer.** "There are none on that shelf" is exactly the
+  finding a physical count exists to make, so an empty field and a nought are
+  different things and only the first is a problem. It is why `countedQuantity`
+  is `null` until counted.
+
+### A representative and a customer's money
+
+`GET /finance/shops/{shopId}/summary` gains `SALES`, scoped by the same
+`territoryPermits` rule `listShops`, `getShop` and `addShopAddress` apply. The
+check is in the **controller** and not only on the route, because the route
+knows the role and only the controller knows the customer: a rep who may read
+_a_ summary must not thereby read _every_ summary by pasting an identifier.
+
+The ledger, the invoices and the statement stay management-only. Those are the
+documents a conversation about money is had from, and that conversation is a
+manager's.
+
+### The one the end-to-end suite found
+
+The browser test that adds a delivery address while taking an order **failed on
+the last run of this phase**, and it was right to. Tier 5's contract is that
+each test undoes what it did; this one had appended an address on every run
+since it was written, against a database seeded once. Twenty had accumulated on
+Shafin Pharmacy, and the twenty-address cap refused the twenty-first.
+
+The cap did not cause it. It made it visible, which is what a cap is for. Two
+things came out of it:
+
+- **The test now removes what it added**, signing in again through the API
+  rather than scraping the page's token — that token lives in a store the test
+  has no handle on, and scraping it breaks the day the store changes shape.
+- **Staff gained a delete for a customer's delivery address.** Phase 38 gave
+  them an add and nothing else, so a manager who mistyped one could add another
+  and never remove the first: a list that grew in one direction only. The
+  removal logic is shared with the customer's own route, because what happens to
+  the **default** when it is the address being removed must not be two answers.
+
+### Found and recorded, not fixed
+
+- **The web ledger prints a raw enum.** `CustomerLedger.tsx` renders
+  `entry.type.replaceAll('_', ' ').toLowerCase()` — a database word shown to a
+  person, which is the defect the status pills removed everywhere else. The
+  mobile ledger shows the server's own `description`. Fixing web needs a
+  catalogue namespace over `LedgerTransactionType`.
+- **The purchase-order form does not seed the unit cost from the catalogue.**
+  `customerMoney.test.ts` refused it, correctly, for a reason that survives this
+  being a staff screen: the catalogue cost is what we paid last time and the
+  field asks what we are paying now.

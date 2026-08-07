@@ -1657,6 +1657,13 @@ export const OPERATIONS: Operation[] = [
     body: DeliveryAddressSchema,
   },
   {
+    method: 'delete',
+    path: '/api/v1/shops/{id}/addresses/{addressId}',
+    summary: 'Remove a delivery address from a named customer',
+    tag: 'Shops',
+    roles: [...MANAGEMENT, UserRole.SALES],
+  },
+  {
     method: 'get',
     path: '/api/v1/inventory/medicines/{id}',
     summary: 'One medicine, with its current availability',

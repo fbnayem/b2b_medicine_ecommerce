@@ -419,39 +419,74 @@ export const updateMyAddress = async (req: AuthRequest, res: Response, next: Nex
   }
 };
 
+/**
+ * Take one address off a shop, whoever asked.
+ *
+ * Shared by the customer's own route and the staff one, because what happens to
+ * the **default** when it is the address being removed must not be two answers.
+ *
+ * Removed, not refused, even when it is the last one. Orders already placed
+ * keep their own copy — `deliveryAddressSnapshot` is written at submission — so
+ * deleting this record cannot change where an order in flight is going. A shop
+ * left with none is told plainly at checkout that it needs one, which is the
+ * same state a shop registered five minutes ago is in.
+ */
+async function removeAddress(req: AuthRequest, res: Response, shop: ShopDocument) {
+  const index = shop.deliveryAddresses.findIndex(
+    (address) => String(address._id) === req.params.addressId,
+  );
+  if (index < 0) {
+    return res
+      .status(404)
+      .json({ error: { code: 'NOT_FOUND', message: 'No such delivery address' } });
+  }
+
+  const before = shop.deliveryAddresses[index]!.toObject();
+  shop.deliveryAddresses.splice(index, 1);
+  const chosen = soleDefaultIndex(shop.deliveryAddresses);
+  shop.deliveryAddresses.forEach((entry, position) => {
+    entry.isDefault = position === chosen;
+  });
+  await shop.save();
+
+  await auditAddress(req, 'SHOP_ADDRESS_REMOVED', shop._id, { before });
+  return res.json(addressList(shop));
+}
+
 export const removeMyAddress = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const shop = await ownShop(req);
     if (!shop) return noShop(res);
+    return await removeAddress(req, res, shop);
+  } catch (error) {
+    next(error);
+  }
+};
 
-    const index = shop.deliveryAddresses.findIndex(
-      (address) => String(address._id) === req.params.addressId,
-    );
-    if (index < 0) {
-      return res
-        .status(404)
-        .json({ error: { code: 'NOT_FOUND', message: 'No such delivery address' } });
+/**
+ * And the staff equivalent, which completes a pair that was half-built.
+ *
+ * Phase 38 gave staff `POST /shops/:id/addresses` and nothing else, so a
+ * manager who mistyped an address could add another and never remove the first
+ * — and a shop's list grew in one direction only. The twenty-address cap made
+ * that visible rather than causing it: the browser test that adds one on every
+ * run reached the ceiling, having never undone what it did.
+ */
+export const removeShopAddress = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const shop = await Shop.findById(req.params.id);
+    if (!shop) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Shop not found' } });
     }
-
-    /*
-     * Removed, not refused, even when it is the last one.
-     *
-     * Orders already placed keep their own copy — `deliveryAddressSnapshot` is
-     * written at submission — so deleting this record cannot change where an
-     * order in flight is going. A shop left with none is told plainly at
-     * checkout that it needs one, which is the same state a shop registered
-     * five minutes ago is in.
-     */
-    const before = shop.deliveryAddresses[index]!.toObject();
-    shop.deliveryAddresses.splice(index, 1);
-    const chosen = soleDefaultIndex(shop.deliveryAddresses);
-    shop.deliveryAddresses.forEach((entry, position) => {
-      entry.isDefault = position === chosen;
-    });
-    await shop.save();
-
-    await auditAddress(req, 'SHOP_ADDRESS_REMOVED', shop._id, { before });
-    res.json(addressList(shop));
+    if (
+      req.user!.role === UserRole.SALES &&
+      !territoryPermits(req.user!.territories, shop.territory)
+    ) {
+      return res.status(403).json({
+        error: { code: 'SHOP_OUTSIDE_TERRITORY', message: 'That customer is not in your area' },
+      });
+    }
+    return await removeAddress(req, res, shop);
   } catch (error) {
     next(error);
   }

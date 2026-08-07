@@ -577,3 +577,75 @@ which about sixty were artefacts of paths built from variables. The committed
 gate stays strict and explicit — a list of capabilities somebody wrote down —
 precisely because the general version is either too loose to gate with or too
 strict to believe. See `ASSUMPTIONS.md`.
+
+## Phase 39 coverage — MedSupply Manage
+
+- `navigation/routes.test.ts`: the phase's central gate. **Every destination the
+  shared manifest permits a role is either reachable on this client or named in
+  `NO_MOBILE_SCREEN`.** It is the defect `callers.test.ts` catches at the
+  endpoint layer, one level up: a screen can exist on the server and on web, be
+  permitted to a role, and have no way in on the phone — silently, because an
+  unwritten screen has nothing to fail. Also checks every route names a file
+  that exists, that both maps use ids the manifest actually has, and that the
+  waiver list only shrinks.
+  _Planted twice. Deleting `MOBILE_ROUTE['collections']` named the destination
+  and the three roles that lose it. Restoring the `TAB_ROUTE_FILE` filter on the
+  menu gave `expected 13 to be greater than 13` — the original figure, exactly._
+- `home/waiting.test.ts`: what the staff home shows and in what order. The order
+  is a judgement — people who are blocked before money nobody can collect today
+  — so it lives where it can be argued with. **No noughts**: a screen listing "0
+  orders to approve" teaches somebody to stop reading it, and the next number
+  they skip is a real one.
+  _Planted by showing zeroes: red._
+- `offline/queueCore.test.ts`: the queue two applications now share. The
+  idempotency key is the whole safety property — a flush that timed out _after_
+  the server committed confirms a delivery twice, or posts fourteen counted
+  units as twenty-eight. Also asserts one refusal does not hold up the thirteen
+  behind it, and that a rider's actions and a storekeeper's count sheets do not
+  count each other.
+  _Planted by fixing the key: two tests red._
+- `warehouse/stocktakes.test.ts`: **zero is a real answer**, and the blind count
+  stays blind. A rack counted as empty is counted; a progress bar that
+  disagreed would send somebody back to count it again.
+  _Planted by revealing `systemQuantity` while counting: two tests red._
+- `warehouse/purchasing.test.ts`: the goods-in door. Two rules are why the
+  screen exists, and both are about weeks later — an expired batch received into
+  saleable stock is picked for a pharmacy, and a short delivery accepted without
+  a reason stops being a conversation with a supplier and becomes what looks
+  like a counting error.
+  _Planted by accepting an expired batch: red._
+- `pricing/api.test.ts`: `withLine` keeps every other line exactly as it was.
+  `PATCH /pricing/price-lists/{id}` replaces the **whole** set, so a helper that
+  returned only the edited line would replace a two-hundred-line list with one
+  and drop every customer on it back to default pricing. Also pins the taka →
+  poisha conversion: `12.005 * 100` is 1200.4999999999998 in IEEE 754.
+  _Planted by returning only the edited line: two tests red._
+- `financeIntegration.test.ts` grows by four: a rep reads the summary for a
+  customer in their own territory, is refused one outside it, and is refused the
+  ledger, the invoices and the statement for both — while a manager still reads
+  all of them.
+  _Planted by adding `SALES` to the ledger route: red._
+- `api/callers.test.ts` grows from 22 entries to **35**, adding the warehouse,
+  counter and goods-in capabilities. Four of the new ones had no caller on any
+  client: `GET /inventory/batches/{id}`, `GET /reports/orders`,
+  `GET /reports/stock-movements` and `GET /activity`.
+  _Planted by pointing the order funnel at `/reports/overview`: the failure named
+  the capability, "see how many submitted orders actually become deliveries"._
+
+### The tier-5 contract, enforced by a cap
+
+`pickers.spec.ts` adds a delivery address while taking an order, and had never
+removed it — against a database seeded once. Twenty accumulated and the
+twenty-address cap refused the twenty-first, which is the first time a test that
+had been quietly violating its own tier contract for phases actually said so.
+It now signs in again through the API and deletes what it created; the failure
+message is _the address this test added was left behind_.
+
+### A note on the two modules that name their own requests
+
+`reports/api.ts` and `documents/files.ts` each write `apiClient.get('/literal')`
+per capability rather than handing a path to a shared fetcher. That is not
+style. `callers.test.ts` reads the HTTP method sitting immediately before a path
+literal, so a shared fetcher would quietly exempt every one of those endpoints
+from the only gate that notices when a capability loses its caller. Both were
+written the tidy way first and both were corrected when the gate went red.
