@@ -2,14 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { Text, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { RealtimeEvent, UserRole, type UnreadNotificationSummary } from '@medsupply/shared-types';
-import { NAV_GROUP_LABEL, navItemsFor } from '@medsupply/navigation';
+import { NAV_GROUP_LABEL } from '@medsupply/navigation';
 import { translatedOr } from '@medsupply/i18n';
 import { useAuthStore } from '../../../src/store/useAuth';
 import { leaveSession } from '../../../src/store/leave';
 import { getFinanceNavigation } from '../../../src/finance/navigation';
 import { fetchUnreadSummary } from '../../../src/notifications/api';
 import { onRealtime } from '../../../src/notifications/realtime';
-import { TAB_ROUTE_FILE } from '../../../src/navigation/tabs';
+import { MOBILE_ROUTE, destinationsFor } from '../../../src/navigation/routes';
 import { colour, layout } from '../../../src/theme';
 import { useLanguage } from '../../../src/i18n/useLanguage';
 import { CustomerHome } from '../../../src/home/CustomerHome';
@@ -71,9 +71,16 @@ export default function DashboardScreen() {
   );
 
   const role = user?.role as UserRole | undefined;
-  const destinations = role
-    ? navItemsFor(role).filter((item) => item.id !== 'dashboard' && TAB_ROUTE_FILE[item.id])
-    : [];
+  /*
+   * Everything this role may open, not everything that happens to be a tab.
+   *
+   * This filtered through `TAB_ROUTE_FILE` — the seventeen files that are a tab
+   * for *somebody* — so the menu could only offer a destination that was a tab,
+   * and every screen reached by pushing was invisible. A manager permitted 35
+   * destinations was shown 13, a storekeeper 8 of 16. `src/navigation/routes.ts`
+   * carries the reasoning and the list of what is still missing.
+   */
+  const destinations = role ? destinationsFor(role) : [];
   const financeLinks = getFinanceNavigation(role);
 
   const groups = GROUPS.map((group) => ({
@@ -107,7 +114,7 @@ export default function DashboardScreen() {
               key={item.id}
               accessibilityRole="button"
               style={styles.secondaryAction}
-              onPress={() => router.push(`/(protected)/(tabs)/${TAB_ROUTE_FILE[item.id]}` as never)}
+              onPress={() => router.push(MOBILE_ROUTE[item.id] as never)}
             >
               <Text style={styles.secondaryActionText}>
                 {translatedOr(t, `navItem.${item.id}`, item.label)}
