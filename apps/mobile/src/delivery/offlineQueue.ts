@@ -4,9 +4,9 @@ import { apiClient } from '../api/client';
 import {
   addUniqueAction,
   createQueuedAction,
-  processDeliveryQueue,
-  type DeliveryQueuedAction,
-} from './queueCore';
+  processQueue,
+  type QueuedAction,
+} from '../offline/queueCore';
 
 const CACHE_KEY = 'medsupply.delivery.assigned.v1';
 const QUEUE_KEY = 'medsupply.delivery.actions.v1';
@@ -44,7 +44,7 @@ export function loadCachedDeliveries() {
 }
 
 export function loadDeliveryQueue() {
-  return readJson<DeliveryQueuedAction[]>(QUEUE_KEY, []);
+  return readJson<QueuedAction[]>(QUEUE_KEY, []);
 }
 
 export async function queueDeliveryAction(
@@ -57,7 +57,7 @@ export async function queueDeliveryAction(
     throw new Error('This action requires an immediate server confirmation');
   }
   const queue = await loadDeliveryQueue();
-  const action = createQueuedAction(deliveryId, path, version, body);
+  const action = createQueuedAction('delivery', deliveryId, path, version, body);
   const next = addUniqueAction(queue, action);
   await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(next));
   return action;
@@ -65,8 +65,8 @@ export async function queueDeliveryAction(
 
 export async function syncDeliveryQueue() {
   const queue = await loadDeliveryQueue();
-  const result = await processDeliveryQueue(queue, async (action) => {
-    await apiClient.post(`/deliveries/${action.deliveryId}/${action.path}`, action.body);
+  const result = await processQueue(queue, async (action) => {
+    await apiClient.post(`/deliveries/${action.subjectId}/${action.path}`, action.body);
   });
   await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(result.remaining));
   return result;

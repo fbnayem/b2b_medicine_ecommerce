@@ -4,8 +4,11 @@ import {
   DeliveryStatus,
   OrderStatus,
   PaymentStatus,
+  PurchaseOrderStatus,
   ReturnStatus,
   ShopStatus,
+  StocktakeStatus,
+  TripStatus,
   UserStatus,
 } from '@medsupply/shared-types';
 import { amber, blue, green, neutral, red } from '@medsupply/design-tokens';
@@ -149,6 +152,35 @@ const USER: Record<UserStatus, BadgeTone> = {
   [UserStatus.SUSPENDED]: 'danger',
 };
 
+/*
+ * A count in progress is `info` and not `warning`: somebody is doing the job,
+ * and nothing is wrong. `REVIEW` is the one that wants a manager's eye, because
+ * a sheet sits there until a variance is accepted.
+ */
+const STOCKTAKE: Record<StocktakeStatus, BadgeTone> = {
+  [StocktakeStatus.COUNTING]: 'info',
+  [StocktakeStatus.REVIEW]: 'warning',
+  [StocktakeStatus.POSTED]: 'success',
+  [StocktakeStatus.ABANDONED]: 'neutral',
+};
+
+const PURCHASE_ORDER: Record<PurchaseOrderStatus, BadgeTone> = {
+  [PurchaseOrderStatus.DRAFT]: 'neutral',
+  [PurchaseOrderStatus.ISSUED]: 'info',
+  // Part-received is the one worth a colour: something is outstanding against
+  // an order somebody has stopped thinking about.
+  [PurchaseOrderStatus.PARTIALLY_RECEIVED]: 'warning',
+  [PurchaseOrderStatus.RECEIVED]: 'success',
+  [PurchaseOrderStatus.CANCELLED]: 'neutral',
+};
+
+const TRIP: Record<TripStatus, BadgeTone> = {
+  [TripStatus.PLANNED]: 'info',
+  [TripStatus.IN_PROGRESS]: 'brand',
+  [TripStatus.COMPLETED]: 'success',
+  [TripStatus.CANCELLED]: 'neutral',
+};
+
 const TONES = {
   order: ORDER,
   delivery: DELIVERY,
@@ -156,6 +188,9 @@ const TONES = {
   return: RETURN,
   shop: SHOP,
   user: USER,
+  stocktake: STOCKTAKE,
+  purchaseOrder: PURCHASE_ORDER,
+  trip: TRIP,
 } as const;
 
 /** The catalogue namespace holding each kind's words. */
@@ -166,6 +201,9 @@ const NAMESPACE = {
   return: 'returnStatus',
   shop: 'shopStatus',
   user: 'userStatus',
+  stocktake: 'stocktakeStatus',
+  purchaseOrder: 'purchaseOrderStatus',
+  trip: 'tripStatus',
 } as const;
 
 export type StatusKind = keyof typeof TONES;

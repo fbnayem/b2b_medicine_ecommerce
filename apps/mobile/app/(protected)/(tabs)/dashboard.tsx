@@ -90,24 +90,12 @@ export default function DashboardScreen() {
   })).filter((entry) => entry.items.length > 0);
 
   /*
-   * A shop owner opens this to ask three questions — what do I owe, what is
-   * coming, and can I have that again — and got a list of buttons instead. The
-   * menu is still needed, so it is handed to `CustomerHome` and rendered under
-   * the summary rather than replaced.
-   *
-   * Only the Shop application ever takes that branch, because a build admits
-   * one set of roles.
-   *
-   * **No sign-out in here any more.** It used to live at the bottom of this
-   * screen because there was nowhere else to put it; a shop owner now has an
-   * account menu, and two sign-out buttons two taps apart is a question about
-   * whether they do the same thing.
-   */
-  /*
    * A shop owner signs out from their account screen, which is where anybody
-   * looks for it. Staff and riders have no such screen, so it stays here — one
-   * button, shared by both branches, calling the sequence that unregisters the
-   * push token while the credential authorising it is still valid.
+   * looks for it — two sign-out buttons two taps apart is a question about
+   * whether they do the same thing. Staff and riders have no such screen, so
+   * the button stays here, shared by both branches, calling the sequence that
+   * unregisters the push token while the credential authorising it is still
+   * valid.
    */
   const signOut = (
     <Pressable

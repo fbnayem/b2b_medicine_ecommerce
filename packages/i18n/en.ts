@@ -2846,6 +2846,35 @@ export const en = {
     abandonFailed: 'That count could not be abandoned.',
     abandonedBecause: 'Abandoned: {{reason}}',
     cannotPostYet: 'This count is still being counted.',
+
+    /*
+     * Counting from a phone, in the aisle, rather than from the web sheet.
+     *
+     * Everything above is shared with that screen — one vocabulary for one
+     * idea. These are the words only a handset needs: what is held on it, and
+     * what is wrong with a number somebody typed one-handed.
+     */
+    showing: 'Showing',
+    filterOpen: 'Being counted',
+    filterReview: 'Waiting to be posted',
+    filterAll: 'All',
+    openConfirm: 'Start counting',
+    openSheet: 'Open count {{reference}}',
+    locationRequiredHint: 'The aisle, rack or room you are standing in — "Aisle C", "Cold room".',
+    locationRequired: 'Say which place you are counting.',
+    batchAndPlace: 'Batch {{batch}} · {{place}}',
+    notCountedYet: 'Not counted yet. Zero is a real answer.',
+    alreadyCounted: 'Counted: {{count}}. Recording again replaces it.',
+    recordCount: 'Record this count',
+    recordCountFor: 'Record the count for {{brand}}',
+    heldOnThisPhone: '{{count}} counts are on this phone and not yet sent',
+    stillWaiting:
+      '{{count}} counts have not reached the server yet. Try again where there is a signal.',
+    countFailed: 'That count could not be recorded.',
+    countRequired: 'Type how many there are. Zero is a real answer.',
+    wholeUnitsOnly: 'Count whole units.',
+    countTooLarge: 'That is more than a count sheet can hold. Check the number.',
+    actionFailed: 'That could not be done.',
   },
 
   warehouses: {

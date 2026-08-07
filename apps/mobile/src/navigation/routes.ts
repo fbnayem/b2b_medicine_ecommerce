@@ -42,6 +42,12 @@ const PUSHED: Record<string, string> = {
   // Catalogue
   'medicine-detail': '/(protected)/medicine-detail',
   checkout: '/(protected)/checkout',
+  stocktakes: '/(protected)/stocktakes',
+  // Opening a count is a prompt on the list rather than a screen of its own: a
+  // storekeeper standing in an aisle types where they are, and that is the
+  // whole form.
+  'stocktake-new': '/(protected)/stocktakes',
+  'stocktake-detail': '/(protected)/stocktake-detail',
 
   // Money
   'payment-detail': '/(protected)/payment-detail',
@@ -78,10 +84,6 @@ export const MOBILE_ROUTE: Record<string, string> = {
  * is a mobile gap, not a product gap.
  */
 export const NO_MOBILE_SCREEN: ReadonlySet<string> = new Set([
-  // Slice 3 — stocktaking
-  'stocktakes',
-  'stocktake-new',
-  'stocktake-detail',
   // Slice 4 — goods in
   'suppliers',
   'supplier-new',

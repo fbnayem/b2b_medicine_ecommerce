@@ -2591,6 +2591,28 @@ export const bn: Catalogue = {
     abandonFailed: 'গণনাটি বাতিল করা যায়নি।',
     abandonedBecause: 'বাতিল: {{reason}}',
     cannotPostYet: 'এই গণনা এখনও চলছে।',
+
+    showing: 'দেখাচ্ছে',
+    filterOpen: 'গণনা চলছে',
+    filterReview: 'পোস্টের অপেক্ষায়',
+    filterAll: 'সব',
+    openConfirm: 'গণনা শুরু করুন',
+    openSheet: '{{reference}} গণনাটি খুলুন',
+    locationRequiredHint: 'আপনি যেখানে দাঁড়িয়ে আছেন — "আইল সি", "কোল্ড রুম"।',
+    locationRequired: 'কোন জায়গা গুনছেন তা লিখুন।',
+    batchAndPlace: 'ব্যাচ {{batch}} · {{place}}',
+    notCountedYet: 'এখনও গোনা হয়নি। শূন্যও একটি সত্যিকারের উত্তর।',
+    alreadyCounted: 'গোনা হয়েছে: {{count}}। আবার লিখলে আগেরটি বদলে যাবে।',
+    recordCount: 'এই গণনা লিখে রাখুন',
+    recordCountFor: '{{brand}}-এর গণনা লিখে রাখুন',
+    heldOnThisPhone: '{{count}}টি গণনা এই ফোনে আছে, এখনও পাঠানো হয়নি',
+    stillWaiting:
+      '{{count}}টি গণনা এখনও সার্ভারে পৌঁছায়নি। নেটওয়ার্ক আছে এমন জায়গায় আবার চেষ্টা করুন।',
+    countFailed: 'গণনাটি লেখা যায়নি।',
+    countRequired: 'কতটি আছে লিখুন। শূন্যও একটি সত্যিকারের উত্তর।',
+    wholeUnitsOnly: 'পূর্ণ সংখ্যায় গুনুন।',
+    countTooLarge: 'একটি গণনা শিটে এত ধরে না। সংখ্যাটি দেখে নিন।',
+    actionFailed: 'কাজটি করা যায়নি।',
   },
 
   warehouses: {
