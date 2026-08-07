@@ -60,6 +60,17 @@ const PUSHED: Record<string, string> = {
   'purchase-orders': '/(protected)/purchase-orders',
   'purchase-order-new': '/(protected)/purchase-order-new',
   'purchase-order-detail': '/(protected)/purchase-order-detail',
+  // Seven shared ids, one screen with a chip row. A phone shows one report
+  // at a time, and `MOBILE_ROUTE` exists so the manifest does not have to
+  // pretend otherwise.
+  'analytics-sales': '/(protected)/analytics-report?kind=sales',
+  'analytics-returns': '/(protected)/analytics-report?kind=returns',
+  'analytics-inventory': '/(protected)/analytics-report?kind=inventory',
+  'analytics-deliveries': '/(protected)/analytics-report?kind=deliveries',
+  'analytics-receivables': '/(protected)/analytics-report?kind=receivables',
+  'report-outstanding': '/(protected)/finance-report?kind=outstanding',
+  'report-overdue': '/(protected)/finance-report?kind=overdue',
+  'report-collections': '/(protected)/finance-report?kind=collections',
   'price-lists': '/(protected)/price-lists',
   'price-list-new': '/(protected)/price-lists',
   'price-list-detail': '/(protected)/price-list-detail',
@@ -114,15 +125,6 @@ export const NO_MOBILE_SCREEN: ReadonlySet<string> = new Set([
   // fields including the credit terms, and a phone is the wrong place to set a
   // credit limit for somebody standing in front of you.
   'shop-new',
-  // Slice 8 — reports
-  'analytics-sales',
-  'analytics-returns',
-  'analytics-inventory',
-  'analytics-deliveries',
-  'analytics-receivables',
-  'report-outstanding',
-  'report-overdue',
-  'report-collections',
   // Slice 9 — administration, round planning, the remaining forms
   'trips',
   'trip-new',

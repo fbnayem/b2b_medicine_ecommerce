@@ -1725,6 +1725,55 @@ export const en = {
     bucket90Plus: '90+',
   },
 
+  /**
+   * The reports as a phone shows them: a few headline figures and one list.
+   *
+   * Not the desktop dashboard made small. Seven analytics destinations and
+   * three finance ones land on two screens here, and the screen says out loud
+   * that the breakdown is on the web application — a phone that pretends to be
+   * a dashboard is a phone somebody decides from without the detail.
+   */
+  reportsMobile: {
+    whichReport: 'Which report',
+    loading: 'Working it out',
+    couldNotLoad: 'That report could not be worked out just now.',
+    breakdown: 'Broken down',
+    nothingInPeriod: 'Nothing happened in this period.',
+    nothingHere: 'Nothing to show.',
+    fullDetailOnWeb: 'This is the shape of it. The full breakdown is on the web application.',
+    daysLate: 'Days late',
+    kind: {
+      sales: 'Sales',
+      orders: 'Orders',
+      returns: 'Returns',
+      inventory: 'Stock',
+      deliveries: 'Deliveries',
+      receivables: 'Who owes',
+      movements: 'Stock moves',
+    },
+    finance: {
+      outstanding: 'Everything unpaid',
+      overdue: 'Past due',
+      collections: 'What came in',
+    },
+    net: 'Sold, after returns',
+    gross: 'Sold, before anything',
+    invoices: 'Invoices issued',
+    approvalRate: 'Approved of submitted',
+    deliveryRate: 'Delivered of invoiced',
+    stockValue: 'Stock is worth',
+    batches: 'Batches',
+    units: 'Units on the shelf',
+    onTime: 'On time',
+    delivered: 'Delivered',
+    failed: 'Failed',
+    credited: 'Credited back',
+    returnRate: 'Returned, of sales',
+    unitsBack: 'Units returned',
+    owedInTotal: 'Owed in total',
+    movements: 'Movements recorded',
+  },
+
   analytics: {
     title: 'How the business is doing',
     subtitle: 'Sales, orders, deliveries, returns and what is owed, for the period you choose.',
