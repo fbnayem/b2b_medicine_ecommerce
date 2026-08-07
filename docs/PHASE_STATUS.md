@@ -1,5 +1,52 @@
 # Phase Status
 
+## Phase 40: MedSupply Rider — The Delivery Application
+
+**Status:** COMPLETED
+
+The third and last of the three applications. Unlike Phases 37–39 this was not a
+parity phase: a `DELIVERY_PERSON` may reach 12 destinations in the shared
+manifest and all twelve already had a route and a screen file. What this phase
+found was underneath that.
+
+### Completed work
+
+|                                       |                                                                                                                                                                                                                                                                            |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The permission gate**               | `navigation/permissions.test.ts`. For every destination, every role permitted to see it must be able to make at least one of the `GET` requests the screen opens with — read from the screen and from the exact functions it imports, checked against `docs/openapi.json`. |
+| **The `collections` mismap**          | A management-only id pointed at the rider's own screen, so every manager tapping "Rider collections" got a 403 from an endpoint only a delivery person may call. Introduced in Phase 39; `collection-review.tsx` existed and was unreferenced.                             |
+| **Nine duplicate menu entries**       | Two menus feed one home screen and could not collide until Phase 39 removed the tab filter. `getFinanceNavigation` now carries only what the manifest has no id for.                                                                                                       |
+| **Sixteen rider capabilities named**  | Both busiest rider screens assembled their path from a variable, exempting the whole of a rider's day from `callers.test.ts`. `delivery/actions.ts` and the step table in `returns/api.ts` write one literal each.                                                         |
+| **Offline completion, cash included** | `deliveredAt` on the completion, bounded; proof files on `Paths.document`; the queue holds paths. `DELIVERY_CONFIRMED_OFFLINE` in the audit. An OTP delivery is refused at the door with a reason.                                                                         |
+| **`RiderHome`**                       | Next stop with call and navigate, then unsent work, cash carried, stops left, goods to take back. A zero is never shown.                                                                                                                                                   |
+| **`android.blockedPermissions`**      | MedSupply Shop declared `CAMERA` and both location permissions through manifest merging, contradicting its own store listing. Found by the first `expo prebuild` anybody has run.                                                                                          |
+| **The customer ledger's raw enum**    | Outstanding since Phase 39. Seven `ledgerTransactionType` keys in both languages, on the ledger and the statement.                                                                                                                                                         |
+
+### Not done, and why
+
+**The build did not happen.** `expo prebuild` runs and produces a valid native
+project for all three variants — that much is verified. `./gradlew assembleRelease`
+cannot run here: `java` is absent, `JAVA_HOME` and `ANDROID_HOME` are unset, and
+there is no SDK directory. The generated project wants **Gradle 9.3.1** (its own
+wrapper), **JDK 17** and **Android SDK Platform 36**. `eas.json` has had a profile
+per variant per stage since Phase 36, so the cloud path needs nothing new.
+
+**iOS** still needs macOS and a paid Apple Developer account. Unchanged.
+
+**Four more raw enums**, outside the finance screens this phase had open:
+`FulfilmentWork.tsx:512`, `MedicineForm.tsx:590`, `PaymentDetail.tsx:292`. Same
+defect, different screens; written down rather than silently left.
+
+**`GET /payments/my-collections`** answers the same question as
+`GET /finance/my/collections`, which is the one mobile calls. Both are
+`DELIVERY_PERSON`-only. Removing one is a decision somebody should take
+deliberately.
+
+**Live rider tracking** is out of scope and stays there. No endpoint accepts a
+position stream, and inventing one to draw a moving dot is a surveillance
+feature nobody asked for. Location is captured at the door, as proof, which is
+what the consent notice says.
+
 ## Phase 0: Product Architecture and Repository Planning
 
 **Status:** COMPLETED

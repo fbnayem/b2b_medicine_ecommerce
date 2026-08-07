@@ -7,6 +7,7 @@ import {
   DeliveryStatus,
   NotificationCategory,
   NotificationChannel,
+  LedgerTransactionType,
   PaymentMethod,
   PaymentStatus,
   PurchaseOrderStatus,
@@ -3288,6 +3289,16 @@ export const bn: Catalogue = {
     [PaymentMethod.ADVANCE_BALANCE]: 'আগে জমা দেওয়া টাকা থেকে',
     [PaymentMethod.OTHER]: 'অন্য কিছু',
   } as Record<PaymentMethod, string>,
+
+  ledgerTransactionType: {
+    [LedgerTransactionType.OPENING_BALANCE]: 'আগের জের',
+    [LedgerTransactionType.INVOICE_CHARGE]: 'মালের বিল',
+    [LedgerTransactionType.PAYMENT]: 'টাকা জমা',
+    [LedgerTransactionType.CREDIT_ADJUSTMENT]: 'জমা সমন্বয়',
+    [LedgerTransactionType.DEBIT_ADJUSTMENT]: 'অতিরিক্ত চার্জ',
+    [LedgerTransactionType.PAYMENT_REVERSAL]: 'জমা বাতিল',
+    [LedgerTransactionType.RETURN_CREDIT]: 'ফেরত মালের জমা',
+  } as Record<LedgerTransactionType, string>,
 
   nav: {
     sections: 'বিভাগ',

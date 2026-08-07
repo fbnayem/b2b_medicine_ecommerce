@@ -1,5 +1,93 @@
 # Assumptions
 
+## Phase 40 — MedSupply Rider, the delivery application
+
+### A client-supplied timestamp on a financial record, and its bounds
+
+`DeliveryCompletionSchema` accepts an optional `deliveredAt` so a completion
+recorded away from signal says when the customer signed rather than when the
+handset reconnected — otherwise cash taken at two in the afternoon is dated to
+four, and the ledger a shopkeeper reads disagrees with the receipt in their hand.
+
+That is back-dating unless it is bounded. **Two minutes ahead** is clock skew
+rather than intent; **twelve hours behind** is longer than any round and shorter
+than a shift, so a queue that flushes the next morning is refused and the office
+records it instead. Assumed rather than asked: nobody has stated a maximum round
+length, and twelve hours is the figure that makes "yesterday's cash dated to
+today" impossible without also refusing an ordinary long day.
+
+The audit action becomes `DELIVERY_CONFIRMED_OFFLINE` and carries both times, so
+the difference is visible to whoever reconciles the day rather than only inferable.
+
+### Proof files live in the documents directory, not the cache
+
+Everything else this application writes goes to `Paths.cache` deliberately: an
+invoice a pharmacy has already been offered is a copy of something the server
+holds, and the operating system may reclaim it. **Proof waiting for signal is not
+a copy of anything.** If the phone deletes it the delivery cannot be evidenced,
+and the rider is the one who has to explain it. Files are removed only once the
+server has answered, or once it has refused.
+
+The queue holds **paths, not bytes**. A delivery photograph is a few hundred
+kilobytes of base64 and `AsyncStorage` is one SQLite row per key; a rider with
+four unsent stops writing all of it into a single value is how a queue starts
+failing silently.
+
+### A delivery requiring an OTP cannot be completed offline
+
+The six digits are sent to the customer's phone and checked against a hash the
+handset has never seen. There is no offline answer to it, so the screen refuses
+at the door — where somebody can still walk to where there is signal — rather
+than accepting the completion and failing on flush hours later with the rider
+long gone. Assumed: that is better than queueing it and hoping, and it is the
+only carve-out.
+
+### The permission gate is deliberately conservative
+
+For each destination it requires every permitted role to be able to call **at
+least one** of the `GET` requests the screen makes — not all of them.
+`delivery-detail.tsx` legitimately holds a storekeeper's handover and a rider's
+acknowledgement in one file, each behind a role check in the markup, and a
+stricter rule would fire on every shared screen in the application. The class of
+defect worth a gate is a destination whose data the role cannot fetch at all,
+which is a 403 the moment they tap it.
+
+It follows imports **one hop**, into the exact functions a screen names. Two hops
+would drag in the whole data layer: `finance/api.ts` holds a rider's collections
+and a manager's reports, so a coarser rule concludes a manager can load the
+rider's screen — the exact defect it was written for. The first draft read only
+the screen file, found nothing because screens import their requests, and passed.
+
+### `getFinanceNavigation` was kept rather than folded into the manifest
+
+The manifest's `money` group is management's, so "your own money" — a shop
+owner's statement, a rider's collections — has no id there. Giving it one would
+cost a web route, a component and a page guide for screens neither role will ever
+open on a desktop, because the manifest's gates require all three. The second map
+survives, scoped to exactly that, and `routes.test.ts` holds the boundary: what
+the manifest offers a role, this must not offer again.
+
+### Omitting a config plugin does not remove a permission
+
+Found by the first `expo prebuild` anybody has run. All three variants are built
+from one `package.json`, so `expo-camera` and `expo-location` are autolinked into
+every one of them and Android's manifest merger folds each library's own
+`<uses-permission>` into the app's. `appVariant.test.ts` was reading the config
+and passing while the generated manifest said something else.
+
+`android.blockedPermissions` emits `tools:node="remove"`, which is the only thing
+that undoes a merge. Derived from the same two reason strings rather than written
+out, so a variant that gains a camera gains the permission with it.
+
+### The pure trip helpers moved out of the transport module
+
+`currentTrip` and `orderedStops` were in `delivery/trips.ts` beside the fetchers,
+so asking which stop comes next imported `apiClient` and through it
+`react-native`, whose Flow sources vitest cannot parse. Every consumer had to
+mock a network client to answer a question about an array. They are in
+`home/round.ts` now and `trips.test.ts`'s six assertions moved with them,
+unchanged and no longer needing the mock.
+
 - Real-time updates via Socket.IO will use standard authorization patterns (passing JWT token).
 - ~~Currency is strictly BDT, stored as integer minor units (poisha).~~ **Superseded in Phase 12.** Amounts are still integer minor units, but the _scale_ of a minor unit is now the configured currency's ISO 4217 exponent rather than a hard-coded hundred — yen has none and dinar has three, so assuming two was a hundredfold error in one direction and a tenfold one in the other. One currency per deployment, set by `PRIMARY_CURRENCY`; a multi-currency ledger is Phase 14.
 - Deliveries are internally handled by the system's own delivery persons, not third-party couriers.

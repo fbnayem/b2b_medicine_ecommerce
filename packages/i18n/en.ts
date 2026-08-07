@@ -5,6 +5,7 @@ import {
   DeliveryProofType,
   DeliveryPriority,
   DeliveryStatus,
+  LedgerTransactionType,
   NotificationCategory,
   NotificationChannel,
   PaymentMethod,
@@ -3630,6 +3631,28 @@ export const en = {
     [PaymentMethod.ADVANCE_BALANCE]: 'From money already paid',
     [PaymentMethod.OTHER]: 'Something else',
   } as Record<PaymentMethod, string>,
+
+  /**
+   * What each line on a customer's ledger is.
+   *
+   * The ledger and the statement printed `entry.type.replaceAll('_', ' ').toLowerCase()`
+   * — so a shopkeeper querying their account was shown "invoice charge",
+   * "credit adjustment" and "payment reversal", which are the names of database
+   * values rather than of things that happened to their money. They stayed
+   * English whatever the language was set to, on the one screen somebody reads
+   * when they think they have been charged wrongly.
+   *
+   * Written as what happened, from the customer's side of it.
+   */
+  ledgerTransactionType: {
+    [LedgerTransactionType.OPENING_BALANCE]: 'Balance brought forward',
+    [LedgerTransactionType.INVOICE_CHARGE]: 'Goods invoiced',
+    [LedgerTransactionType.PAYMENT]: 'Payment received',
+    [LedgerTransactionType.CREDIT_ADJUSTMENT]: 'Credit applied',
+    [LedgerTransactionType.DEBIT_ADJUSTMENT]: 'Charge added',
+    [LedgerTransactionType.PAYMENT_REVERSAL]: 'Payment reversed',
+    [LedgerTransactionType.RETURN_CREDIT]: 'Credit for goods returned',
+  } as Record<LedgerTransactionType, string>,
 
   nav: {
     sections: 'Sections',

@@ -2,6 +2,37 @@
 
 Tests must pass before a phase is marked complete.
 
+## Phase 40 coverage — MedSupply Rider
+
+Every gate below was proved by planting the defect it claims to catch, and two
+of them caught a live one before any planting was needed.
+
+| Gate                                               | What it holds                                                                                                                                                                                                                 | Planted to prove it                                                                                                                                                                                                                |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `navigation/permissions.test.ts`                   | No role is offered a destination whose data the server will not give it. Reads each screen's `GET`s — its own and those inside the functions it imports — and checks them against `docs/openapi.json`.                        | Caught the live `collections` mismap, naming the destination, the three roles and the endpoint. Then `activity` — permitted to everybody — was pointed at the rider's screen: six roles named, `DELIVERY_PERSON` correctly absent. |
+| `navigation/routes.test.ts`                        | No role sees one screen twice under two names, across both menus.                                                                                                                                                             | Found nine live duplicates when the mismap was fixed.                                                                                                                                                                              |
+| `api/callers.test.ts`                              | Sixteen rider capabilities now named, each with the sentence saying who is blocked without it.                                                                                                                                | `arrived` pointed at a path that does not exist; the failure read "say they are at the door, which is what turns the proof screen on".                                                                                             |
+| `offline/completion.test.ts`                       | A queued completion sends exactly once under the key minted at the door; carries the time the rider finished; holds file paths rather than bytes; keeps the files while the server has not answered; refuses an OTP delivery. | The idempotency key was dropped from the flush — the double-send test went red.                                                                                                                                                    |
+| API integration                                    | `deliveredAt` is refused from the future and refused beyond twelve hours; the proof and the payment carry it; the audit action says the completion arrived queued.                                                            | The future bound was removed from the schema — the back-dating test went red.                                                                                                                                                      |
+| `home/round.test.ts` + `RiderHome.render.test.tsx` | The next stop is the first _unfinished_ one in the planned sequence; a zero is never rendered.                                                                                                                                | `roundFacts` made to keep zeroes (two red, both suites); `nextStop` made to return the first stop rather than the first unfinished one (four red).                                                                                 |
+| `appVariant.test.ts`                               | Each variant strikes out the permissions its libraries would add anyway, and the blocked list cannot contradict the declared plugins.                                                                                         | The live defect: MedSupply Shop's generated manifest declared `CAMERA` and both location permissions.                                                                                                                              |
+
+### A trap worth knowing about
+
+The obvious mock for `useFocusEffect` — `(effect) => effect()` — runs the load
+during the **render** phase, so its state updates land outside `act` and React
+tears the tree down mid-commit. The error it produces is _"Element type is
+invalid… check the render method of RiderHome"_, which points at a component that
+is entirely fine and sends you bisecting a working file. The mock defers to
+`useEffect`, which is what the real hook does.
+
+### Verified once, not in CI
+
+`expo prebuild` for all three variants, comparing the generated
+`AndroidManifest.xml`. Far too slow for a suite, so `appVariant.test.ts` holds the
+config-level rule and this is the periodic check that the config still produces
+the manifest it claims to. It is what found the permission defect.
+
 ## Commands
 
 - API unit/service tests: `pnpm --filter @medsupply/api test`

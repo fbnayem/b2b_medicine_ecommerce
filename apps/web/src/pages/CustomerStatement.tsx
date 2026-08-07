@@ -14,6 +14,7 @@ import {
 } from '../components/ui';
 import { useApiResource } from '../lib/query';
 import { keys } from '../lib/queryKeys';
+import { translatedOr } from '@medsupply/i18n';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDate, formatMinor } from '../lib/finance';
 import type { CustomerStatementData } from './financeTypes';
@@ -60,7 +61,10 @@ export function CustomerStatement({ ownerMode = false }: CustomerStatementProps)
     {
       key: 'description',
       header: t('statement.description'),
-      cell: (entry) => entry.description ?? entry.type.replaceAll('_', ' ').toLowerCase(),
+      // Same correction as the ledger next door: a customer's own statement is
+      // the last place a database value should be showing through.
+      cell: (entry) =>
+        entry.description ?? translatedOr(t, `ledgerTransactionType.${entry.type}`, entry.type),
     },
     {
       key: 'debit',

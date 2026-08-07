@@ -14,6 +14,7 @@ import {
 } from '../components/ui';
 import { useApiCollection, useApiResource } from '../lib/query';
 import { keys } from '../lib/queryKeys';
+import { translatedOr } from '@medsupply/i18n';
 import { useLanguage } from '../lib/useLanguage';
 import { formatFinanceDateTime, formatMinor } from '../lib/finance';
 import type { AccountSummary, LedgerEntry } from './financeTypes';
@@ -53,7 +54,17 @@ export function CustomerLedger() {
     {
       key: 'type',
       header: t('finance.type'),
-      cell: (entry) => entry.type.replaceAll('_', ' ').toLowerCase(),
+      /*
+       * The catalogue, not the enum. This printed
+       * `entry.type.replaceAll('_', ' ').toLowerCase()`, so the ledger read
+       * "invoice charge" and "credit adjustment" — the names of database values
+       * — and stayed English whatever the language was set to, on the screen
+       * somebody opens when they think they have been charged wrongly.
+       *
+       * `translatedOr` keeps a type the catalogue has not caught up with
+       * readable rather than blank.
+       */
+      cell: (entry) => translatedOr(t, `ledgerTransactionType.${entry.type}`, entry.type),
     },
     {
       key: 'description',

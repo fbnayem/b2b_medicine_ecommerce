@@ -1,5 +1,106 @@
 # Changelog
 
+## Phase 40 — MedSupply Rider, and four things a prebuild found
+
+Asked for: plan the third application, then complete it. Offline completion in
+full including cash, the rider home led by the round, and a local Android build
+attempted rather than deferred.
+
+### The measurement, and why it is not the one from Phase 39
+
+A `DELIVERY_PERSON` may reach **12** destinations in the shared manifest and all
+twelve already had a `MOBILE_ROUTE` and a screen file. Parity was done before
+this phase started. Everything below was found underneath it.
+
+### A manager was offered a screen the server refuses them
+
+The shared id `collections` is labelled **"Rider collections"** and is permitted
+to `SUPER_ADMIN`, `ADMIN` and `MANAGER` — the desk where the cash a rider hands
+in is posted or refused. Phase 39 pointed it at `/(protected)/collections`, which
+is the screen a **rider** carries: its only request is
+`GET /finance/my/collections`, permitted to `DELIVERY_PERSON` and nobody else.
+
+Every manager in MedSupply Manage had a menu entry that answered 403, and
+`collection-review.tsx` — the right screen — sat in the repository with nothing
+pointing at it.
+
+Three gates existed and none could see it. `routes.test.ts` asks whether the
+destination has a file; it had one. `callers.test.ts` asks whether an endpoint
+has a caller; it had one. Between "the screen exists" and "the endpoint is
+called" nobody was asking **whether the person being offered the screen may make
+the request it opens with**.
+
+`navigation/permissions.test.ts` asks it, for every destination and every role,
+against `docs/openapi.json`. Nine duplicate menu entries fell out of the fix:
+two menus feed one home screen, and until Phase 39 removed the tab filter they
+could not collide. `getFinanceNavigation` now carries only what the manifest has
+no id for — a shop owner's invoices, and the rider's own collections.
+
+### Not one thing a rider does was named by the gate that watches for it
+
+`delivery-detail.tsx` wrote ``apiClient.post(`/deliveries/${id}/${step}`)`` and
+passed the step in as a string; `return-detail.tsx` did the same. The caller gate
+reads the method before a path _literal_, so sixteen endpoints — the whole of a
+rider's day — were exempt from it. Deleting the button that tells the office a
+rider has reached the shop failed nothing anywhere in the repository.
+
+Third time this shape has been corrected; `documents/files.ts` and
+`reports/api.ts` were untangled in Phase 39 and the rider's two busiest screens
+were left alone. Sixteen entries added, including `POST /returns/{id}/collect` —
+the only way a rider takes back goods a shop is sending, on a screen that already
+filtered a rider's list down to exactly that queue and then offered no way to act
+on it.
+
+### A delivery can be finished where there is no signal
+
+The queue held every cheap status tap and refused `complete` — the one that ends
+the stop, carries the photograph and the signature, and may carry cash. A rider
+at a shop door with no bars was told to keep the screen open and try again.
+
+|                     |                                                                                                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| When it happened    | `deliveredAt` on the completion, bounded to two minutes ahead and twelve hours behind. The payment's `collectedAt` matches it, so cash taken at two in the afternoon is not dated to four. |
+| What the audit says | `DELIVERY_CONFIRMED_OFFLINE`, carrying both times. `GET /admin/audit/actions` is built from distinct actions, so it is a filter with no further plumbing.                                  |
+| Where the bytes go  | `Paths.document`, not the cache the operating system may reclaim. The queue holds paths; `AsyncStorage` holds a few hundred bytes rather than megabytes.                                   |
+| What cannot be held | A delivery whose proof requires an OTP. The code lives on the server, so the screen says so at the door while somebody can still act on it.                                                |
+
+GPS is not network — satellites need no cell tower — so location proof is as
+honest offline as on.
+
+### A rider's home was a signpost
+
+A notifications button and a list of links, defended on the grounds that five
+tabs already carry a rider's day. The tabs carry the _lists_. The next stop is
+now a card with **Call** and **Navigate** on it, and underneath: unsent work
+first because the office cannot see it at all, then the cash they are answerable
+for, then stops left, then goods still in the van. A zero is never shown.
+
+### MedSupply Shop asked for a camera and a location it has never used
+
+Nobody had ever run `expo prebuild`. Doing it once found this.
+
+Phase 36 made the permission prompts conditional and asserted the shop variant
+declares neither plugin. The generated manifest declared `CAMERA`,
+`ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION` anyway: all three
+applications are built from one `package.json`, so both libraries are autolinked
+into every one of them and Android's manifest merger folds each library's own
+`<uses-permission>` into the app's. Omitting a config plugin removes the _prompt_
+and nothing else.
+
+`docs/STORE_LISTINGS.md` declares that MedSupply Shop collects no location. That
+would have been either a rejected submission or a false declaration.
+`android.blockedPermissions` now strikes them out, derived from the same reason
+strings so it cannot drift.
+
+### What a customer's ledger says
+
+`entry.type.replaceAll('_', ' ').toLowerCase()` — so a shopkeeper querying their
+account read "invoice charge" and "payment reversal", database values in English
+whatever the language was set to, on the screen somebody opens when they think
+they have been charged wrongly. Seven `ledgerTransactionType` keys in both
+languages, written as what happened: "Goods invoiced", "Payment reversed",
+"Credit for goods returned".
+
 ## Phase 39 — MedSupply Manage, the staff application
 
 Asked for: plan the second application, then complete it. Full parity chosen.
