@@ -191,6 +191,36 @@ export default ({ config }: ConfigContext): ExpoConfig => {
        * confirming before discarding, not a flag.
        */
       predictiveBackGestureEnabled: false,
+      /**
+       * Permissions this build does **not** want, struck out by name.
+       *
+       * Omitting a config plugin removes the *prompt* and nothing else. Every
+       * variant is built from one `package.json`, so `expo-camera` and
+       * `expo-location` are autolinked into all three, and Android's manifest
+       * merger folds each library's own `<uses-permission>` into the app's.
+       *
+       * The result went unnoticed for four phases because nothing ever ran a
+       * prebuild: **MedSupply Shop declared CAMERA, ACCESS_FINE_LOCATION and
+       * ACCESS_COARSE_LOCATION** — the three things Phase 36 says out loud it
+       * asks for none of, and that `docs/STORE_LISTINGS.md` declares it does
+       * not collect. A pharmacy owner installing it would have been shown a
+       * location permission on the store page for an application whose screens
+       * are a catalogue, a basket and a statement.
+       *
+       * `blockedPermissions` emits `tools:node="remove"`, which is the only
+       * thing that undoes a merge. Derived from the same two reason strings, so
+       * a variant that gains a camera gains the permission with it and cannot
+       * drift.
+       */
+      blockedPermissions: [
+        ...(identity.cameraReason ? [] : ['android.permission.CAMERA']),
+        ...(identity.locationReason
+          ? []
+          : [
+              'android.permission.ACCESS_FINE_LOCATION',
+              'android.permission.ACCESS_COARSE_LOCATION',
+            ]),
+      ],
     },
     web: { favicon: './assets/favicon.png' },
     plugins: [

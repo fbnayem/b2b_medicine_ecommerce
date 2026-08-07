@@ -214,6 +214,59 @@ describe('what each application asks the operating system for', () => {
     expect(pluginNames('staff')).not.toContain('expo-location');
   });
 
+  it('strikes out the permissions its libraries would add anyway', () => {
+    /*
+     * **Omitting a plugin removes the prompt and nothing else.**
+     *
+     * All three applications are built from one `package.json`, so `expo-camera`
+     * and `expo-location` are autolinked into every one of them, and Android's
+     * manifest merger folds each library's own `<uses-permission>` into the
+     * app's. The rule above passed the whole time while the generated manifest
+     * told a different story.
+     *
+     * Found in Phase 40, the first time anybody ran `expo prebuild`: **MedSupply
+     * Shop declared CAMERA, ACCESS_FINE_LOCATION and ACCESS_COARSE_LOCATION** —
+     * the three things Phase 36 says out loud it asks for none of, and that
+     * `docs/STORE_LISTINGS.md` declares it does not collect. That is a store
+     * page showing a pharmacy owner a location permission for an application
+     * whose screens are a catalogue, a basket and a statement.
+     *
+     * `blockedPermissions` emits `tools:node="remove"`, which is the only thing
+     * that undoes a merge.
+     */
+    const blocked = (variant: AppVariant): string[] =>
+      (configFor(variant).android?.blockedPermissions as string[]) ?? [];
+
+    expect(blocked('shop')).toEqual([
+      'android.permission.CAMERA',
+      'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.ACCESS_COARSE_LOCATION',
+    ]);
+    // A manager scans barcodes and is not tracked.
+    expect(blocked('staff')).toEqual([
+      'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.ACCESS_COARSE_LOCATION',
+    ]);
+    // A rider uses both, and blocks neither.
+    expect(blocked('rider')).toEqual([]);
+
+    /*
+     * And the two lists cannot disagree: whatever a variant declares a plugin
+     * for, it must not also strike out. Derived from the same reason strings in
+     * `app.config.ts`, and this is what holds that derivation honest if somebody
+     * writes the lists by hand later.
+     */
+    for (const variant of APP_VARIANTS) {
+      const declared = pluginNames(variant);
+      if (declared.includes('expo-camera')) {
+        expect(blocked(variant), variant).not.toContain('android.permission.CAMERA');
+      }
+      if (declared.includes('expo-location')) {
+        expect(blocked(variant), variant).not.toContain('android.permission.ACCESS_FINE_LOCATION');
+      }
+    }
+  });
+
   it('always declares what every application needs', () => {
     for (const variant of APP_VARIANTS) {
       const declared = pluginNames(variant);
