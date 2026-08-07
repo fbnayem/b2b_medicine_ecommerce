@@ -10,7 +10,9 @@ import {
   CANCELLATION_REASON,
   cancellationReasonProblem,
 } from '../../src/orders/actions';
+import { useAuthStore } from '../../src/store/useAuth';
 import { useCart, type CartLine } from '../../src/store/useCart';
+import { createFinancialIdempotencyKey } from '../../src/finance/idempotency';
 import { formatMoneyMinor } from '../../src/finance/money';
 import { formatFinanceDateTime } from '../../src/finance/date';
 import { useLanguage } from '../../src/i18n/useLanguage';
@@ -23,6 +25,7 @@ import {
   Screen,
   SectionTitle,
   StatusPill,
+  requireReason,
   toast,
   useAsk,
 } from '../../src/components';
@@ -48,7 +51,8 @@ export default function OrderDetailScreen() {
   const replaceBasket = useCart((state) => state.replace);
   const [order, setOrder] = useState<Order>();
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState<'reorder' | 'cancel' | null>(null);
+  const role = useAuthStore((state) => state.user?.role);
+  const [busy, setBusy] = useState<'reorder' | 'cancel' | 'grant' | 'refuse' | null>(null);
 
   const load = useCallback(async () => {
     setError('');
@@ -95,6 +99,43 @@ export default function OrderDetailScreen() {
       router.push('/(protected)/(tabs)/cart');
     } catch (caught) {
       toast.error(errorMessage(caught, language, t('orders.reorderFailed')));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * The manager's half of a cancellation: granting it, or refusing it.
+   *
+   * Granting releases the stock and the credit the order was holding, which is
+   * why it takes a version and an idempotency key — a retry after a timeout
+   * must not release them twice. Refusing writes a sentence the customer reads,
+   * so it is required rather than optional.
+   */
+  async function decide(approve: boolean) {
+    const reason = await ask.prompt({
+      title: approve ? t('orders.grantTitle') : t('orders.refuseTitle'),
+      description: approve ? t('orders.grantBody') : t('orders.refuseBody'),
+      label: t('actions.reason'),
+      confirmLabel: approve ? t('orders.grantCancellation') : t('orders.refuseCancellation'),
+      multiline: true,
+      danger: approve,
+      validate: requireReason(t),
+    });
+    if (reason === null) return;
+
+    setBusy(approve ? 'grant' : 'refuse');
+    try {
+      await apiClient.post(`/orders/${id}/cancellation-decision`, {
+        approve,
+        reason: reason.trim(),
+        version: order?.version ?? 0,
+        idempotencyKey: createFinancialIdempotencyKey('cancellation-decision', String(id)),
+      });
+      toast.success(approve ? t('orders.cancellationGranted') : t('orders.cancellationRefused'));
+      await load();
+    } catch (caught) {
+      toast.error(errorMessage(caught, language, t('orders.decisionFailed')));
     } finally {
       setBusy(null);
     }
@@ -152,6 +193,9 @@ export default function OrderDetailScreen() {
   }
 
   const can = actionsFor(order);
+  // The manager's half. A shop owner sees the request they made; the people
+  // who answer it are the ones the endpoint admits.
+  const canDecide = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(String(role));
 
   return (
     <Screen>
@@ -177,6 +221,33 @@ export default function OrderDetailScreen() {
         // and a shop that assumes otherwise stops expecting the delivery.
         <Card style={{ borderColor: colour.warning }}>
           <Text style={{ color: colour.text }}>{t('orders.cancellationRequested')}</Text>
+          {order.cancellationReason ? (
+            <Text style={{ color: colour.textMuted }}>{order.cancellationReason}</Text>
+          ) : null}
+
+          {/*
+            And the answer, for whoever has to give it.
+
+            `POST /orders/{id}/cancellation-decision` had no caller on this
+            client, so a customer's request sat here as a warning nobody on a
+            phone could act on. Granting it releases the stock and the credit;
+            refusing it says why, and the customer reads that sentence.
+          */}
+          {canDecide ? (
+            <>
+              <Button
+                busy={busy === 'grant'}
+                label={t('orders.grantCancellation')}
+                onPress={() => void decide(true)}
+              />
+              <Button
+                variant="secondary"
+                busy={busy === 'refuse'}
+                label={t('orders.refuseCancellation')}
+                onPress={() => void decide(false)}
+              />
+            </>
+          ) : null}
         </Card>
       ) : null}
 

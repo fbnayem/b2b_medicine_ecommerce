@@ -96,8 +96,12 @@ function isCalled(method: string, path: string, sources: readonly string[]): boo
 }
 
 /**
- * What a pharmacy must be able to do from this application, by the endpoint
- * that does it.
+ * What somebody must be able to do from this application, by the endpoint that
+ * does it.
+ *
+ * The first sixteen are a pharmacy's, because this file was written during the
+ * Shop phase. The rest are a warehouse's, a counter's and a goods-in door's —
+ * the defect has nothing to do with which role is holding the phone.
  *
  * The reasons are not decoration: a failure here prints them, and "a pharmacy
  * can no longer find out where an order is" is a sentence somebody can act on
@@ -221,6 +225,98 @@ const MUST_REACH: ReadonlyArray<{ method: string; path: string; capability: stri
       'withdraw a saved order, so emptying the basket does not leave the distributor holding ' +
       'a draft for goods nobody wants',
   },
+
+  /*
+   * The staff half — MedSupply Manage. This file was written for a pharmacy and
+   * the entries above are all a pharmacy's, but the defect it guards has
+   * nothing to do with which role is holding the phone: a finished endpoint
+   * with no caller is finished work nobody can use.
+   *
+   * These are the ones a **warehouse, a counter or a goods-in door** needs, and
+   * the four at the end had no caller on any client at all.
+   */
+  {
+    method: 'post',
+    path: '/stocktakes/{}/counts',
+    capability:
+      'count a rack from the aisle it is in, rather than on paper to be typed up at a desk ' +
+      'afterwards',
+  },
+  {
+    method: 'post',
+    path: '/stocktakes/{}/post',
+    capability: 'post a finished count to stock, so what the shelf says is what the system says',
+  },
+  {
+    method: 'post',
+    path: '/purchasing/orders/{}/receipts',
+    capability:
+      'book a delivery in at the door it arrives at, with the batch number and expiry read ' +
+      'off the carton rather than transcribed twice',
+  },
+  {
+    method: 'get',
+    path: '/purchasing/recall/batches',
+    capability:
+      'find a batch by the number printed on a manufacturer’s recall notice, standing in ' +
+      'front of the shelves',
+  },
+  {
+    method: 'get',
+    path: '/purchasing/controlled-register',
+    capability: 'produce the prescription-medicine return an inspector asks for, in the stockroom',
+  },
+  {
+    method: 'post',
+    path: '/fulfilment/picking/{}/{}',
+    capability:
+      'decide a discrepancy that has stopped a picking list, which otherwise leaves a ' +
+      'storekeeper standing still until somebody reaches a desk',
+  },
+  {
+    method: 'post',
+    path: '/orders/{}/cancellation-decision',
+    capability: 'answer a customer who has asked to cancel, releasing the stock and the credit',
+  },
+  {
+    method: 'get',
+    path: '/finance/shops/{}/summary',
+    capability:
+      'see what a customer owes while standing at their counter, which is what decides ' +
+      'whether to take the order',
+  },
+  {
+    method: 'post',
+    path: '/payments',
+    capability: 'record money handed over, where it is handed over',
+  },
+  {
+    method: 'patch',
+    path: '/pricing/price-lists/{}',
+    capability: 'correct one price without the whole list being on screen at once',
+  },
+  {
+    method: 'get',
+    path: '/inventory/batches/{}',
+    capability:
+      'see how much of a batch is already promised to an approved order — the difference ' +
+      'between what is on the shelf and what may be sold',
+  },
+  {
+    method: 'get',
+    path: '/reports/orders',
+    capability: 'see how many submitted orders actually become deliveries',
+  },
+  {
+    method: 'get',
+    path: '/reports/stock-movements',
+    capability: 'see what moved in and out of stock over a period, and why',
+  },
+  {
+    method: 'get',
+    path: '/activity',
+    capability: 'find out what has been happening, after a day away',
+  },
 ];
 
 function sources(): Array<[string, string]> {
@@ -249,7 +345,7 @@ describe('what a pharmacy can do from this application', () => {
     const code = sources().map(([, raw]) => raw);
     const unreachable = MUST_REACH.filter((entry) => !isCalled(entry.method, entry.path, code)).map(
       (entry) =>
-        `${entry.method.toUpperCase()} ${entry.path}\n      so that a shop can: ${entry.capability}`,
+        `${entry.method.toUpperCase()} ${entry.path}\n      so that somebody can: ${entry.capability}`,
     );
 
     expect(

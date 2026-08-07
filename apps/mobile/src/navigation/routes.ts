@@ -82,7 +82,17 @@ const PUSHED: Record<string, string> = {
   shops: '/(protected)/shops',
   'shop-detail': '/(protected)/shop-detail',
   'shop-ledger': '/(protected)/shop-ledger',
+  'payment-new': '/(protected)/payment-new',
+  trips: '/(protected)/trips',
+  users: '/(protected)/users',
+  'user-new': '/(protected)/user-form',
+  audit: '/(protected)/audit',
+  activity: '/(protected)/activity',
   'shop-statement': '/(protected)/shop-statement',
+  'medicine-new': '/(protected)/medicine-form',
+  // One screen for both: the difference is an identifier, and two files would
+  // be two places to forget a field.
+  'medicine-edit': '/(protected)/medicine-form',
   recall: '/(protected)/recall',
   'controlled-register': '/(protected)/controlled-register',
 
@@ -121,20 +131,20 @@ export const MOBILE_ROUTE: Record<string, string> = {
  * is a mobile gap, not a product gap.
  */
 export const NO_MOBILE_SCREEN: ReadonlySet<string> = new Set([
-  // Slice 6 — customers. Creating one stays on the desktop: it is fourteen
-  // fields including the credit terms, and a phone is the wrong place to set a
-  // credit limit for somebody standing in front of you.
+  /*
+   * Creating a customer: fourteen fields including the credit limit, the
+   * payment terms, the discount and the price list. A phone is the wrong place
+   * to set somebody's credit limit while they are standing in front of you.
+   * Reading, opening and suspending a customer are all here.
+   */
   'shop-new',
-  // Slice 9 — administration, round planning, the remaining forms
-  'trips',
+  /*
+   * Planning a round: choosing from a list of plannable deliveries and putting
+   * them in an order, which is a drag on a monitor. The rounds already planned
+   * are readable here, and **calling one off** — the action that has to work
+   * when a van breaks down — is on the list screen.
+   */
   'trip-new',
-  'medicine-new',
-  'medicine-edit',
-  'payment-new',
-  'users',
-  'user-new',
-  'audit',
-  'activity',
 ]);
 
 /**

@@ -1067,6 +1067,16 @@ export const en = {
   },
 
   orders: {
+    grantCancellation: 'Grant the cancellation',
+    refuseCancellation: 'Refuse it',
+    grantTitle: 'Grant this cancellation?',
+    grantBody:
+      'The stock and the credit this order was holding are released. The customer is told, and the order ends here.',
+    refuseTitle: 'Refuse this cancellation?',
+    refuseBody: 'The order carries on. The customer reads the reason you give.',
+    cancellationGranted: 'Cancelled. The stock and credit are released.',
+    cancellationRefused: 'Refused. The order carries on.',
+    decisionFailed: 'That decision could not be recorded.',
     title: 'Orders',
     subtitle: 'Every order you have placed, newest first.',
     start: 'Start an order',
@@ -1349,6 +1359,20 @@ export const en = {
   },
 
   users: {
+    search: 'Find somebody',
+    searchHint: 'Search by name or email.',
+    add: 'Add somebody',
+    role: 'Role',
+    roleHint: 'What they will be able to do. You can only create roles below your own.',
+    chooseRole: 'Choose a role',
+    needRole: 'Choose a role first.',
+    needNameAndEmail: 'A name and an email address are needed.',
+    create: 'Create this account',
+    created: '{{name}} has an account.',
+    createFailed: 'That account could not be created.',
+    mayNotAdd: 'Your role cannot add people. An administrator does that.',
+    passwordNote:
+      'No password is set here. One is issued and has to be changed at their first sign-in.',
     title: 'People',
     subtitle: 'Who works here, what they can do, and their sign-ins. Every change is recorded.',
     reload: 'Reload',
@@ -1394,6 +1418,10 @@ export const en = {
   },
 
   audit: {
+    actionHint: 'Type an action to narrow the list, or leave it empty for everything.',
+    who: 'Who',
+    what: 'What',
+    reference: 'Log reference',
     title: 'Audit log',
     subtitle: 'A permanent record of sensitive actions. Nothing here can be edited or removed.',
     reload: 'Reload',
@@ -1839,6 +1867,7 @@ export const en = {
   },
 
   activity: {
+    who: 'Who',
     title: 'What is happening',
     subtitle: 'Orders, picking, deliveries and money, as they happen.',
     refresh: 'Refresh now',
@@ -1882,6 +1911,12 @@ export const en = {
   },
 
   finance: {
+    record: 'Record a payment',
+    needShop: 'Choose which customer paid.',
+    needAmount: 'Type how much was paid.',
+    onAccount: 'On account, not against an invoice',
+    referenceHint: 'The transfer or deposit reference, if there is one.',
+    postedNote: 'It is recorded now and posted to the account by whoever handles the money.',
     dueAndCollections: 'Due and collections',
     ledgerTitle: 'Customer account',
     ledgerSubtitle: 'Every charge, payment, credit and reversal, in the order they happened.',
@@ -2236,6 +2271,10 @@ export const en = {
    * was.
    */
   trips: {
+    noneBodyPlanner: 'Rounds are planned on the web application. Ones already planned appear here.',
+    date: 'Planned for',
+    open: 'Open this round',
+    cancelNamed: 'Call off round {{reference}}',
     title: 'Delivery rounds',
     subtitle: 'Who is out today, where they are going, and in what order.',
     myTitle: 'My round',
@@ -2405,6 +2444,10 @@ export const en = {
   } as Record<DeliveryPriority, string>,
 
   picking: {
+    resolve: 'Decide this',
+    resolutionNotes: 'What was decided',
+    resolvedDone: 'Decided. Picking can carry on.',
+    waitingOnManager: 'Waiting for a manager to decide this.',
     scan: 'Scan or type a batch number',
     scanHint: 'One scan is one carton. Add “x 12” to record a whole outer at once.',
     scanPlaceholder: 'Scan here…',
@@ -2515,6 +2558,13 @@ export const en = {
   } as Record<string, string>,
 
   medicineForm: {
+    addTitle: 'Add a medicine',
+    needNames: 'A brand name and a generic name are both needed.',
+    listPrice: 'List price, in taka',
+    listPriceHint: 'What a customer with no price list of their own pays.',
+    notWhatAnyShopPays:
+      'This is the list price. What a particular shop pays comes from their price list and their discount.',
+    created: 'The medicine has been added to the catalogue.',
     productType: 'Type of product',
     title: 'Add a medicine',
     subtitle: 'Prices are entered in taka. Everything else describes the pack itself.',

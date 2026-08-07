@@ -19,6 +19,7 @@ import { formatMoneyMinor } from '../finance/money';
  */
 
 type Envelope<T> = { data: T };
+type Answer = { data: Envelope<unknown> };
 
 /** A figure with its name, already formatted. */
 export interface Headline {
@@ -51,10 +52,14 @@ const count = (value: number) => String(value ?? 0);
  */
 export const REPORTS: Record<
   string,
-  { path: string; ranged: boolean; view: (data: never) => ReportView }
+  {
+    fetch: (params: Record<string, string>) => Promise<Answer>;
+    ranged: boolean;
+    view: (data: never) => ReportView;
+  }
 > = {
   sales: {
-    path: '/reports/sales',
+    fetch: (params) => apiClient.get<Envelope<unknown>>('/reports/sales', { params }),
     ranged: true,
     view: (data: never) => {
       const value = data as unknown as {
@@ -84,7 +89,7 @@ export const REPORTS: Record<
 
   orders: {
     // No caller on any client before this phase.
-    path: '/reports/orders',
+    fetch: (params) => apiClient.get<Envelope<unknown>>('/reports/orders', { params }),
     ranged: true,
     view: (data: never) => {
       const value = data as unknown as {
@@ -122,7 +127,7 @@ export const REPORTS: Record<
   },
 
   inventory: {
-    path: '/reports/inventory',
+    fetch: (params) => apiClient.get<Envelope<unknown>>('/reports/inventory', { params }),
     ranged: false,
     view: (data: never) => {
       const value = data as unknown as {
@@ -148,7 +153,7 @@ export const REPORTS: Record<
   },
 
   deliveries: {
-    path: '/reports/deliveries',
+    fetch: (params) => apiClient.get<Envelope<unknown>>('/reports/deliveries', { params }),
     ranged: true,
     view: (data: never) => {
       const value = data as unknown as {
@@ -174,7 +179,7 @@ export const REPORTS: Record<
   },
 
   returns: {
-    path: '/reports/returns',
+    fetch: (params) => apiClient.get<Envelope<unknown>>('/reports/returns', { params }),
     ranged: true,
     view: (data: never) => {
       const value = data as unknown as {
@@ -206,7 +211,7 @@ export const REPORTS: Record<
   },
 
   receivables: {
-    path: '/reports/receivables-ageing',
+    fetch: (params) => apiClient.get<Envelope<unknown>>('/reports/receivables-ageing', { params }),
     ranged: false,
     view: (data: never) => {
       const value = data as unknown as {
@@ -231,7 +236,7 @@ export const REPORTS: Record<
 
   movements: {
     // The other one with no caller anywhere.
-    path: '/reports/stock-movements',
+    fetch: (params) => apiClient.get<Envelope<unknown>>('/reports/stock-movements', { params }),
     ranged: true,
     view: (data: never) => {
       const value = data as unknown as {
@@ -255,25 +260,31 @@ export const REPORTS: Record<
   },
 };
 
-/** The three finance reports, which share a shape and a screen. */
-export const FINANCE_REPORTS: Record<string, string> = {
-  outstanding: '/finance/reports/outstanding',
-  overdue: '/finance/reports/overdue',
-  collections: '/finance/reports/collections',
+/**
+ * The three finance reports, which share a shape and a screen.
+ *
+ * Each names its own request rather than being a path handed to a shared
+ * fetcher, for the reason `documents/files.ts` records: `api/callers.test.ts`
+ * reads the HTTP method sitting immediately before a path literal, and a path
+ * passed through a variable is invisible to the one gate that notices when a
+ * capability loses its caller.
+ */
+export const FINANCE_REPORTS: Record<string, () => Promise<Answer>> = {
+  outstanding: () => apiClient.get<Envelope<unknown>>('/finance/reports/outstanding'),
+  overdue: () => apiClient.get<Envelope<unknown>>('/finance/reports/overdue'),
+  collections: () => apiClient.get<Envelope<unknown>>('/finance/reports/collections'),
 };
 
 export async function getReport(kind: string, from?: string, to?: string): Promise<ReportView> {
   const report = REPORTS[kind];
   if (!report) throw new Error(`Unknown report: ${kind}`);
-  const response = await apiClient.get<Envelope<unknown>>(report.path, {
-    params: report.ranged && from && to ? { from, to } : {},
-  });
+  const response = await report.fetch(report.ranged && from && to ? { from, to } : {});
   return report.view(response.data.data as never);
 }
 
 export async function getFinanceReport(kind: string) {
-  const path = FINANCE_REPORTS[kind];
-  if (!path) throw new Error(`Unknown finance report: ${kind}`);
-  const response = await apiClient.get<Envelope<unknown>>(path);
+  const fetcher = FINANCE_REPORTS[kind];
+  if (!fetcher) throw new Error(`Unknown finance report: ${kind}`);
+  const response = await fetcher();
   return response.data.data;
 }

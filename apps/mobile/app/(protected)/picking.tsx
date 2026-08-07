@@ -9,6 +9,7 @@ import {
   buildPickingProgress,
   findLineForBarcode,
 } from '../../src/fulfilment/flow';
+import { useAuthStore } from '../../src/store/useAuth';
 import { useLanguage } from '../../src/i18n/useLanguage';
 import {
   Badge,
@@ -47,6 +48,20 @@ interface PickingList {
    * fixed on the web client and still live here.
    */
   batchNumbers?: Record<string, { batchNumber: string; expiryDate: string }>;
+  /**
+   * Problems reported against this list. An OPEN one stops picking until a
+   * manager decides it — which had no caller on this client, so a storekeeper
+   * could halt a list from the warehouse floor and nobody with a phone could
+   * restart it.
+   */
+  discrepancies?: Array<{
+    _id?: string;
+    type: string;
+    status: string;
+    quantity?: number;
+    notes?: string;
+    resolutionNotes?: string;
+  }>;
 }
 
 /** Local to fulfilment; there is no shared enum for these. */
@@ -67,6 +82,7 @@ export default function PickingScreen() {
   const { t, language } = useLanguage();
   const ask = useAsk();
   const [permission, requestPermission] = useCameraPermissions();
+  const role = useAuthStore((state) => state.user?.role);
 
   const [list, setList] = useState<PickingList>();
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -149,6 +165,33 @@ export default function PickingScreen() {
   }
 
   /**
+   * The manager's answer, which is what lets picking continue.
+   *
+   * A note rather than a yes-or-no: whoever comes back to this list needs to
+   * know what was decided, and "resolved" on its own is not a decision anybody
+   * can act on or audit.
+   */
+  async function resolve() {
+    if (!list) return;
+    const notes = await ask.prompt({
+      title: t('picking.resolveTitle'),
+      description: t('picking.resolveBody'),
+      label: t('picking.resolutionNotes'),
+      multiline: true,
+      confirmLabel: t('picking.resolve'),
+      validate: (value) => (value.trim().length >= 3 ? null : t('picking.needNotes')),
+    });
+    if (!notes) return;
+
+    await post(
+      'discrepancies/resolve',
+      { version: list.version, resolutionNotes: notes.trim() },
+      t('picking.resolvedDone'),
+      t('picking.resolveFailed'),
+    );
+  }
+
+  /**
    * A problem, recorded against the line it is actually on.
    *
    * This posted `items[0]` — the *first* line — whatever the picker was looking
@@ -223,6 +266,9 @@ export default function PickingScreen() {
 
   const working = WORKING.includes(list.status);
   const editing = list.status === 'PICKING' || list.status === 'PACKING';
+  // The storekeeper reports; management decides. Offering the button to the
+  // person who cannot press it is worse than not offering it at all.
+  const canResolve = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(String(role));
 
   return (
     <Screen>
@@ -244,6 +290,39 @@ export default function PickingScreen() {
           </Badge>
         </View>
       </Card>
+
+      {/*
+        The problems reported against this list, and the answer to them.
+        `POST /fulfilment/picking/{id}/discrepancies/resolve` had no caller on
+        this client, so a storekeeper could stop a list from the warehouse floor
+        and nobody holding a phone could start it again. Reporting is the half
+        that was built; deciding is the half somebody is waiting on.
+      */}
+      {(list.discrepancies ?? []).map((entry, index) => (
+        <Card key={entry._id ?? index} style={{ borderColor: colour.warning }}>
+          <Text style={{ color: colour.text, fontWeight: '600' }}>
+            {t(`discrepancyType.${entry.type}`)}
+          </Text>
+          {entry.notes ? <Text style={{ color: colour.text }}>{entry.notes}</Text> : null}
+          {entry.status === 'OPEN' ? (
+            canResolve ? (
+              <Button
+                busy={busy === 'discrepancies/resolve'}
+                label={t('picking.resolve')}
+                onPress={() => void resolve()}
+              />
+            ) : (
+              <Text style={{ color: colour.textMuted, fontSize: layout.fontSize.sm }}>
+                {t('picking.waitingOnManager')}
+              </Text>
+            )
+          ) : (
+            <Text style={{ color: colour.success, fontSize: layout.fontSize.sm }}>
+              {t('picking.resolved', { notes: entry.resolutionNotes ?? '' })}
+            </Text>
+          )}
+        </Card>
+      ))}
 
       <SectionTitle>{t('picking.allocated')}</SectionTitle>
       {list.items.map((item) => (
