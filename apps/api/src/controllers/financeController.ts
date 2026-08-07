@@ -4,6 +4,7 @@ import { UserRole } from '@medsupply/shared-types';
 import { CreditReservationBackfillSchema, LedgerAdjustmentSchema } from '@medsupply/validation';
 import { AuthRequest } from '../middlewares/auth';
 import { Shop } from '../models/Shop';
+import { territoryPermits } from '../services/onBehalfRules';
 import {
   getCollectionReport,
   getCollectorSummary,
@@ -123,6 +124,25 @@ export async function myCollectionHistory(req: AuthRequest, res: Response, next:
 
 export async function shopSummary(req: AuthRequest, res: Response, next: NextFunction) {
   try {
+    /*
+     * A representative reads only their own customers.
+     *
+     * The same rule `listShops`, `getShop` and `addShopAddress` apply, and it
+     * has to be here rather than only on the route: the route knows the role
+     * and not the customer, and a rep who may read *a* summary must not thereby
+     * read *every* summary by pasting an identifier.
+     */
+    if (req.user!.role === UserRole.SALES) {
+      const shop = await Shop.findById(req.params.shopId).select('territory').lean();
+      if (!shop) {
+        return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Shop not found' } });
+      }
+      if (!territoryPermits(req.user!.territories, shop.territory)) {
+        return res.status(403).json({
+          error: { code: 'SHOP_OUTSIDE_TERRITORY', message: 'That customer is not in your area' },
+        });
+      }
+    }
     res.json({ data: await getCreditSummary(String(req.params.shopId)) });
   } catch (error) {
     next(error);

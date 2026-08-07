@@ -60,6 +60,10 @@ const PUSHED: Record<string, string> = {
   'purchase-orders': '/(protected)/purchase-orders',
   'purchase-order-new': '/(protected)/purchase-order-new',
   'purchase-order-detail': '/(protected)/purchase-order-detail',
+  shops: '/(protected)/shops',
+  'shop-detail': '/(protected)/shop-detail',
+  'shop-ledger': '/(protected)/shop-ledger',
+  'shop-statement': '/(protected)/shop-statement',
   recall: '/(protected)/recall',
   'controlled-register': '/(protected)/controlled-register',
 
@@ -98,12 +102,10 @@ export const MOBILE_ROUTE: Record<string, string> = {
  * is a mobile gap, not a product gap.
  */
 export const NO_MOBILE_SCREEN: ReadonlySet<string> = new Set([
-  // Slice 6 — customers
-  'shops',
-  'shop-detail',
+  // Slice 6 — customers. Creating one stays on the desktop: it is fourteen
+  // fields including the credit terms, and a phone is the wrong place to set a
+  // credit limit for somebody standing in front of you.
   'shop-new',
-  'shop-ledger',
-  'shop-statement',
   // Slice 7 — pricing
   'price-lists',
   'price-list-new',

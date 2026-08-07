@@ -16018,7 +16018,7 @@
           "Finance"
         ],
         "summary": "What one customer owes, and how overdue it is",
-        "description": "Permitted roles: SUPER_ADMIN, ADMIN, MANAGER.",
+        "description": "Permitted roles: SUPER_ADMIN, ADMIN, MANAGER, SALES.",
         "security": [
           {
             "bearerAuth": []

@@ -52,6 +52,8 @@ const owner = { _id: new Types.ObjectId(), role: UserRole.SHOP_OWNER };
 const otherOwner = { _id: new Types.ObjectId(), role: UserRole.SHOP_OWNER };
 const rider = { _id: new Types.ObjectId(), role: UserRole.DELIVERY_PERSON };
 const storekeeper = { _id: new Types.ObjectId(), role: UserRole.STOREKEEPER };
+const rep = { _id: new Types.ObjectId(), role: UserRole.SALES };
+const farRep = { _id: new Types.ObjectId(), role: UserRole.SALES };
 
 let shop: Types.ObjectId;
 let otherShop: Types.ObjectId;
@@ -143,6 +145,7 @@ async function makeShop(index: number, name: string, owners: Types.ObjectId[], b
     status: ShopStatus.ACTIVE,
     creditLimit: 100_000_00,
     paymentTermsDays: 15,
+    territory: 'Dhaka',
     outstandingBalance: balance,
     deliveryAddresses: [
       { label: 'Shop', line1: '1 Green Road', city: 'Dhaka', district: 'Dhaka', isDefault: true },
@@ -234,6 +237,8 @@ before(async () => {
         [otherOwner, 'finance-other-owner', 'Other', 'Owner'],
         [rider, 'finance-rider', 'Delivery', 'Rider'],
         [storekeeper, 'finance-storekeeper', 'Store', 'Keeper'],
+        [rep, 'finance-rep', 'Near', 'Rep'],
+        [farRep, 'finance-far-rep', 'Far', 'Rep'],
       ] as const
     ).map(([who, email, firstName, lastName]) => ({
       _id: who._id,
@@ -243,6 +248,9 @@ before(async () => {
       lastName,
       role: who.role,
       status: UserStatus.ACTIVE,
+      // One rep covers Dhaka, the other covers Sylhet. A rep with no
+      // territories at all may act anywhere, so both are set deliberately.
+      ...(who.role === UserRole.SALES ? { territories: [who === rep ? 'Dhaka' : 'Sylhet'] } : {}),
     })),
   );
 
@@ -712,4 +720,52 @@ test('the fixtures mean what the assertions above assume', async () => {
     'the payment the customer could not see is genuinely there — otherwise that ' +
       'refusal proved nothing',
   );
+});
+
+// ─── What a representative may read about a customer's money ────────────────
+
+/**
+ * A rep stands at a counter deciding whether to take an order, and the three
+ * figures that decide it — owed, overdue, credit left — were management-only.
+ * The answer to "can I take this order" was a telephone call to the office.
+ *
+ * The line is deliberate and these tests are where it lives: **the summary, and
+ * not the ledger, the invoices or the statement.** Those are the documents a
+ * conversation about money is had from, and that conversation is a manager's.
+ */
+test('a representative reads what a customer in their area owes', async () => {
+  const answer = await get(`/api/v1/finance/shops/${shop}/summary`, rep);
+  assert.equal(answer.status, 200, JSON.stringify(answer.body));
+  const summary = answer.body.data as unknown as { outstandingBalanceMinor: number };
+  assert.equal(typeof summary.outstandingBalanceMinor, 'number');
+});
+
+test('and may not read a customer outside it', async () => {
+  /*
+   * The route knows the role; only the controller knows the customer. Without
+   * the check there, a rep who may read *a* summary could read *every* summary
+   * by pasting an identifier — scoping that only looks like scoping.
+   */
+  const refused = await get(`/api/v1/finance/shops/${shop}/summary`, farRep);
+  assert.equal(refused.status, 403);
+  assert.equal(
+    (refused.body as unknown as { error: { code: string } }).error.code,
+    'SHOP_OUTSIDE_TERRITORY',
+  );
+});
+
+test('a representative may not open the ledger, the invoices or the statement', async () => {
+  for (const path of ['ledger', 'invoices', 'statement']) {
+    const refused = await get(`/api/v1/finance/shops/${shop}/${path}`, rep);
+    assert.equal(refused.status, 403, `${path} was readable by a sales representative`);
+  }
+});
+
+test('a manager still reads all four', async () => {
+  // The other half of the same rule: narrowing what a rep sees must not have
+  // narrowed what a manager sees.
+  for (const path of ['summary', 'ledger', 'invoices']) {
+    const answer = await get(`/api/v1/finance/shops/${shop}/${path}`, manager);
+    assert.equal(answer.status, 200, `${path}: ${JSON.stringify(answer.body)}`);
+  }
 });

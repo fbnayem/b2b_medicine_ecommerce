@@ -29,7 +29,20 @@ router.get('/my/summary', requireRole([UserRole.SHOP_OWNER]), mySummary);
 router.get('/my/invoices', requireRole([UserRole.SHOP_OWNER]), myInvoices);
 router.get('/my/statement', requireRole([UserRole.SHOP_OWNER]), myStatement);
 router.get('/my/collections', requireRole([UserRole.DELIVERY_PERSON]), myCollectionHistory);
-router.get('/shops/:shopId/summary', requireRole(finance), shopSummary);
+/*
+ * A representative may read what a customer owes, and nothing else about it.
+ *
+ * They stand at a counter deciding whether to take an order, and the three
+ * figures that decide it — owed, overdue, credit left — were management-only,
+ * so the answer was a telephone call to the office. The **ledger, the invoices
+ * and the statement stay closed to them**: those are the documents a
+ * conversation about money is had from, and that conversation is a manager's.
+ *
+ * The controller applies the same territory rule `listShops` and `getShop` do.
+ * Opening the route without it would let a rep read any customer in the country
+ * by pasting an id, which is scoping that only looks like scoping.
+ */
+router.get('/shops/:shopId/summary', requireRole([...finance, UserRole.SALES]), shopSummary);
 router.get('/shops/:shopId/invoices', requireRole(finance), shopInvoices);
 router.get('/shops/:shopId/ledger', requireRole(finance), shopLedger);
 router.get('/shops/:shopId/statement', requireRole(finance), shopStatement);

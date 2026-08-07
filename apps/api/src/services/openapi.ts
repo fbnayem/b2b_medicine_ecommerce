@@ -1097,7 +1097,9 @@ export const OPERATIONS: Operation[] = [
     path: '/api/v1/finance/shops/{shopId}/summary',
     summary: 'What one customer owes, and how overdue it is',
     tag: 'Finance',
-    roles: MANAGEMENT,
+    // A representative reads this for customers in their own territory, and
+    // deliberately not the ledger, the invoices or the statement below.
+    roles: [...MANAGEMENT, UserRole.SALES],
   },
   {
     method: 'get',
