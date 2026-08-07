@@ -2715,6 +2715,51 @@ export const en = {
     byShopNone: 'No prescription medicines were sold in this period.',
     invoices: 'On invoices',
     badRange: 'Give a start date before the end date.',
+
+    /*
+     * Booking a delivery in from a phone at the goods-in door — which the web
+     * screen never had to think about: a lorry outside, cartons open, somebody
+     * reading a batch number off the side of a box with a driver waiting.
+     */
+    showing: 'Showing',
+    filterDueIn: 'Due in',
+    filterPartly: 'Part arrived',
+    openOrder: 'Open purchase order {{reference}}',
+    units: '{{count}} units',
+    days: '{{count}} days',
+    notInUse: 'No longer buying from them',
+    supplierNeedsNameAndPhone: 'A supplier needs a name and a phone number.',
+    licenceHint: 'What an inspection asks for. Record it if the paperwork is to hand.',
+    supplierInvoiceHint: 'The number on the supplier’s own invoice, so the paper matches this.',
+    batchNumberHint: 'Exactly as printed on the carton.',
+    dateHint: 'Year, month, day — 2028-01-31.',
+    warehouseLocationHint: 'The aisle or rack it is going on.',
+    outstandingHint: '{{count}} still to come on this line.',
+    bookInLine: 'Book in {{brand}}',
+    batchAndExpiry: 'Batch {{batch}} · expires {{expiry}}',
+    shortBy: '{{count}} short — {{reason}}',
+    batchRequired: 'Type the batch number printed on the carton.',
+    placeRequired: 'Say where it is being put.',
+    quantityRequired: 'Type how many arrived, in whole units.',
+    expiryRequired: 'Type the expiry date as 2028-01-31.',
+    expiredOnArrival:
+      'That batch has already expired. It must not go into stock — put it aside and tell a manager.',
+    expiryBeforeMade: 'The expiry is before the manufacturing date. Check the years.',
+    moreThanOrdered: 'Only {{outstanding}} are still outstanding on this line.',
+    shortNeedsReason:
+      'Less arrived than was ordered. Say why, so it is a record and not a mystery.',
+    noSuppliersYet: 'Add a supplier before raising an order.',
+    changeSupplier: 'Choose a different supplier',
+    notChosen: 'Not chosen yet',
+    alreadyOnOrder: 'That medicine is already on this order.',
+    chooseMedicineHint: 'Type at least two letters of a brand name.',
+    onThisOrder: 'On this order',
+    nothingAdded: 'Nothing added yet',
+    nothingAddedBody: 'Search for a medicine above and add it.',
+    unitCostTaka: 'Cost each, in taka',
+    unitCostHint: 'What the supplier charges for one unit.',
+    removeLineNamed: 'Remove {{brand}} from this order',
+    orderValueNote: 'What has been typed here. The supplier’s own invoice is what gets paid.',
   },
 
   inventory: {
@@ -2901,6 +2946,7 @@ export const en = {
     batches: 'Batches',
     onHand: 'On the shelf',
     available: 'Free to sell',
+    needsCodeAndName: 'A warehouse needs a short code and a name.',
     save: 'Add this warehouse',
     saved: '{{name}} added.',
     saveFailed: 'That warehouse could not be added.',

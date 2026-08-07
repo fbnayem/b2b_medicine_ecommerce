@@ -48,6 +48,18 @@ const PUSHED: Record<string, string> = {
   // whole form.
   'stocktake-new': '/(protected)/stocktakes',
   'stocktake-detail': '/(protected)/stocktake-detail',
+  warehouses: '/(protected)/warehouses',
+  // Adding a warehouse is a form on its own list. Four fields do not need a
+  // screen, and a phone that pushes for four fields has decided for somebody
+  // standing at a goods-in door with a driver waiting.
+  'warehouse-new': '/(protected)/warehouses',
+
+  // Buying in
+  suppliers: '/(protected)/suppliers',
+  'supplier-new': '/(protected)/suppliers',
+  'purchase-orders': '/(protected)/purchase-orders',
+  'purchase-order-new': '/(protected)/purchase-order-new',
+  'purchase-order-detail': '/(protected)/purchase-order-detail',
 
   // Money
   'payment-detail': '/(protected)/payment-detail',
@@ -84,14 +96,6 @@ export const MOBILE_ROUTE: Record<string, string> = {
  * is a mobile gap, not a product gap.
  */
 export const NO_MOBILE_SCREEN: ReadonlySet<string> = new Set([
-  // Slice 4 — goods in
-  'suppliers',
-  'supplier-new',
-  'purchase-orders',
-  'purchase-order-new',
-  'purchase-order-detail',
-  'warehouses',
-  'warehouse-new',
   // Slice 5 — recall and batches
   'recall',
   'controlled-register',

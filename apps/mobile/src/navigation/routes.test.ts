@@ -44,7 +44,7 @@ const FILES = new Set(Object.keys(SCREENS));
  * waiver list with no ceiling is a to-do list, and a to-do list in a test file
  * is a place regressions go to be forgotten.
  */
-const WAIVER_FLOOR = 37;
+const WAIVER_FLOOR = 30;
 
 describe('every destination a role may reach', () => {
   it('found the screens to search, so a clean run is not an empty one', () => {
