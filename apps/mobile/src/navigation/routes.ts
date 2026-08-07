@@ -98,7 +98,24 @@ const PUSHED: Record<string, string> = {
 
   // Money
   'payment-detail': '/(protected)/payment-detail',
-  collections: '/(protected)/collections',
+  /*
+   * **The desk screen, not the rider's own.**
+   *
+   * `collections` is labelled "Rider collections" and is permitted to
+   * management: it is where the cash a rider handed in is posted or refused,
+   * and on web it opens `CollectionReview`. This pointed at
+   * `/(protected)/collections` — the screen a *rider* carries, whose only
+   * request is `GET /finance/my/collections`, permitted to `DELIVERY_PERSON`
+   * alone. Every manager in MedSupply Manage had a menu entry that answered
+   * 403, and it shipped because no gate asked whether the role being offered a
+   * screen may make the request it opens with. `permissions.test.ts` now does.
+   *
+   * A rider reaches their own collections through `finance/navigation.ts`,
+   * which is where "my own money" lives for the two roles whose money is their
+   * own — a rider and a shop owner. Neither has an id in the shared manifest,
+   * because the manifest's `money` group is management's.
+   */
+  collections: '/(protected)/collection-review',
 
   // A shop owner's own account
   'my-payments': '/(protected)/payments',

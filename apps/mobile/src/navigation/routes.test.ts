@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NAV_ITEMS, navItemsFor } from '@medsupply/navigation';
 import { UserRole } from '@medsupply/shared-types';
+import { getFinanceNavigation } from '../finance/navigation';
 import { MOBILE_ROUTE, NO_MOBILE_SCREEN, destinationsFor, reachable } from './routes';
 
 /**
@@ -139,6 +140,45 @@ describe('the menu offers what the role is permitted', () => {
         expect(FILES.has(fileFor(MOBILE_ROUTE[item.id]!)), `${role} → ${item.id}`).toBe(true);
       }
     }
+  });
+
+  it('never lists the same screen twice under two names', () => {
+    /*
+     * Two menus feed one home screen: the manifest, through `destinationsFor`,
+     * and the hand-written `getFinanceNavigation`, which exists because "my own
+     * money" has no id in a manifest whose `money` group is management's.
+     *
+     * Before Phase 39 they could not collide — the menu was filtered down to
+     * things that were a tab for somebody, so most of the manifest never
+     * appeared. Removing that filter made the second map's manager and
+     * shop-owner entries duplicates of destinations the first now offers, and a
+     * home screen that lists one screen twice under two different words is a
+     * question about whether they do the same thing.
+     *
+     * Web has held this rule since Phase 21 — `navigation.test.ts` there says a
+     * role is never shown two sidebar entries with the same words. This is the
+     * same rule for the same reason, one client along.
+     */
+    const doubled: string[] = [];
+    for (const role of Object.values(UserRole)) {
+      const routes = [
+        ...destinationsFor(role).map((item) => MOBILE_ROUTE[item.id]!),
+        ...getFinanceNavigation(role).map((item) => item.route as string),
+      ];
+      const seen = new Set<string>();
+      for (const route of routes) {
+        if (seen.has(route)) doubled.push(`${role} is offered ${route} twice`);
+        seen.add(route);
+      }
+    }
+
+    expect(
+      doubled,
+      'These roles see one screen listed twice on their home screen, under two different ' +
+        'names:\n  ' +
+        doubled.join('\n  ') +
+        '\nThe shared manifest wins; the finance map is for destinations it has no id for.',
+    ).toEqual([]);
   });
 
   it('leaves out the screen it is rendered on, and the ones reached from a list', () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isCalled, normalise } from './paths';
 
 /**
  * **Every endpoint this application exists to reach has something that reaches
@@ -32,68 +33,13 @@ const RAW = import.meta.glob(['../../app/**/*.tsx', '../**/*.ts', '../**/*.tsx']
   eager: true,
 }) as Record<string, string>;
 
-/**
- * A template's interpolations flattened to `{}`, so one pattern matches both
- * `'/returns'` and `` `/orders/${id}/duplicate` ``.
- *
- * The path in the table is then written the way the OpenAPI document writes
- * one, minus the parameter names — which nobody agrees on between a client and
- * a specification anyway.
+/*
+ * `normalise`, `methodBefore` and `isCalled` moved to `src/api/paths.ts` when
+ * `navigation/permissions.test.ts` needed the same parse for the opposite
+ * question — that one asks what a screen calls, this one asks whether anything
+ * still calls an endpoint. Two implementations of "what counts as a call" would
+ * let the two gates disagree, and the disagreement would be silent.
  */
-function normalise(raw: string): string {
-  return raw.replace(/\$\{[^{}]*\}/g, '{}');
-}
-
-const METHOD = /\.(get|post|patch|put|delete)\b/g;
-
-/**
- * Which HTTP method a path literal is being passed to.
- *
- * The nearest preceding `.get(`/`.post(`/… with **no closing parenthesis**
- * between it and the path — which is what says the call has not already ended.
- * That tolerates the two shapes this codebase actually writes: a generic
- * argument (`.post<Envelope<{ _id: string }>>('/returns', …)`, semicolons and
- * all) and a ternary (`.post(draftId ? … : '/orders/submit', …)`), while a path
- * sitting after some unrelated finished call is separated from it by the `)`
- * that finished it.
- *
- * **The method is half the capability.** `GET /returns` lists the returns a
- * shop has raised; `POST /returns` raises one. Without this, the list screen
- * satisfies the entry and deleting the whole return form goes unnoticed — which
- * is precisely what happened when this rule was first written without it.
- */
-function methodBefore(source: string, index: number): string | undefined {
-  METHOD.lastIndex = 0;
-  let found: { method: string; end: number } | undefined;
-  for (let match = METHOD.exec(source); match; match = METHOD.exec(source)) {
-    if (match.index >= index) break;
-    found = { method: match[1]!, end: match.index + match[0].length };
-  }
-  if (!found) return undefined;
-  const between = source.slice(found.end, index);
-  return between.includes(')') ? undefined : found.method;
-}
-
-/**
- * The endpoint must be followed by the end of its string, or a query.
- *
- * Without that boundary, `/shops/my/addresses` would be satisfied by the
- * *sub*-path `/shops/my/addresses/{}` — so deleting the "add an address" call
- * would pass because editing one still exists.
- */
-function isCalled(method: string, path: string, sources: readonly string[]): boolean {
-  return sources.some((source) => {
-    let from = 0;
-    for (;;) {
-      const at = source.indexOf(path, from);
-      if (at < 0) return false;
-      const next = source[at + path.length];
-      const ends = next === "'" || next === '"' || next === '`' || next === '?';
-      if (ends && methodBefore(source, at) === method) return true;
-      from = at + 1;
-    }
-  });
-}
 
 /**
  * What somebody must be able to do from this application, by the endpoint that
