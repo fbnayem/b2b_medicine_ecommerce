@@ -263,6 +263,103 @@ const MUST_REACH: ReadonlyArray<{ method: string; path: string; capability: stri
     path: '/activity',
     capability: 'find out what has been happening, after a day away',
   },
+
+  /*
+   * A rider's whole day, added in Phase 40.
+   *
+   * Not one of these was named here before, and none of them could be: both of
+   * a rider's busiest screens assembled the path from a variable —
+   * `` `/deliveries/${id}/${step}` `` — so the entire round was exempt from the
+   * gate. Deleting the button that tells the office a rider has reached the
+   * shop failed nothing anywhere in the repository.
+   */
+  {
+    method: 'post',
+    path: '/deliveries/{}/acknowledge',
+    capability:
+      'confirm they have the packages a storekeeper handed them — the handover is not ' +
+      'finished until somebody says they took it',
+  },
+  {
+    method: 'post',
+    path: '/deliveries/{}/pickup',
+    capability: 'say the goods have physically left the building',
+  },
+  {
+    method: 'post',
+    path: '/deliveries/{}/start',
+    capability: 'go on the road, which is what lets the shop see the delivery coming',
+  },
+  {
+    method: 'post',
+    path: '/deliveries/{}/arrived',
+    capability: 'say they are at the door, which is what turns the proof screen on',
+  },
+  {
+    method: 'post',
+    path: '/deliveries/{}/send-otp',
+    capability:
+      'send the customer the six digits that prove the person signing is the person ' +
+      'the order was for',
+  },
+  {
+    method: 'post',
+    path: '/deliveries/{}/complete',
+    capability:
+      'finish a delivery: who took it, the signature, the photograph, and any cash ' +
+      'handed over at the door',
+  },
+  {
+    method: 'post',
+    path: '/deliveries/{}/fail',
+    capability:
+      'report that a delivery did not happen, with the reason management reads to decide ' +
+      'whether to send them back',
+  },
+  {
+    method: 'post',
+    path: '/deliveries/{}/returning',
+    capability: 'tell the warehouse that goods are coming back, before they arrive',
+  },
+  {
+    method: 'post',
+    path: '/deliveries/{}/handover',
+    capability: 'hand a packed order to the rider who is going to carry it',
+  },
+  {
+    method: 'post',
+    path: '/deliveries/{}/returned',
+    capability: 'book undelivered goods back into the warehouse',
+  },
+  {
+    method: 'get',
+    path: '/trips',
+    capability: 'see the round they are meant to drive today, in the order the office planned',
+  },
+  {
+    method: 'post',
+    path: '/trips/{}/start',
+    capability: 'begin the round, so the office knows the van has left',
+  },
+  {
+    method: 'get',
+    path: '/finance/my/collections',
+    capability:
+      'count the cash they are carrying — the money is on the customer’s account the ' +
+      'moment it is taken, and this is the only view of what is still in the bag',
+  },
+  {
+    method: 'post',
+    path: '/payments/{}/handover',
+    capability: 'hand that cash in at the end of the day and stop being answerable for it',
+  },
+  {
+    method: 'post',
+    path: '/returns/{}/collect',
+    capability:
+      'take back goods a shop is sending — the returns screen already filters a rider’s ' +
+      'list down to exactly this queue',
+  },
 ];
 
 function sources(): Array<[string, string]> {

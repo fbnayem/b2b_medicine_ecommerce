@@ -76,15 +76,45 @@ export async function getReturn(id: string) {
   return response.data.data;
 }
 
-export async function returnAction(
-  id: string,
-  action: 'review' | 'decision' | 'reject' | 'cancel' | 'collect' | 'receive' | 'credit-note',
-  body: Record<string, unknown>,
-) {
-  const response = await apiClient.post<Envelope<ReturnDetailView>>(
-    `/returns/${id}/${action}`,
-    body,
-  );
+export type ReturnStep =
+  'review' | 'decision' | 'reject' | 'cancel' | 'collect' | 'receive' | 'credit-note';
+
+type Body = Record<string, unknown>;
+type Acted = Promise<{ data: Envelope<ReturnDetailView> }>;
+
+/**
+ * Each step of a return, naming its own request.
+ *
+ * This was one call with the step interpolated — `` `/returns/${id}/${action}` ``
+ * — and a path assembled from a variable is invisible to `callers.test.ts`,
+ * which reads the method sitting immediately before a path *literal*. Seven
+ * endpoints were exempt from the one gate that notices when a capability loses
+ * its caller, and `POST /returns/{id}/collect` in particular: the only way a
+ * rider takes back goods a shop is sending, on a screen that already filters a
+ * rider's list down to exactly that queue.
+ *
+ * Same correction as `documents/files.ts`, `reports/api.ts` and
+ * `delivery/actions.ts`.
+ */
+const STEP: Record<ReturnStep, (id: string, body: Body) => Acted> = {
+  /** A manager takes the request off the queue and starts looking at it. */
+  review: (id, body) => apiClient.post(`/returns/${id}/review`, body),
+  /** How much of what was asked for is agreed, line by line. */
+  decision: (id, body) => apiClient.post(`/returns/${id}/decision`, body),
+  /** Or none of it, with the reason the shop will read. */
+  reject: (id, body) => apiClient.post(`/returns/${id}/reject`, body),
+  /** The shop changes its mind, or the office does. */
+  cancel: (id, body) => apiClient.post(`/returns/${id}/cancel`, body),
+  /** A rider picks the goods up from the shop. */
+  collect: (id, body) => apiClient.post(`/returns/${id}/collect`, body),
+  /** The warehouse books them back in and says what each is fit for. */
+  receive: (id, body) => apiClient.post(`/returns/${id}/receive`, body),
+  /** And the money goes back on the shop's account. */
+  'credit-note': (id, body) => apiClient.post(`/returns/${id}/credit-note`, body),
+};
+
+export async function returnAction(id: string, action: ReturnStep, body: Body) {
+  const response = await STEP[action](id, body);
   return response.data.data;
 }
 

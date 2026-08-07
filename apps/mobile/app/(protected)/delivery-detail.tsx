@@ -10,6 +10,7 @@ import {
 import type { Delivery } from '@medsupply/shared-types';
 import { errorMessage } from '@medsupply/api-client';
 import { apiClient } from '../../src/api/client';
+import { sendDeliveryStep, type DeliveryStep } from '../../src/delivery/actions';
 import { isSafeOfflineDeliveryAction, queueDeliveryAction } from '../../src/delivery/offlineQueue';
 import { createFinancialIdempotencyKey } from '../../src/finance/idempotency';
 import { useAuthStore } from '../../src/store/useAuth';
@@ -101,11 +102,18 @@ export default function DeliveryDetailScreen() {
     [id, load],
   );
 
-  async function act(path: string, body: Record<string, unknown>, confirmation: string) {
+  async function act(path: DeliveryStep, body: Record<string, unknown>, confirmation: string) {
     if (!delivery || busy) return;
     setBusy(path);
     try {
-      await apiClient.post(`/deliveries/${id}/${path}`, {
+      /*
+       * Through `delivery/actions.ts`, where each step writes its own path.
+       * This assembled `` `/deliveries/${id}/${path}` `` inline, which meant
+       * every transition a rider makes was invisible to `callers.test.ts` — it
+       * reads the method before a path *literal* — so deleting any of these
+       * buttons failed nothing.
+       */
+      await sendDeliveryStep(path, String(id), {
         version: delivery.version,
         idempotencyKey: keyFor(path),
         ...body,

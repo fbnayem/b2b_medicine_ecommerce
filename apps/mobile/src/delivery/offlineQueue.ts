@@ -1,12 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Delivery } from '@medsupply/shared-types';
-import { apiClient } from '../api/client';
 import {
   addUniqueAction,
   createQueuedAction,
   processQueue,
   type QueuedAction,
 } from '../offline/queueCore';
+import { isDeliveryStep, sendDeliveryStep } from './actions';
 
 const CACHE_KEY = 'medsupply.delivery.assigned.v1';
 const QUEUE_KEY = 'medsupply.delivery.actions.v1';
@@ -66,7 +66,16 @@ export async function queueDeliveryAction(
 export async function syncDeliveryQueue() {
   const queue = await loadDeliveryQueue();
   const result = await processQueue(queue, async (action) => {
-    await apiClient.post(`/deliveries/${action.subjectId}/${action.path}`, action.body);
+    /*
+     * Through the step table rather than assembling the path here, which is what
+     * this used to do. A step written to disk by an older build and since
+     * removed would otherwise be posted to an endpoint that no longer exists,
+     * over and over, with no way for the rider to clear it.
+     */
+    if (!isDeliveryStep(action.path)) {
+      throw new Error(`This version no longer knows the step "${action.path}"`);
+    }
+    await sendDeliveryStep(action.path, action.subjectId, action.body);
   });
   await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(result.remaining));
   return result;

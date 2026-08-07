@@ -14,6 +14,7 @@ import {
   returnAction,
   type ReturnDetailView,
   type ReturnLineView,
+  type ReturnStep,
 } from '../../src/returns/api';
 import { useAuthStore } from '../../src/store/useAuth';
 import { useLanguage } from '../../src/i18n/useLanguage';
@@ -104,7 +105,7 @@ export default function ReturnDetailScreen() {
     void load();
   }, [load]);
 
-  async function act(action: string, body: Record<string, unknown>, message: string) {
+  async function act(action: ReturnStep, body: Record<string, unknown>, message: string) {
     if (!record || busy) return;
     const mapKey = `${record._id}:${action}`;
     let key = actionKeys.current.get(mapKey);
@@ -114,7 +115,7 @@ export default function ReturnDetailScreen() {
     }
     setBusy(action);
     try {
-      await returnAction(record._id, action as never, {
+      await returnAction(record._id, action, {
         version: record.version,
         idempotencyKey: key,
         ...body,
