@@ -37,10 +37,16 @@ per variant per stage since Phase 36, so the cloud path needs nothing new.
 `FulfilmentWork.tsx:512`, `MedicineForm.tsx:590`, `PaymentDetail.tsx:292`. Same
 defect, different screens; written down rather than silently left.
 
-**`GET /payments/my-collections`** answers the same question as
-`GET /finance/my/collections`, which is the one mobile calls. Both are
-`DELIVERY_PERSON`-only. Removing one is a decision somebody should take
-deliberately.
+**Eleven endpoints are reached by no client**, re-verified by hand at the end of
+this phase and listed under Phase 38 with the full history of the figure — it
+was seventeen, then thirteen, and every automated attempt to count it produced a
+different wrong answer. Two are this project's own doing rather than
+administrator plumbing: `GET /payments/my-collections`, a duplicate of
+`GET /finance/my/collections` and both `DELIVERY_PERSON`-only, and
+`DELETE /shops/{id}/addresses/{addressId}`, added for staff in Phase 39 and
+given no screen — the browser test reaches it through the API directly, which is
+how it stayed invisible. Removing the duplicate and giving the delete a button
+are both decisions somebody should take deliberately.
 
 **Live rider tracking** is out of scope and stays there. No endpoint accepts a
 position stream, and inventing one to draw a moving dot is a surveillance
@@ -1970,25 +1976,38 @@ outstanding since Phase 36, and the coverage measurement for Manage and Rider.
 
 ### Not done
 
-**Thirteen endpoints are reached by no client** — a figure corrected in Phase
-39 and hand-verified there. The list published here first said seventeen and
-named `discrepancies/resolve` among them; both were wrong, and `ASSUMPTIONS.md`
-under Phase 39 records why the matcher produced them. They are administrator
-plumbing rather than customer or floor work:
+**Eleven endpoints are reached by no client.** This figure has now been wrong
+twice and corrected twice, so the count and the method both belong here.
+
+It was published as **seventeen** in Phase 38, corrected to **thirteen** in
+Phase 39, and is **eleven** as re-verified at the end of Phase 40 — by hand, one
+grep per endpoint, because every automated attempt has produced a different
+answer. A path matcher that requires a literal misses
+`` `/approvals/${id}/${action}` ``; one that tolerates a variable tail
+over-matches; one that drops the method counts a `GET` as satisfying a `POST`.
+All three mistakes were made while producing this list.
 
 |                |                                                                                                                                                           |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Inventory      | `POST /inventory/allocations/reserve` — called internally by the approval flow; no screen should reserve stock outside an approval                        |
 | Finance        | `POST /finance/adjustments`, `GET /finance/reconciliation/{id}`, `POST /finance/reconciliation/{id}/repair`, `POST /finance/credit-reservations/backfill` |
-| Administration | `GET /admin/runtime`, `POST /shops/{id}/assign-owner`, `POST /shops/{id}/assign-manager`                                                                  |
+| Administration | `POST /shops/{id}/assign-owner`, `POST /shops/{id}/assign-manager`                                                                                        |
 | Notifications  | `GET /notifications/{id}/deliveries`, `POST /notifications/test`                                                                                          |
+| Money          | `GET /payments/my-collections` — a duplicate of `GET /finance/my/collections`, which is the one mobile calls. Both are `DELIVERY_PERSON`-only.            |
+| Customers      | `DELETE /shops/{id}/addresses/{addressId}` — added in Phase 39 for staff and given no screen. Only the browser test calls it, through the API directly.   |
 
 **Corrected in Phase 39:** `GET /inventory/batches/{id}`, `GET /reports/orders`
-and `GET /reports/stock-movements` now have mobile screens. `GET /admin/audit`,
+and `GET /reports/stock-movements` gained mobile screens. `GET /admin/audit`,
 `GET /finance/shops/{id}/ledger`, `GET /purchasing/recall/batches` and
 `POST /fulfilment/picking/{id}/discrepancies/resolve` were **never** unreached —
-web calls all four, and the sentence above claiming a discrepancy could be
+web calls all four, and the Phase 38 sentence claiming a discrepancy could be
 decided from no screen was simply false.
+
+**Corrected in Phase 40:** `GET /admin/runtime` was on the thirteen and should
+not have been — `apps/web/src/pages/SecurityCentre.tsx:76` reads it. Two entries
+were added rather than removed: `GET /payments/my-collections`, which was always
+unreached and never listed, and the staff address delete, which this project
+created and left without a caller.
 
 Also outstanding, unchanged: **nothing has been built into a binary** — Android
 can be built from a workstation or on EAS, iOS needs macOS or an EAS cloud build
@@ -2050,12 +2069,15 @@ strict. The corrected list was checked by hand.
 
 ### Not done
 
-- **The web ledger prints a raw enum** — `type.replaceAll('_', ' ')`. Fixing it
-  needs a catalogue namespace over `LedgerTransactionType`.
+- ~~**The web ledger prints a raw enum**~~ — fixed in Phase 40. Seven
+  `ledgerTransactionType` keys in both catalogues, on the ledger and the
+  statement.
 - **Thirteen endpoints are still reached by no client**, all administrator
   plumbing: ledger adjustments, reconciliation and its repair, the
   credit-reservation backfill, notification test sends, `GET /admin/runtime`,
   owner and manager assignment, `POST /inventory/allocations/reserve`.
+  _Superseded: the figure is **eleven**, re-verified by hand at the end of Phase
+  40, and `GET /admin/runtime` was never among them. See the Phase 40 section._
 - **The Rider application has not had a phase.** The queue generalised here is
   the piece it shares, which makes that phase smaller rather than larger.
 - **Nothing has been built into a binary**, and the store submission checklist
