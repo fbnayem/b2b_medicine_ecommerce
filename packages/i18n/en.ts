@@ -2760,6 +2760,10 @@ export const en = {
     unitCostHint: 'What the supplier charges for one unit.',
     removeLineNamed: 'Remove {{brand}} from this order',
     orderValueNote: 'What has been typed here. The supplier’s own invoice is what gets paid.',
+
+    // A recall ends in telephone calls, and on a phone those are a tap.
+    ringShop: 'Ring {{name}}',
+    ringSupplier: 'Ring {{name}}',
   },
 
   inventory: {
@@ -2811,6 +2815,26 @@ export const en = {
     receiveFailed: 'That stock could not be booked in.',
     badAmount: 'Enter an amount like 12.50.',
     movements: 'Recent movements',
+    openBatch: 'Where these units are',
+    openBatchNamed: 'Open batch {{batch}}',
+    batchLoading: 'Loading this batch',
+    batchCouldNotLoad: 'This batch could not be loaded.',
+    whereTheUnitsAre: 'Where the units are',
+    receivedQuantity: 'Received in total',
+    quarantinedUnits: 'Held back',
+    damagedUnits: 'Damaged',
+    block: 'Block this batch',
+    unblock: 'Allow this batch again',
+    blockTitle: 'Block this batch?',
+    blockBody:
+      'It comes out of every order that has not been picked yet, and nothing new can be allocated from it.',
+    unblockTitle: 'Allow this batch again?',
+    unblockBody: 'It goes back into stock that can be allocated to orders.',
+    blockReason: 'Why',
+    blockConfirm: 'Block it',
+    unblockConfirm: 'Allow it',
+    unblocked: 'The batch can be allocated again.',
+    blockFailed: 'That could not be changed.',
     noMovements: 'No movements recorded yet.',
   },
 

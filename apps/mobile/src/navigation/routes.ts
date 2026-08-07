@@ -60,6 +60,8 @@ const PUSHED: Record<string, string> = {
   'purchase-orders': '/(protected)/purchase-orders',
   'purchase-order-new': '/(protected)/purchase-order-new',
   'purchase-order-detail': '/(protected)/purchase-order-detail',
+  recall: '/(protected)/recall',
+  'controlled-register': '/(protected)/controlled-register',
 
   // Money
   'payment-detail': '/(protected)/payment-detail',
@@ -96,9 +98,6 @@ export const MOBILE_ROUTE: Record<string, string> = {
  * is a mobile gap, not a product gap.
  */
 export const NO_MOBILE_SCREEN: ReadonlySet<string> = new Set([
-  // Slice 5 — recall and batches
-  'recall',
-  'controlled-register',
   // Slice 6 — customers
   'shops',
   'shop-detail',

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { router } from 'expo-router';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { Medicine, MedicineBatch, StockMovementType } from '@medsupply/shared-types';
 import { errorMessage } from '@medsupply/api-client';
@@ -232,6 +233,18 @@ export default function InventoryScreen() {
                     busy={busyId === item._id}
                     disabled={busyId !== ''}
                     onPress={() => void chooseAction(item)}
+                  />
+                  {/*
+                    The breakdown this row cannot show. A card gives a batch its
+                    headline figure; the detail says how much of it is already
+                    promised to an approved order, which is the difference
+                    between "400 on hand" and "400 you may sell".
+                  */}
+                  <Button
+                    variant="secondary"
+                    label={t('inventory.openBatch')}
+                    accessibilityLabel={t('inventory.openBatchNamed', { batch: item.batchNumber })}
+                    onPress={() => router.push(`/(protected)/batch-detail?id=${item._id}` as never)}
                   />
                 </Card>
               );
