@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { errorMessage } from '@medsupply/api-client';
+import { translatedOr } from '@medsupply/i18n';
 import { getMyStatement } from '../../src/finance/api';
 import { defaultStatementRange, formatFinanceDate, isDateOnly } from '../../src/finance/date';
 import { formatMoneyMinor } from '../../src/finance/money';
@@ -115,10 +116,16 @@ export default function StatementScreen() {
                   <Text style={{ color: colour.brand, fontWeight: '600' }}>{entry.reference}</Text>
                   <Text style={{ color: colour.textMuted }}>{formatFinanceDate(entry.date)}</Text>
                 </View>
+                {/*
+                  The ledger catalogue, not the stock one.
+                  `movementType.*` names what happened to a carton — "Booked
+                  in", "Packed" — and a customer's statement carries ledger
+                  entries, so the lookup never matched and every row fell
+                  through to `entry.type.replaceAll('_', ' ')`. A shop owner
+                  reading their own statement in Bangla saw `invoice charge`.
+                */}
                 <Text style={{ fontWeight: '600', color: colour.text }}>
-                  {t(`movementType.${entry.type}`) === `movementType.${entry.type}`
-                    ? entry.type.replaceAll('_', ' ').toLowerCase()
-                    : t(`movementType.${entry.type}`)}
+                  {translatedOr(t, `ledgerTransactionType.${entry.type}`, entry.type)}
                 </Text>
                 <Text style={{ color: colour.text }}>{entry.description}</Text>
                 <ListRow

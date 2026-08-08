@@ -1,5 +1,213 @@
 # Phase Status
 
+## Phase 44: The Product Page
+
+**Status:** COMPLETED
+
+Asked for: redesign the single medicine page; make name, price, offer price and
+stock visible on every similar and alternative product. A competitor's product
+page was given as the reference for the layout.
+
+### Shipped
+
+|                                     |                                                                                                                                                                                                |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A product block**                 | Photograph and price side by side, where four stat tiles and a definition list used to sit between the two decisions somebody makes here — is this the right pack, and what does it cost me.   |
+| **The price a buyer could not see** | `canSeeCommercial` excludes `SHOP_OWNER`, so the customer read ৳95.00 on the catalogue card and lost it on the product page. Prices now follow `canReadCatalogue`; cost is unchanged.          |
+| **Two prices, told apart**          | Trade price prominent, MRP struck through beside it, and the gap badged as **"You make 20.8%"** — margin, not a discount we are giving. Struck through only where the MRP is genuinely higher. |
+| **Suggestion cards**                | Photograph, brand, strength, molecule, manufacturer, pack, trade price, struck MRP, margin, free stock, and Add to order. Was: name, manufacturer, one price, a stock pill.                    |
+| **One margin function**             | `marginPercent` in `@medsupply/utilities`, used by the web card, the web page and mobile.                                                                                                      |
+| **Mobile parity**                   | The same block and the same card fields, plus a `classification` row that had been printing `PRESCRIPTION` in capitals.                                                                        |
+
+### The gates that caught this
+
+- `customerMoney.test.ts` failed the mobile build for rendering a catalogue
+  price with no `catalogue.listPrice` label. The rule is right and the web hero
+  now carries the label too.
+- `MedicineDetail.test.tsx` failed on two headings for one product, which is how
+  the duplicated title in the hero was found.
+- Both new gates were planted: prices put back behind `canSeeCommercial` turns
+  three tests red, and swapping the two prices on the card turns one red.
+
+### Not done
+
+Unchanged and still blocked on inputs this project does not have — **stock**
+(0 warehouses, 0 batches, so every card reads "No stock"), **cost price**,
+**barcodes**, **store binaries**, and **a pharmacist's review of the 79,904
+monographs**. The audit that preceded this phase also found the order caps and
+`deliveryRestriction` defects; neither is fixed here.
+
+## Phase 43: The Endpoints Nobody Could Reach
+
+**Status:** COMPLETED
+
+Asked for: finish everything the Phase 42 audit left open.
+
+### Shipped
+
+|                                         |                                                                                                                                                                                                                                                  |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Monograph search, reachable at last** | `searchContent` was written, indexed and tested for a whole phase with no route calling it. `typhoid` now answers, as a labelled fallback when the catalogue matched nothing — the prose search costs 451–1,568 ms and cannot go on a keystroke. |
+| **Nine endpoints given screens**        | Ledger adjustments, reconciliation and its repair, the credit-reservation backfill, owner and manager assignment, notification deliveries and test sends, and the staff address delete.                                                          |
+| **One endpoint deleted**                | `GET /payments/my-collections`, a byte-for-byte duplicate of `GET /finance/my/collections` that no client called. 187 routes → 186.                                                                                                              |
+| **A 500 that was always there**         | `GET /payments/<not-an-id>` threw an unhandled `CastError`. Now 404.                                                                                                                                                                             |
+| **Four raw enums**                      | The medicine **form** printed `prescription` while the medicine **page** two clicks away printed "On prescription" from the same catalogue. Payment source, discrepancy status and the mobile statement's ledger types, likewise.                |
+| **The `uncategorized` product**         | Resolved from the supplier's own category trail rather than the fallback. The two agree on 55,970 of 57,033 rows.                                                                                                                                |
+| **The logo-residue product**            | Looked at. It is the manufacturer's trademark on their own packaging, on gallery image 5 of 5. Kept, reason recorded, with a staleness rule so the list can only shrink.                                                                         |
+
+### The recommendation withdrawn
+
+I told the user catalogue search should move to the text index. Measured, the
+`$text` and prefix union returns **2,718 fewer matches** across twenty terms a
+pharmacy actually types — `amox` stops finding `Co-amoxiclav` — and saves about
+ten milliseconds on a page that warm costs 30. The regex stays; the measurement
+is written above it.
+
+The real cost is the **113 ms `countDocuments`** that pages the result, not the
+query. Recorded rather than optimised: correct paging needs the total.
+
+### Not done
+
+Unchanged from Phase 42, and all blocked on something this project does not
+have:
+
+- **Stock.** 0 warehouses, 0 batches, 0 goods receipts. Nothing can be sold.
+- **Cost price.** Equal to trade on all 55,999 rows; every margin reads zero.
+- **Barcodes.** None in the source, so scanner picking cannot work.
+- **No binary has been built**, and the store checklist is untouched.
+- **No pharmacist has reviewed the 79,904 monographs**, which state dose limits
+  and contraindications in two languages on live product pages.
+- **`POST /inventory/allocations/reserve` is still reached by no client**, and
+  should be: no screen should set stock aside outside an approval.
+
+## Phase 42: The Whole Supplier Record, Losing Nothing
+
+**Status:** COMPLETED
+
+Asked for: import everything from the Arogga export, lose no information.
+
+An audit of Phase 41 found that the largest and most useful part of the dataset
+had never arrived — 1.4 M rows of structured drug monograph, both languages —
+and that some of what the audit itself had dismissed as junk was not junk.
+
+### What arrived
+
+- **The lossless archive.** `cataloguesourcerecords` holds all 57,033 source
+  products whole, including the ~1,000 the catalogue refuses, with a sha256 over
+  the source bytes. Created with zstd block compression: the raw JSON is 3.1 GB
+  and compresses ~6× (gzip) to ~24× (brotli) when blocks are compressed
+  together, which is how WiredTiger works. Verified against the live server —
+  `collStats` reports `block_compressor=zstd`, not just the schema option.
+- **The monograph.** `medicinecontents`, one document per (medicine, language):
+  `brief_description`, `overview`, `quick_tips` and `safety_advices`, each with
+  its Bengali twin, plus `description_html` bodies and the real prose among the
+  SEO sections. Bodies are uncapped — the previous 2,000-character cap cut the
+  middle out of monographs, and the longest legitimate body is 29,431.
+- **All 3,627,168 scraped relations**, all four kinds, every rank — the rank cap
+  of 24 is gone, and `SAME_BRAND` and `PROMOTED` are stored for the first time.
+  `PROMOTED` is labelled as advertising wherever it is shown.
+- **The supplier record on `Medicine`**: popularity, attributes, tags, short
+  description, full name, slug, generic id, category ids, delivery restriction
+  and the supplier's stock snapshot.
+- **The FAQ**, folded: all 285,165 rows are five questions and five answers.
+
+### Defects found and fixed
+
+The catalogue list took **6,130 ms** to return one page of twenty, because the
+stock `$lookup` ran before `$skip`/`$limit` and therefore once per matched
+product across all 55,998. Moved below the `$limit`: **11 ms**. Same defect
+class as the finance N+1 that Phase 1 fixed, in a place that phase never looked.
+
+The web catalogue could reach **100 of 55,998 products** — `limit=100`, no
+pagination, no category filter, and it ignored the `?branch=` parameter the
+breadcrumbs linked to. Now paginated, with a category sidebar carrying rolled-up
+counts and a sort control.
+
+`isActive` meant "the supplier had stock when we scraped", which hid **24,188
+products — 43% of the catalogue** — from every shop owner.
+
+Five data-loss defects, each silent, each caught by a counter or a gate rather
+than by reading the output — see `ASSUMPTIONS.md` for the full list. The worst:
+`readable()`'s dangling-tag rule deleted **5,380,934 characters** of clinical
+text across 21,796 passages, because `/<[^>]*$/` matches the literal `<` in
+`CrCl (ml/min) <20`. The Bengali copy survived intact — Bengali escapes the
+character — so the two languages stated different renal doses for the same drug.
+
+`checkIndexes` named 28 of 40 models, so eleven collections' indexes were built
+by nothing in production. `categoryService.ts` contained a raw NUL byte, so git
+classified it as binary and its diffs could not be reviewed.
+
+### Verification
+
+Every gate proved by planting. The stage-order gate was planted, observed red
+with a message naming the capability, reverted, observed green — the first
+attempt passed misleadingly against stale compiled output, which is itself the
+reason a gate nobody has seen fail is not a gate.
+
+### Not done
+
+- **Stock.** The catalogue has no warehouses and no batches, so nothing can be
+  sold until an opening goods receipt exists. That follows from the reset.
+- **Cost price.** Absent from the export, so cost equals trade price and every
+  margin reads zero until a goods receipt supplies the real figure.
+- **Barcodes.** The source has none, so scanner-based picking cannot work on
+  imported lines.
+- **`GET /payments/my-collections`** remains a duplicate of
+  `/finance/my/collections`, recorded rather than removed.
+
+## Phase 41: The Real Catalogue, and What Else To Send
+
+**Status:** COMPLETED
+
+Asked for: empty the product database, import everything from the Arogga
+export, keep the source ids so the similar/alternative data is usable — and a
+plan for the best way to use it.
+
+### Completed work
+
+|                                                  |                                                                                                                                                                             |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The catalogue**                                | **55,998 products** imported from 57,033 source rows, every one through the real `CreateMedicineSchema`. 31,810 active, 45,557 with a photograph, 51,231 with English copy. |
+| **Photography**                                  | 45,842 primary images copied into the media root, 4.2 GB. One image flagged for review where logo removal left a residue.                                                   |
+| **Alternatives, derived**                        | `SAME_INGREDIENT` is a query over `genericName` under a collation index — not 436,348 stored rows that would be wrong the first time a line was delisted.                   |
+| **Alternatives, stored**                         | 1,347,473 rows for the two kinds nothing on the record predicts: comparable products and basket affinity. Capped at supplier rank 24, with the 1,201,594 dropped reported.  |
+| **`GET /inventory/medicines/{id}/alternatives`** | Service-layer, three groups, free stock on every card. 21 ms against the live catalogue. Sections on both web and mobile product screens, both languages.                   |
+| **`resetCatalogue.ts`**                          | Dry-run by default. Takes the catalogue and its thirteen dependants together, and refuses to run if any collection is in neither its clear list nor its keep list.          |
+| **The `.gitignore` typo**                        | `arogga export/` vs `arogga_export/` — twelve gigabytes untracked and unignored. The importer's `findExport()` had the same typo.                                           |
+| **2,141 misfiled products**                      | `healthcare`, `sexual_wellness` and `ayurvedic` had no shelf and fell silently to `MEDICINE`. Now mapped, and an unknown type is reported.                                  |
+| **Bulk import**                                  | `reserveReferences` claims a block in one `$inc`; ids minted client-side; `bulkWrite` in batches. Was ~167,000 round trips.                                                 |
+
+### Completed after the first report
+
+|                     |                                                                                                                                                                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gallery**         | `productImages` holds every photograph in display order. **81,421** served, 5.8G across 45,557 products, 11,274 of them with more than one shot. Chooser on web, horizontal strip on mobile — which is also the first product photography mobile has ever rendered. |
+| **Shelf hierarchy** | `categoryPath` as a multi-key index, `?branch=` at any depth, and `GET /inventory/categories` returning a tree derived from the products rather than stored.                                                                                                        |
+| **The 225 blanks**  | `SAME_CATEGORY` as a last resort. **Zero** products now show nothing at all.                                                                                                                                                                                        |
+
+### Known and deliberate
+
+**The catalogue's cost prices are all equal to its trade prices**, so margin
+reads as zero on all 55,998 rows. Cost is not in the export at all, and zero
+was rejected as the alternative because it reports a 100% margin — a dangerous
+number to be wrong about. A goods receipt supplies the real figure.
+
+**`meta_title` and `meta_description` are still not imported.** They name Arogga
+outright.
+
+**Drug monographs are Arogga's clinical text.** 51,231 products carry one. They
+should be reviewed before being shown to a customer as this business's own
+advice; the importer's `--no-descriptions` turns them off wholesale.
+
+**One product needs a person**: `91652 Himalaya Men Power Bright Licorice Face
+Wash 50ml`, where logo removal left a detectable residue.
+
+**One product type is still unmapped**: `uncategorized`, a single row, which
+falls to `MEDICINE` and is reported on every run.
+
+**The four raw enums from Phase 40 are still there.** `FulfilmentWork.tsx:512`,
+`MedicineForm.tsx:590`, `PaymentDetail.tsx:292`. Untouched by this phase.
+
 ## Phase 40: MedSupply Rider — The Delivery Application
 
 **Status:** COMPLETED

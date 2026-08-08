@@ -95,6 +95,13 @@ export interface Collection<T> {
   total: number;
   page: number;
   limit: number;
+  /**
+   * Catalogue search only: which field the term was found in. `name` is the
+   * ordinary case; `productInformation` means the catalogue matched nothing and
+   * the server fell back to searching the monographs, so the screen has to say
+   * that rather than show the products as though the name had matched.
+   */
+  matchedIn?: 'name' | 'productInformation';
 }
 
 /**
@@ -143,6 +150,9 @@ export function normaliseCollection<T>(payload: Record<string, unknown>): Collec
     total: number(meta.total, items.length),
     page: number(meta.page, 1),
     limit: number(meta.limit, items.length),
+    ...(meta.matchedIn === 'name' || meta.matchedIn === 'productInformation'
+      ? { matchedIn: meta.matchedIn }
+      : {}),
   };
 }
 

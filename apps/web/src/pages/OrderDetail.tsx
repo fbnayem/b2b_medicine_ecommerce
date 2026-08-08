@@ -5,6 +5,7 @@ import type { Delivery, Order } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
 import { useCart } from '../store/useCart';
 import { ActivityTimeline } from '../components/ActivityTimeline';
+import { CreditReservationRepair } from '../components/CreditReservationRepair';
 import {
   Button,
   Card,
@@ -181,6 +182,8 @@ export function OrderDetail() {
                 entityId={String(item._id)}
                 title={t('orders.activity')}
               />
+
+              <CreditReservationRepair orderId={String(item._id)} />
             </>
           );
         }}

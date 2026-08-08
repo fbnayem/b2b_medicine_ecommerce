@@ -9,6 +9,9 @@ import {
   createMedicine,
   getBatch,
   getMedicine,
+  getMedicineAlternatives,
+  getMedicineContent,
+  listCategories,
   listBatches,
   listMedicines,
   listMovements,
@@ -52,8 +55,25 @@ const stockOperators = [
 ];
 
 router.get('/medicines', requireRole(catalogueReaders), listMedicines);
+/*
+ * The shelf hierarchy, for anyone who may read the catalogue. It is derived
+ * from the products themselves, so it needs no separate permission: it says
+ * exactly what a search over the same collection would already reveal.
+ */
+router.get('/categories', requireRole(catalogueReaders), listCategories);
 router.post('/medicines', requireRole(catalogueManagers), createMedicine);
 router.get('/medicines/:id', requireRole(catalogueReaders), getMedicine);
+/*
+ * Declared before the `:id` PATCH purely for readability; Express matches on
+ * method as well as path, so the order of these two carries no meaning.
+ */
+router.get('/medicines/:id/alternatives', requireRole(catalogueReaders), getMedicineAlternatives);
+/*
+ * The monograph is catalogue text under the catalogue's rules: whoever may
+ * read the line may read its copy, and the rider exclusion above carries over
+ * unchanged.
+ */
+router.get('/medicines/:id/content', requireRole(catalogueReaders), getMedicineContent);
 router.patch('/medicines/:id', requireRole(catalogueManagers), updateMedicine);
 router.get('/batches', requireRole(stockReaders), listBatches);
 router.post('/batches/receive', requireRole(stockOperators), receive);

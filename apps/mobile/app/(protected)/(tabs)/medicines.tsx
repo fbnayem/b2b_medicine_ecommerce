@@ -55,6 +55,13 @@ export default function MedicinesScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  /*
+   * Why these products are on screen. The server falls back to searching the
+   * monographs when no product name matched — `typhoid` is not a brand — and a
+   * list that switched what it was searching without saying so would read as a
+   * catalogue full of irrelevant results.
+   */
+  const [matchedInContent, setMatchedInContent] = useState(false);
 
   const load = useCallback(
     async (wanted = 1, mode: 'first' | 'more' | 'refresh' = 'first') => {
@@ -72,6 +79,7 @@ export default function MedicinesScreen() {
         setItems((current) => (mode === 'more' ? current.concat(batch) : batch));
         setPage(response.data.meta?.page ?? wanted);
         setPages(response.data.meta?.pages ?? 1);
+        setMatchedInContent(response.data.meta?.matchedIn === 'productInformation');
       } catch {
         setError(t('catalogue.couldNotLoad'));
       } finally {
@@ -105,6 +113,23 @@ export default function MedicinesScreen() {
         <ErrorState message={error} onRetry={() => void load()} />
       ) : (
         <FlatList
+          ListHeaderComponent={
+            matchedInContent ? (
+              <Text
+                style={{
+                  color: colour.text,
+                  fontSize: layout.fontSize.sm,
+                  backgroundColor: colour.surface,
+                  borderColor: colour.border,
+                  borderWidth: 1,
+                  borderRadius: layout.radius.md,
+                  padding: layout.space[3],
+                }}
+              >
+                {t('catalogue.matchedInContent', { term: search.trim() })}
+              </Text>
+            ) : null
+          }
           data={items}
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ gap: layout.space[3], paddingBottom: layout.space[6] }}

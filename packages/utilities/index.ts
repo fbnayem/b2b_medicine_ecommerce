@@ -648,3 +648,30 @@ export function humaniseEnum(value: string): string {
   const words = value.replaceAll('_', ' ').toLowerCase();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
+
+/**
+ * What a pharmacy earns on a pack, as a percentage of the price printed on it.
+ *
+ * Both applications show this beside the trade price, and it has to be one
+ * function: the web card, the web product page and the mobile screen would
+ * otherwise each carry their own copy of an arithmetic that is easy to get
+ * subtly wrong in three different ways.
+ *
+ * Measured against the **MRP** rather than against cost, because the MRP is the
+ * ceiling a pharmacy may charge and therefore the number their own margin comes
+ * out of. A markup over cost is a different figure and one keystroke away, so
+ * the two are never shown under the same word.
+ *
+ * `undefined` — not zero — when there is no MRP, when it is not above the trade
+ * price, or when the trade price exceeds it. Each of those is "there is no
+ * margin to state", and a nought would be a claim that the pharmacy makes
+ * nothing, which is a different and usually false thing to say.
+ *
+ * Integer arithmetic on minor units throughout, to one decimal place. These are
+ * poisha, and a percentage of them is the one place a float would be tempting
+ * and wrong.
+ */
+export function marginPercent(tradeMinor: number, mrpMinor?: number | null): number | undefined {
+  if (!mrpMinor || mrpMinor <= 0 || tradeMinor > mrpMinor) return undefined;
+  return Math.round(((mrpMinor - tradeMinor) * 1000) / mrpMinor) / 10;
+}

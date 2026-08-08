@@ -1,5 +1,186 @@
 # Assumptions
 
+## Phase 43 — finishing what the audit left open
+
+### The catalogue search stays an unanchored regex
+
+Measured over twenty terms a pharmacy types, a `$text` and prefix-anchored union
+returns **2,718 fewer products** than the substring match does: `amox` stops
+finding `Co-amoxiclav`, `losar` stops finding `Repace Losar`, `omeprazole`
+loses 460. Warm, the substring query costs 30 ms for a page of twenty against
+55,999 products and the text index would save roughly ten of those. Finding a
+drug by the middle of its name is worth 194,244 index keys.
+
+The dominant cost is the `countDocuments` that pages the result — **113 ms** —
+and that is not removable while the page total is honest.
+
+### The monograph is searched only when the catalogue found nothing
+
+`typhoid` names no brand, ingredient or manufacturer, so a name search for it
+returns nothing while 79,904 monographs say which drugs treat it. Searching that
+prose costs 451–1,568 ms, which cannot go on every keystroke, so it runs on the
+request that was going to render an empty screen anyway. The response says
+`matchedIn: 'productInformation'` and both clients state it, because a list that
+silently changed the question it was answering would be lying about why those
+products are there. Capped at 200: `hypertension` is mentioned by thousands, and
+an answer of thousands is the catalogue again in a different order.
+
+### A test notification goes to the person who asked for it
+
+`POST /notifications/test` accepts any recipient and any event. Together those
+would send a real customer a real-looking "your order was approved" —
+indistinguishable from the true one, because it is the true template. The screen
+sends only to the signed-in user; their own address, handset and number prove a
+channel end to end, which is the only thing the feature is for.
+
+### `uncategorized` is answered from the trail, not from the fallback
+
+One product in the bundle carries the type `uncategorized`, which is the
+supplier declining to answer rather than a shelf. Its `category_path` says
+`Medicine > Dermatological Preparations > Topical Anti-Infectives`. Type and
+trail agree on **55,970 of 57,033** rows, which is what makes the trail a second
+opinion rather than a guess; the type still wins wherever it is recognised,
+because where they disagree it is the more specific of the two.
+
+### The one logo residue is the manufacturer's own mark, and stays
+
+`91652 Himalaya Men Power Bright Licorice Face Wash` was looked at on
+08 Aug 2026. What the detector found is the Himalaya wordmark and "SINCE 1930" —
+the manufacturer's trademark on their own packaging. Stripping a reseller's
+watermark is the point of the step; stripping a manufacturer's brand off their
+own tube would misrepresent the product. It is image 5 of 5, a marketing banner
+rather than a photograph of this product, so it is not the picture on the card.
+The decision is recorded in `LOGO_RESIDUE_REVIEWED` with a rule that reports the
+entry as stale if the flag ever disappears.
+
+### `POST /inventory/allocations/reserve` keeps no client, deliberately
+
+It is the one endpoint left that no screen calls, and it should stay that way:
+stock is set aside by the approval flow, and a button that reserved stock
+outside an approval would create a hold nothing accounts for. It is exercised by
+three integration tests, so it is covered — it is simply not a thing a person
+does.
+
+## Phase 41 — importing the whole catalogue, and deriving alternatives
+
+### An alternative is a query, not a row
+
+The export offers "same generic", "same brand" and "same category" as **2.5
+million stored relations**. All three are already answerable from fields on the
+medicine, so none of them is stored. The reason is not size, it is truth: a
+stored suggestion is a snapshot, and nothing in this system would ever rebuild
+it, so the first delisting makes it wrong and it stays wrong. A derived answer
+has nothing to go stale.
+
+It also works for products this import never touched. A medicine somebody types
+in by hand tomorrow gets alternatives immediately; an imported relation row
+would never have named it.
+
+Only `similar_products` and `frequently_bought_together` are kept, because
+nothing on either record predicts them — the first is a judgement and the second
+is a fact about how people order.
+
+### Case-insensitive by collation, not by a second column
+
+`genericName` is matched under `{ locale: 'en', strength: 2 }`, with an index
+carrying the same collation. The alternative — storing a lower-cased copy
+alongside the real one — is two fields that can disagree, and something has to
+keep them in step forever. A pharmacy typing `paracetamol` has not entered a
+different drug from `Paracetamol`.
+
+### Relations capped at the supplier's rank 24
+
+Their "similar products" list averages 66 entries and runs to 120. No screen
+shows more than a dozen, and the list is ranked, so everything past 24 exists
+only to be sorted past. The 1,201,594 rows dropped are **printed by the
+importer** — a cap nobody is told about reads as complete coverage.
+
+### An ingredient list is never truncated; a product name is
+
+Three rows carry an active ingredient longer than the column allows, and every
+one is a combination. A truncated ingredient list is not a shorter answer, it is
+a wrong one, in the field a pharmacist reads to decide what is in the pack — so
+it is dropped, which says "we do not have this", and `validateClinicalIdentity`
+then refuses the row if it is a prescription line. A product **name** over 120
+characters is marketing copy somebody stuffed into it and is cut at a word
+boundary. Both are counted and reported.
+
+### A unit longer than thirty characters is not a unit
+
+Nine rows put `0.25mg,0.5mg/dose for injection pre-filled pen` where the unit
+goes. Cutting it to fit yields `0.25mg,0.5mg/dose for injectio`, which is
+nothing at all. It is a description of the pack, so it moves to `packSize` where
+it is true, and the unit becomes `Pack`.
+
+### A literal `-` means absent
+
+The export writes `-` for "not applicable" — five products carry it as their
+dosage form. Passed through it is a one-character string the schema refuses for
+being too short, and the refusal reads as malformed data rather than missing
+data. It is missing data.
+
+### The reset takes the catalogue's dependants with it
+
+Thirteen models hold an `ObjectId` pointing at a medicine and Mongoose enforces
+nothing, so deleting products alone leaves orders whose lines have no product.
+That failure is silent, arrives later, and looks like a bug in the screen. The
+list of what is cleared and what is kept is **checked against the database** —
+a collection in neither list stops the run, which is how `medicinerelations`
+was caught before the first real reset.
+
+Counters are deliberately **not** rewound. The next medicine is
+`MED-2026-000052`, not `...000001`: rewinding would mint references that audit
+records and printed paperwork already use for something else. A gap in a
+sequence is harmless; two documents sharing a reference is not.
+
+Audit records survive a reset, and the reset writes one. A reset that erased its
+own evidence would be the worst thing in the script.
+
+### References are claimed in blocks for bulk work
+
+`nextReference` is one round trip per reference, which is right for an order and
+is 55,998 of them for a catalogue import. `reserveReferences` claims the whole
+range in a single `$inc`, so it keeps the property that matters — a concurrent
+caller gets the range _after_ this one, never a number inside it — and gives up
+only density. A caller that claims more than it writes leaves a gap.
+
+### The category tree is derived, like the alternatives
+
+The supplier's 1,204-row category table is not imported. `categoryPath` on the
+product is the whole hierarchy, and the tree is grouped out of it per request —
+997 distinct paths over 56,000 products, five deep at most, so it is one
+grouping over an indexed field.
+
+A stored tree would be a second place the hierarchy lives and would drift the
+first time a product moved; worse, it would list branches holding nothing, so a
+buyer could click into an empty page. Derived, a branch exists exactly when
+something is filed under it.
+
+Counted **at every level a path passes through**, so a parent reports the total
+underneath it. Filtered to active products for a shop owner and not for a buyer,
+which is the same rule `listMedicines` already applies — one of them is choosing
+what to order and the other is choosing what to stock.
+
+### `productImageUrl` mirrors `productImages[0]`
+
+A denormalisation, entered into deliberately. A dozen screens, the order-entry
+picker and both mobile apps already read the singular field, and rewriting all of
+them to index into an array buys nothing. The rule that makes it safe is that
+**one writer sets both together** — the importer, in a single place — and nothing
+else may set either alone.
+
+### The shelf is a floor, not a fourth suggestion
+
+`SAME_CATEGORY` is asked for only when same-ingredient, comparable and
+bought-together all came back empty. Offering it alongside them would put
+"others in this category" under a real list of drug alternatives, and a
+suggestion list that is mostly filler is one people stop reading — at which
+point the real suggestions stop working too.
+
+It matches the **leaf** category, not anywhere in the trail. Matching a branch
+would offer a nebuliser mask against a walking stick because both are
+Healthcare, which is not a suggestion.
+
 ## Phase 40 — MedSupply Rider, the delivery application
 
 ### A client-supplied timestamp on a financial record, and its bounds
@@ -1182,3 +1363,89 @@ things came out of it:
   `customerMoney.test.ts` refused it, correctly, for a reason that survives this
   being a staff screen: the catalogue cost is what we paid last time and the
   field asks what we are paying now.
+
+## Phase 42 — importing the whole supplier record
+
+Asked for: import everything, lose no information.
+
+### Decisions taken rather than asked
+
+- **The archive is the guarantee, not the mapping.** Every one of the 57,033
+  source products is stored whole in `cataloguesourcerecords`, including the
+  ~1,000 the catalogue itself refuses. Every mapping decision below is therefore
+  reversible by migration rather than by re-scraping 12 GB, and "nothing was
+  lost" is a hash comparison instead of a promise.
+- **`rating` is not imported as a score.** Measured across all 57,033 rows it is
+  a constant 4.8 — minimum 4.8, maximum 4.8. Storing it would stamp a fabricated
+  four-and-a-half-star rating on our own product pages. `ratingCount` varies and
+  is kept.
+- **Placeholder images are recorded as an absence.** 8,471 of the 90,764 images
+  are the supplier's grey "no image" graphic. What is worth keeping is the fact
+  that they have no photograph — `hasSupplierPhoto: false` — not the graphic.
+- **The five FAQ rows are folded, not multiplied.** All 285,165 rows are five
+  distinct questions and five distinct answers repeated once per product. They
+  are stored once, and rewritten: they describe delivery, cash on delivery and
+  returns, and they name Arogga, so publishing them verbatim would be stating a
+  competitor's policy as our own.
+- **`computed_relations` is archived, not modelled.** Its 2,550,388 rows are
+  derived by the exporter from `generic_id`, `category_id` and `brand_id`, all
+  three of which we store. `alternativesService` answers the same three
+  questions by query, and a query cannot go stale when a product is delisted.
+- **`isActive` is ours again.** It previously meant "the supplier had stock on
+  the day we scraped", which switched off 24,188 products — 43% of the catalogue
+  — and hid them from every shop owner. The snapshot moved to `listedElsewhere`;
+  `isActive` is now derived from whether the line has a price at all.
+- **`meta_title` and `meta_description` are archived, not published.** They name
+  Arogga on 56,930 rows.
+
+### Losses that remain, and why
+
+Three, all defects in the supplier's own export rather than in this import.
+Each is preserved verbatim in the archive, so if the supplier ever fixes their
+exporter the passages can be re-read rather than re-scraped:
+
+- passages that are a **dangling reference** — the exporter wrote `"$48"`,
+  a pointer to a target it then failed to include;
+- passages **cut off mid-write** by the exporter's serialiser;
+- passages that are **empty once markup is stripped**, which carry nothing.
+
+### Defects this phase found in its own earlier work
+
+Recorded because they were all silent, and each was caught by a counter or a
+gate rather than by anybody reading the output.
+
+- **`readable()` deleted 5.38 million characters of clinical text.** Its
+  dangling-tag rule was `/<[^>]*$/`, which matches _any_ remaining `<` through
+  to the end of a passage — and monograph prose is full of literal ones
+  (`CrCl (ml/min) <20`, `if <50 kg`, `<6 months`). 21,796 passages across 13,983
+  products lost their tail, with no adjustment counted, while the summary
+  printed "never cut to fit". Worse, the Bengali copy of the same drug survived
+  intact because Bengali escapes the character — so the two languages stated
+  different renal doses for the same medicine.
+- **`SafetyAdviceTag` held four values where the source has seven**, dropping
+  57,377 of 215,391 verdicts (26.6%) — including `CONSULT YOUR DOCTOR`, which at
+  56,447 rows is the single most common verdict in the catalogue.
+- **`shortDescription` was bounded at 500 characters**, truncating 2,810 of the
+  7,013 summaries. The supplier's own field stops at exactly 1,000.
+- **Four more bounds were set through the data rather than above it**, each
+  found the same way — by reading the importer's own "reshaped to fit" report
+  after a full run, and then measuring the source rather than guessing again:
+
+  | field             |                 was |             cut |  longest real value |      now |
+  | ----------------- | ------------------: | --------------: | ------------------: | -------: |
+  | product name      |                 120 |       235 names |                 186 |      200 |
+  | active ingredient |                 160 | 3 dropped whole |                 215 |      250 |
+  | tag               | 80 chars / 20 items | 7 tags, 8 lists | 89 chars / 24 items | 120 / 32 |
+  | attribute value   |                 120 |               1 |                   — |      300 |
+
+  A product name matters more than its length suggests: combo packs list their
+  contents in the title, so cutting one removes what is in the box. A bound
+  exists to stop a malformed export writing something unbounded into every
+  document — not to trim a well-formed one, which is the mistake all four of
+  these were.
+
+- **HTML entities were never decoded**, so 35,289 passages would have reached a
+  pharmacist as `&lt;6 months`.
+- **`checkIndexes` named 28 of 40 models**, so eleven collections' indexes were
+  built by nothing in production — including the text index without which
+  monograph search does not run slowly but fails outright.

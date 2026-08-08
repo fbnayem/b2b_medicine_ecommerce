@@ -34,4 +34,11 @@ blob-report/
 # megabytes at full scale, and not this repository's to redistribute. The
 # importer finds the bundle by name at the repository root; keep it there and
 # out of version control. `apps/api/scripts/importArogga.ts` documents the shape.
+#
+# Both spellings are listed on purpose. The bundle arrives named either way
+# depending on whether it came out of the zip or off a filesystem that dislikes
+# spaces, and for a while only the spaced form was here — so twelve gigabytes of
+# third-party product data sat untracked but *unignored*, one `git add -A` away
+# from the history. Matching the name is not worth being clever about.
 arogga export/
+arogga_export/

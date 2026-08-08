@@ -425,21 +425,41 @@ test('a deposit slip is scoped exactly as tightly as the payment it belongs to',
   );
 });
 
+/*
+ * One endpoint, not two. `GET /payments/my-collections` was an identical
+ * second door onto `getCollectorSummary` that no client used, and it has been
+ * removed; the assertions it carried belong to the surviving path.
+ */
 test('a rider’s own collection summary is their own', async () => {
-  const summary = await get('/api/v1/payments/my-collections', rider);
-  assert.equal(summary.status, 200);
-
-  const desk = await get('/api/v1/payments/my-collections', manager);
-  assert.equal(desk.status, 403, 'this endpoint answers "what am I holding", so only a rider asks');
-
   const history = await get('/api/v1/finance/my/collections', rider);
   assert.equal(history.status, 200);
+
+  const desk = await get('/api/v1/finance/my/collections', manager);
+  assert.equal(desk.status, 403, 'this endpoint answers "what am I holding", so only a rider asks');
+
   const customer = await get('/api/v1/finance/my/collections', owner);
   assert.equal(
     customer.status,
     403,
     '`/finance/my/collections` sits among the shop owner’s endpoints and belongs to a ' +
       'rider — a path prefix that reads as ownership and is not',
+  );
+
+  /*
+   * The duplicate is gone rather than merely uncalled — a route that still
+   * answers is still a route to keep in step and to defend. The path now falls
+   * through to `GET /payments/:id`, where "my-collections" is not an id, and
+   * that has to be a 404 rather than the 500 a raw `CastError` used to produce.
+   */
+  const gone = await get('/api/v1/payments/my-collections', rider);
+  assert.equal(gone.status, 404, 'the removed path must not answer, and must not crash either');
+
+  const mistyped = await get('/api/v1/payments/not-an-object-id', manager);
+  assert.equal(
+    mistyped.status,
+    404,
+    'any mistyped identifier reached the same CastError; removing the duplicate only ' +
+      'surfaced it',
   );
 });
 

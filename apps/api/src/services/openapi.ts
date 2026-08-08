@@ -275,7 +275,15 @@ export const OPERATIONS: Operation[] = [
     summary: 'Search the medicine catalogue',
     tag: 'Inventory',
     roles: [...MANAGEMENT, UserRole.STOREKEEPER, UserRole.SHOP_OWNER, UserRole.SALES],
-    query: ['search', 'category', 'active', 'page', 'limit'],
+    query: ['search', 'category', 'branch', 'active', 'sort', 'page', 'limit'],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/inventory/categories',
+    summary: 'The shelf hierarchy, derived from what is actually stocked',
+    tag: 'Inventory',
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER, UserRole.SHOP_OWNER, UserRole.SALES],
+    query: ['active'],
   },
   {
     method: 'post',
@@ -1056,19 +1064,6 @@ export const OPERATIONS: Operation[] = [
     produces: 'image/*',
   },
   {
-    /*
-     * A rider's own collections, and the second endpoint whose path prefix
-     * reads as ownership it does not have — `/payments/my-collections` sits
-     * among the finance desk's endpoints and belongs to one rider, exactly as
-     * `/finance/my/collections` does.
-     */
-    method: 'get',
-    path: '/api/v1/payments/my-collections',
-    summary: 'What the signed-in rider has collected and not yet handed in',
-    tag: 'Payments',
-    roles: [UserRole.DELIVERY_PERSON],
-  },
-  {
     method: 'post',
     path: '/api/v1/payments/{id}/fail',
     summary: 'Record that a pending payment did not clear',
@@ -1672,6 +1667,22 @@ export const OPERATIONS: Operation[] = [
   },
   {
     method: 'get',
+    path: '/api/v1/inventory/medicines/{id}/alternatives',
+    summary: 'What else could be supplied instead — same ingredient, comparable, or bought with',
+    tag: 'Inventory',
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER, UserRole.SHOP_OWNER, UserRole.SALES],
+  },
+  {
+    method: 'get',
+    path: '/api/v1/inventory/medicines/{id}/content',
+    summary:
+      'The full product copy — brief facts, overview, tips and safety panel — in English or Bangla',
+    tag: 'Inventory',
+    roles: [...MANAGEMENT, UserRole.STOREKEEPER, UserRole.SHOP_OWNER, UserRole.SALES],
+    query: ['lang'],
+  },
+  {
+    method: 'get',
     path: '/api/v1/orders/{id}',
     summary: 'One order, scoped to what the caller may see',
     tag: 'Orders',
@@ -1822,6 +1833,16 @@ const ENVELOPE = {
           page: { type: 'integer' },
           limit: { type: 'integer' },
           pages: { type: 'integer' },
+          matchedIn: {
+            type: 'string',
+            enum: ['name', 'productInformation'],
+            description:
+              'Catalogue search only. `name` means the term matched a brand, ingredient, ' +
+              'manufacturer, SKU or barcode. `productInformation` means no product name ' +
+              'matched and these products mention the term in their monograph instead — ' +
+              'a different question, so a client must say so rather than present them as ' +
+              'name matches.',
+          },
         },
       },
     },

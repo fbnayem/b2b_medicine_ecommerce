@@ -7,7 +7,6 @@ import {
   getPayment,
   handover,
   listPayments,
-  myCollections,
   post,
   receipt,
   reverse,
@@ -27,7 +26,16 @@ const readers = [
 const finance = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER];
 router.get('/', requireRole(readers), listPayments);
 router.post('/', requireRole(finance), createPayment);
-router.get('/my-collections', requireRole([UserRole.DELIVERY_PERSON]), myCollections);
+/*
+ * `GET /my-collections` was here and is gone.
+ *
+ * It was a byte-for-byte duplicate of `GET /finance/my/collections` — same
+ * `getCollectorSummary` call, same paging, same `DELIVERY_PERSON` guard — and
+ * no client ever called it. Two paths answering one question is two things to
+ * keep in step, two entries in the specification and two doors to defend, for
+ * a capability that already had a door. The mobile rider screen has always
+ * used the finance path; the removed handler had no other caller.
+ */
 router.get('/:id/receipt', requireRole(readers), receipt);
 router.get('/:id/attachment', requireRole(readers), attachment);
 router.get('/:id', requireRole(readers), getPayment);

@@ -10,6 +10,28 @@ export const baseURL =
   configuredApiUrl ||
   (Platform.OS === 'android' ? 'http://10.0.2.2:5000/api/v1' : 'http://localhost:5000/api/v1');
 
+/**
+ * A product photograph's address, from the path the catalogue stores.
+ *
+ * `/media` is served **above** the versioned API — `baseURL` ends in `/api/v1`
+ * and a media path begins at the root — so joining the two naively produces
+ * `…/api/v1/media/…`, which is a 404 and renders as a silently blank image.
+ *
+ * Unauthenticated by design, and that decision is recorded in
+ * `middlewares/media.ts`: a picture of a box tells a stranger what the box
+ * looks like, while prices, stock and customers stay behind the API. Which is
+ * why this is a plain URL and not an authorised fetch — React Native's `Image`
+ * cannot attach a bearer token to one anyway.
+ *
+ * An absolute URL is passed through untouched, so a catalogue that later points
+ * at a CDN needs no change here.
+ */
+export function mediaUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  const root = baseURL.replace(/\/api\/v\d+$/, '');
+  return `${root}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
 type TokenPair = { accessToken: string; refreshToken: string };
 let refreshRequest: Promise<TokenPair> | null = null;
 

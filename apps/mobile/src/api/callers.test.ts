@@ -64,6 +64,13 @@ const MUST_REACH: ReadonlyArray<{ method: string; path: string; capability: stri
   { method: 'post', path: '/orders/submit', capability: 'send an order to the distributor' },
   { method: 'post', path: '/orders/{}/duplicate', capability: 'order the same thing again' },
   {
+    method: 'get',
+    path: '/inventory/medicines/{}/alternatives',
+    capability:
+      'find another brand of the same medicine when the one they asked for has no stock, ' +
+      'instead of being told "out of stock" and left to ring somebody',
+  },
+  {
     method: 'post',
     path: '/orders/{}/cancellation-request',
     capability: 'ask for an order to be cancelled before it is dispatched',
@@ -359,6 +366,21 @@ const MUST_REACH: ReadonlyArray<{ method: string; path: string; capability: stri
     capability:
       'take back goods a shop is sending — the returns screen already filters a rider’s ' +
       'list down to exactly this queue',
+  },
+
+  /*
+   * The catalogue's reading half, added with the monograph.
+   *
+   * Until this phase a medicine's page said what a product costs and how many
+   * are on the shelf, and nothing about the product itself — the supplier's
+   * copy existed on the server with no screen anywhere that asked for it.
+   */
+  {
+    method: 'get',
+    path: '/inventory/medicines/{}/content',
+    capability:
+      'read what a medicine is for, how it is taken and whether it is safe in pregnancy ' +
+      'or with a failing kidney — at the counter, in Bangla where the supplier shipped it',
   },
 ];
 

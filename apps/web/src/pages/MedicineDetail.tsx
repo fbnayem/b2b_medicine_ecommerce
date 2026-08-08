@@ -1,20 +1,30 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
-import { useParams } from 'react-router-dom';
+import { useId, useState, type FormEvent, type ReactNode } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  AlternativeGroupKind,
+  DeliveryRestriction,
+  MedicineContentGroup,
+  SafetyAdviceTag,
   StockMovementType,
+  UserRole,
+  type AlternativeGroup,
+  type ContentLanguage,
   type Medicine,
   type MedicineBatch,
   type PriceListRecord,
+  type SafetyAdviceType,
   type SchemeRecord,
 } from '@medsupply/shared-types';
-import { parseMoney, toMoneyInputValue } from '@medsupply/utilities';
+import { marginPercent, parseMoney, toMoneyInputValue } from '@medsupply/utilities';
 import { apiClient, errorMessage } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
+import { useCart } from '../store/useCart';
 import {
   canAdjustStock,
   canEditCatalogue,
   canOperateStock,
+  canReadCatalogue,
   canSeeCommercial,
   canSeeCost,
   canSeeStock,
@@ -38,8 +48,10 @@ import {
   requireReason,
   toast,
   useAsk,
+  type BadgeTone,
   type Column,
 } from '../components/ui';
+import { ProductCard } from '../components/ProductCard';
 import { useApiCollection, useApiResource } from '../lib/query';
 import { keys } from '../lib/queryKeys';
 import { useLanguage } from '../lib/useLanguage';
@@ -93,6 +105,52 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/**
+ * The product's photographs, one large and the rest as a row to choose from.
+ *
+ * The catalogue held a single image per product until the shelf trail and
+ * gallery landed, so a pharmacy deciding between two similar packs saw one
+ * angle of each. Products carry up to sixteen shots.
+ *
+ * The thumbnails are only rendered when there is more than one — a lone
+ * thumbnail under its own full-size copy is a control that does nothing.
+ */
+function Gallery({ item }: { item: Medicine }) {
+  const shots = item.productImages?.length
+    ? item.productImages
+    : [item.productImageUrl].filter((path): path is string => Boolean(path));
+  const [shown, setShown] = useState(0);
+  const { t } = useLanguage();
+  // A product can change under a stale index — a shorter gallery on the next
+  // one would otherwise render nothing at all.
+  const at = Math.min(shown, Math.max(0, shots.length - 1));
+
+  return (
+    <div className="flex flex-col gap-2">
+      <ProductImage path={shots[at]} className="h-48" />
+      {shots.length > 1 && (
+        <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+          {shots.map((path, index) => (
+            <li key={path}>
+              <button
+                type="button"
+                aria-label={t('catalogue.showPhoto', { number: index + 1 })}
+                aria-current={index === at}
+                onClick={() => setShown(index)}
+                className={`block rounded border p-0.5 ${
+                  index === at ? 'border-brand' : 'border-border'
+                }`}
+              >
+                <ProductImage path={path} className="h-10 w-10" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /** A card with a heading you can link to. */
 function Section({
   id,
@@ -126,6 +184,138 @@ interface Movement {
   actorId?: { firstName: string; lastName: string };
 }
 
+/*
+ * What `GET /medicines/{id}/content` answers: the stored sections already
+ * bucketed by group, groups already in reading order. Local, like `Movement`
+ * above — the shared `MedicineContent` type is the stored document, and this
+ * is the served answer, which the service reshapes on the way out.
+ */
+interface MonographSection {
+  title?: string;
+  body: string;
+  safety?: { type?: SafetyAdviceType; tag?: SafetyAdviceTag };
+}
+
+interface MonographGroup {
+  group: MedicineContentGroup;
+  sections: MonographSection[];
+}
+
+interface Monograph {
+  /** The language actually returned — English when no Bangla sibling exists. */
+  lang: ContentLanguage;
+  /** The language asked for, so the fallback is stated rather than hidden. */
+  requested: ContentLanguage;
+  groups: MonographGroup[];
+  source?: { name?: string; scrapedAt?: string };
+}
+
+/*
+ * The verdict's colour ranks it at a glance, but the words carry it: the badge
+ * always prints the tag itself, so a colour-blind pharmacist reads exactly what
+ * a colour-sighted one does. Colour as the only channel is the defect the axe
+ * scan is held at zero to keep out — and it is also why two verdicts may share
+ * a tone: "consult your doctor" and "use with caution" both rank as warnings,
+ * and the words tell them apart. A `Record` rather than a lookup with a
+ * default, so a verdict added to the enum is a compile error here instead of a
+ * badge silently rendered in whatever tone "unknown" happened to fall to.
+ */
+const SAFETY_TONES: Record<SafetyAdviceTag, BadgeTone> = {
+  [SafetyAdviceTag.SAFE]: 'success',
+  [SafetyAdviceTag.SAFE_IF_PRESCRIBED]: 'info',
+  [SafetyAdviceTag.CONSULT_YOUR_DOCTOR]: 'warning',
+  [SafetyAdviceTag.CAUTION]: 'warning',
+  [SafetyAdviceTag.UNSAFE]: 'danger',
+  [SafetyAdviceTag.NOT_RELEVANT]: 'neutral',
+};
+
+/**
+ * A passage that folds when it is long.
+ *
+ * The longest body in the imported catalogue is 29,431 characters, and a page
+ * that dumps that between a pharmacist and the stock table is a page nobody
+ * scrolls to the end of. But a fold that hides only a line or two is a control
+ * that costs a tap and saves nothing, so short passages render whole — the
+ * fold only exists where it hides something worth hiding. The cut lands on a
+ * word boundary because half of "hypersensitivity" reads as a rendering fault
+ * rather than as a fold.
+ */
+const FOLD_OVER = 900;
+const FOLDED_LENGTH = 600;
+
+function Passage({ body }: { body: string }) {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const passageId = useId();
+
+  if (body.length <= FOLD_OVER) {
+    return <p className="m-0 whitespace-pre-line text-text-muted">{body}</p>;
+  }
+
+  const boundary = body.lastIndexOf(' ', FOLDED_LENGTH);
+  const folded = body.slice(0, boundary > 0 ? boundary : FOLDED_LENGTH);
+
+  return (
+    <div>
+      <p id={passageId} className="m-0 whitespace-pre-line text-text-muted">
+        {open ? body : `${folded}…`}
+      </p>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={passageId}
+        onClick={() => setOpen((current) => !current)}
+        className="mt-1 min-h-11 text-sm font-medium text-brand underline underline-offset-2"
+      >
+        {open ? t('catalogueContent.showLess') : t('catalogueContent.showMore')}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * One list of suggested products, shared by the alternatives groups and the
+ * promoted section — the cards look identical on purpose; what differs is the
+ * heading over them, and that difference is the whole point of the split.
+ */
+function AlternativeItems({
+  items,
+  showPrices,
+  onAdd,
+}: {
+  items: AlternativeGroup['items'];
+  showPrices: boolean;
+  /** Absent for anybody who cannot place an order; the card then has no action. */
+  onAdd?: (item: AlternativeGroup['items'][number]) => void;
+}) {
+  const { t } = useLanguage();
+  return (
+    <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-3 p-0">
+      {items.map((other) => (
+        <li key={other._id}>
+          <ProductCard
+            item={other}
+            showPrices={showPrices}
+            action={
+              onAdd && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  className="w-full"
+                  data-test={`add-${other.reference}`}
+                  onClick={() => onAdd(other)}
+                >
+                  {t('catalogue.addToOrder')}
+                </Button>
+              )
+            }
+          />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** The changes a storekeeper may record by hand, in the order they occur. */
 const MANUAL_MOVEMENTS: StockMovementType[] = [
   StockMovementType.DAMAGE,
@@ -145,23 +335,6 @@ const EMPTY_RECEIPT = {
   notes: '',
 };
 
-/**
- * Profit as a percentage of what the pack sells for.
- *
- * Measured against the **MRP**, because that is the ceiling a pharmacy may
- * charge and therefore the number the shop's own margin comes out of. Integer
- * arithmetic throughout: these are poisha, and a percentage of them is the one
- * place a float would be tempting and wrong.
- *
- * A markup over *cost* is a different figure and one keystroke away, so this is
- * never shown to anybody who cannot also see the cost it would be confused
- * with — the label says which it is.
- */
-function marginPercent(tradeMinor: number, mrpMinor?: number): number | undefined {
-  if (!mrpMinor || mrpMinor <= 0 || tradeMinor > mrpMinor) return undefined;
-  return Math.round(((mrpMinor - tradeMinor) * 1000) / mrpMinor) / 10;
-}
-
 export function MedicineDetail() {
   const { id } = useParams();
   const { t, language } = useLanguage();
@@ -176,8 +349,37 @@ export function MedicineDetail() {
    * navigation manifest and the fix here were one change, not two.
    */
   const showStock = canSeeStock(role);
+  /*
+   * Whether to show the *pricing tools* — a price list, an offer, the editable
+   * trade price. Not whether to show the price itself.
+   */
   const showCommercial = canSeeCommercial(role);
   const showCost = canSeeCost(role);
+  /*
+   * The price a pharmacy pays, and the price printed on the pack.
+   *
+   * These were behind `canSeeCommercial`, which excludes `SHOP_OWNER` — so the
+   * buyer read the price on the catalogue card, clicked into the product, and
+   * it vanished. The server has never hidden either figure from them
+   * (`hideCosts` strips `costPriceMinor` and nothing else), and the list has
+   * always rendered them, so this was a disclosure rule that existed only on
+   * one screen and only against the person the screen is for.
+   */
+  const showPrices = canReadCatalogue(role);
+  /*
+   * Only the customer places an order, which is the same rule the catalogue
+   * list applies. Staff order on a shop's behalf from order entry, where they
+   * have first chosen which shop they are acting for — a bare "add to order"
+   * here would have no basket to add to.
+   */
+  const mayOrder = role === UserRole.SHOP_OWNER;
+  const addToCart = useCart((state) => state.add);
+
+  /** Adds, and says so — the basket lives in the header and is easy to miss. */
+  function addToOrder(product: Medicine) {
+    addToCart(product);
+    toast.success(t('cart.addedToOrder', { brand: product.brandName }));
+  }
   const mayEdit = canEditCatalogue(role);
   const mayOperate = canOperateStock(role);
   const mayAdjust = canAdjustStock(role);
@@ -189,6 +391,28 @@ export function MedicineDetail() {
   const [savingPrice, setSavingPrice] = useState(false);
 
   const medicine = useApiResource<Medicine>(keys.medicines.one(id!), `/inventory/medicines/${id}`);
+  /*
+   * What else could be sent instead — a second request rather than a field on
+   * the medicine, because it costs three aggregations and this page is opened
+   * constantly during order entry. It resolves after the page has already
+   * rendered, and the section is simply absent until it does.
+   */
+  const alternatives = useApiResource<AlternativeGroup[]>(
+    keys.medicines.alternatives(id!),
+    `/inventory/medicines/${id}/alternatives`,
+  );
+  /*
+   * The manufacturer's copy, fetched apart from the medicine for the same
+   * reason as the alternatives: kilobytes of prose the catalogue queries never
+   * read, on a page opened constantly during order entry. Asked for in the
+   * reader's language; the server answers `null` for a line with no copy at
+   * all — every hand-entered medicine — and falls back to English when only
+   * the Bangla sibling is missing, saying so in `requested`.
+   */
+  const content = useApiResource<Monograph | null>(
+    keys.medicines.content(id!, language),
+    `/inventory/medicines/${id}/content?lang=${language}`,
+  );
   const batches = useApiCollection<MedicineBatch>(
     keys.medicines.batches(id!),
     `/inventory/batches?medicineId=${id}`,
@@ -559,6 +783,20 @@ export function MedicineDetail() {
         const carriers = (priceLists.data?.items ?? []).filter((list) =>
           list.lines.some((line) => line.medicineId === id),
         );
+        const monograph = content.data;
+        /*
+         * `PROMOTED` is pulled out of the alternatives and given a section of
+         * its own. It is the supplier's bestseller carousel — advertising, not
+         * a clinical relationship — and on a prescription line it returns
+         * products with no connection to the medicine at all. Rendered under
+         * "What else could be sent" it would claim exactly the equivalence it
+         * does not have, so the split is the labelling, not a layout choice.
+         */
+        const suggestions = alternatives.data ?? [];
+        const shelf = suggestions.filter((group) => group.kind !== AlternativeGroupKind.PROMOTED);
+        const promoted = suggestions.filter(
+          (group) => group.kind === AlternativeGroupKind.PROMOTED,
+        );
 
         return (
           <>
@@ -587,38 +825,159 @@ export function MedicineDetail() {
               }
             />
 
-            <StatGrid className="mb-4">
-              <Stat
-                label={t('catalogue.availability')}
-                value={item.totalAvailable ?? 0}
-                note={`${t('catalogue.orderLimits')}: ${item.minimumOrderQuantity}–${
-                  item.maximumOrderQuantity ?? t('catalogue.noMaximum')
-                }`}
-                tone={(item.totalAvailable ?? 0) > 0 ? 'neutral' : 'warning'}
-              />
-              {showStock && <Stat label={t('inventory.onHand')} value={onHand} />}
-              {showCommercial && (
-                <Stat
-                  label={t('catalogue.listPrice')}
-                  value={formatMinor(item.defaultSellingPriceMinor)}
-                  note={t('medicinePage.perUnit', { unit: item.unit })}
-                />
-              )}
-              {showCommercial && (
-                <Stat
-                  label={t('medicinePage.margin')}
-                  value={margin === undefined ? '—' : `${margin}%`}
-                  note={
-                    margin === undefined ? t('medicinePage.noMrp') : t('medicinePage.marginNote')
-                  }
-                />
-              )}
-            </StatGrid>
+            {/*
+              The product block, which is what somebody came to this page for.
+
+              Photograph and price side by side, because the two decisions a
+              pharmacy makes here — "is this the right pack" and "what does it
+              cost me" — were previously separated by four stat tiles and a
+              definition list. The stat row that used to sit here is still
+              below; it carries the warehouse figures a storekeeper wants, and
+              those are a different job from buying.
+            */}
+            <Card className="mb-4">
+              <div className="grid gap-5 md:grid-cols-[16rem_minmax(0,1fr)]">
+                <Gallery item={item} />
+
+                <div className="flex flex-col gap-3">
+                  {/*
+                    No product name here on purpose. `PageHeader` a centimetre
+                    above already carries it as the page's `h1`, with the
+                    ingredient, form and pack beneath — repeating it would be
+                    two headings for one product, and a screen reader would
+                    announce the medicine twice before reaching the price.
+
+                    The manufacturer is the exception: it is what a pharmacist
+                    checks when two brands share a molecule, and the record
+                    below is a scroll away.
+                  */}
+                  <p className="m-0 text-text-muted">{item.manufacturer}</p>
+
+                  {/*
+                    The facts that change what somebody does, as badges: is it
+                    on the catalogue, does it need a prescription, does it need
+                    a cold van, and can it even go where this customer is. Each
+                    is also a row in the record below, which is where somebody
+                    reading the whole line finds it; here they are the four
+                    worth seeing without reading.
+                  */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={item.isActive ? 'success' : 'neutral'}>
+                      {item.isActive ? t('catalogue.listedActive') : t('catalogue.listedInactive')}
+                    </Badge>
+                    {item.coldChain && (
+                      <Badge tone="warning">{t('catalogue.coldChainShort')}</Badge>
+                    )}
+                    {item.deliveryRestriction === DeliveryRestriction.DHAKA_ONLY && (
+                      <Badge tone="warning">{t('catalogue.dhakaOnly')}</Badge>
+                    )}
+                  </div>
+
+                  {/*
+                    Trade price first and largest, MRP struck through beside it,
+                    and the gap between them as the pharmacy's margin. A
+                    consumer shop would call that gap a discount; here it is
+                    what the buyer earns, so it is labelled as margin. The MRP
+                    is shown only when it is genuinely higher — on a line where
+                    the two are equal, a struck-through identical figure reads
+                    as a broken offer.
+                  */}
+                  {showPrices && (
+                    <div>
+                      {/*
+                        Labelled, for the reason the mobile gate enforces on the
+                        other client: a bare figure under a medicine reads as
+                        the price this shop pays, and it is the list price.
+                      */}
+                      <p className="m-0 text-sm text-text-muted">{t('catalogue.listPrice')}</p>
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <span className="text-3xl font-semibold tabular-nums text-text">
+                          {formatMinor(item.defaultSellingPriceMinor)}
+                        </span>
+                        {item.mrpMinor !== undefined &&
+                          item.mrpMinor > item.defaultSellingPriceMinor && (
+                            <span className="text-lg text-text-muted line-through tabular-nums">
+                              {formatMinor(item.mrpMinor)}
+                            </span>
+                          )}
+                        {margin !== undefined && margin > 0 && (
+                          <Badge tone="success">
+                            {t('catalogue.marginBadge', { percent: margin })}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="m-0 mt-1 text-sm text-text-muted">
+                        {t('medicinePage.perUnit', { unit: item.unit })}
+                        {item.mrpMinor !== undefined &&
+                          item.mrpMinor > 0 &&
+                          ` · ${t('medicinePage.mrpIs', { amount: formatMinor(item.mrpMinor) })}`}
+                      </p>
+                      {/*
+                        The list price is not necessarily this customer's price.
+                        Their own price list and any running offer are applied
+                        by the server when the order is priced, and a page that
+                        implied otherwise would be quoting a figure the invoice
+                        then contradicts.
+                      */}
+                      <p className="m-0 mt-1 text-sm text-text-muted">
+                        {t('medicinePage.priceCaveat')}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={(item.totalAvailable ?? 0) > 0 ? 'success' : 'neutral'}>
+                      {(item.totalAvailable ?? 0) > 0
+                        ? t('alternatives.inStock', { count: item.totalAvailable ?? 0 })
+                        : t('alternatives.noStock')}
+                    </Badge>
+                    <span className="text-sm text-text-muted">
+                      {t('catalogue.orderLimits')}: {item.minimumOrderQuantity}–
+                      {item.maximumOrderQuantity ?? t('catalogue.noMaximum')}
+                    </span>
+                  </div>
+
+                  {mayOrder && (
+                    <div>
+                      <Button
+                        variant="primary"
+                        data-test="add-to-order"
+                        onClick={() => addToOrder(item)}
+                      >
+                        {t('catalogue.addToOrder')}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            {/*
+              What the warehouse holds, which is a different question from what
+              a buyer is deciding. Free stock, the price and the margin all
+              moved into the product block above; repeating them here was the
+              same figure twice on one screen — the defect this page already
+              avoids for the product name.
+
+              `onHand` stays because it is genuinely a second number: everything
+              in the building, before anything promised to an order is taken
+              off it. Only staff see it, and only staff can act on it.
+            */}
+            {showStock && (
+              <StatGrid className="mb-4">
+                <Stat label={t('inventory.onHand')} value={onHand} />
+              </StatGrid>
+            )}
 
             <div className="flex flex-col gap-4">
+              {/*
+                The photographs moved up into the product block, so this is now
+                the record rather than the shop window — reference, shelf,
+                pack, status. Two galleries a screen apart was one gallery too
+                many.
+              */}
               <Section id="about" title={t('catalogue.about')}>
-                <div className="grid gap-4 sm:grid-cols-[12rem_1fr]">
-                  <ProductImage path={item.productImageUrl} className="h-48" />
+                <div className="grid gap-4">
                   <dl className="m-0">
                     <Detail label={t('common.reference')}>
                       {item.reference} · {item.sku}
@@ -632,7 +991,35 @@ export function MedicineDetail() {
                       </Detail>
                     )}
                     <Detail label={t('catalogue.manufacturer')}>{item.manufacturer}</Detail>
-                    <Detail label={t('catalogue.category')}>{item.category}</Detail>
+                    {/*
+                      The whole shelf trail, each level a link to everything
+                      under it. The catalogue knew a product was an
+                      "Anti-Bacterial" and not that this sits under "Medicine",
+                      so there was nowhere to go from here but back to a search.
+                    */}
+                    <Detail label={t('catalogue.category')}>
+                      {item.categoryPath?.length ? (
+                        <span className="flex flex-wrap items-baseline gap-1">
+                          {item.categoryPath.map((level, index) => (
+                            <span key={level} className="flex items-baseline gap-1">
+                              {index > 0 && (
+                                <span aria-hidden className="text-text-muted">
+                                  ›
+                                </span>
+                              )}
+                              <Link
+                                to={`/medicines?branch=${encodeURIComponent(level)}`}
+                                className="text-brand underline underline-offset-2"
+                              >
+                                {level}
+                              </Link>
+                            </span>
+                          ))}
+                        </span>
+                      ) : (
+                        item.category
+                      )}
+                    </Detail>
                     <Detail label={t('catalogue.classification')}>
                       {t(`classification.${item.classification}`)}
                     </Detail>
@@ -652,6 +1039,81 @@ export function MedicineDetail() {
                 </div>
                 {item.description && <p className="mt-3 text-text-muted">{item.description}</p>}
               </Section>
+
+              {/*
+                The monograph — dosage, contraindications, interactions — under
+                a heading that says whose words these are. This is a reprinted
+                manufacturer leaflet plus their marketing copy, and nothing on
+                this screen may let it read as MedSupply's own clinical
+                guidance: the attribution is the section title so it cannot be
+                scrolled past, and the caution sits above the first passage
+                rather than below the last one, 29,000 characters too late.
+              */}
+              {monograph && monograph.groups.length > 0 && (
+                <Section id="monograph" title={t('catalogueContent.provenance')}>
+                  <p className="mb-1 text-sm text-text-muted">{t('catalogueContent.notAdvice')}</p>
+                  {monograph.lang !== monograph.requested && (
+                    // The Bangla sibling simply does not exist for this line —
+                    // true of one imported product in eleven — and a screen
+                    // that swaps language without saying so reads as broken.
+                    <p data-test="monograph-language" className="mb-1 text-sm text-text-muted">
+                      {t('catalogueContent.onlyInEnglish')}
+                    </p>
+                  )}
+                  <div className="mt-4 flex flex-col gap-5">
+                    {monograph.groups.map((bundle) => (
+                      <div key={bundle.group}>
+                        <h3 className="mb-2 text-sm font-semibold text-text">
+                          {t(`catalogueContent.group.${bundle.group}`)}
+                        </h3>
+                        {bundle.group === MedicineContentGroup.QUICK_TIP ? (
+                          // Tips have no titles and are one line each — a list,
+                          // not a run of paragraphs pretending to be one.
+                          <ul className="m-0 list-disc ps-5 text-text-muted">
+                            {bundle.sections.map((section) => (
+                              <li key={section.body} className="mb-1 last:mb-0">
+                                {section.body}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : bundle.group === MedicineContentGroup.SAFETY ? (
+                          <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
+                            {bundle.sections.map((section, index) => (
+                              <li
+                                key={section.safety?.type ?? index}
+                                className="rounded-lg border border-border p-3"
+                              >
+                                <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-medium text-text">
+                                    {section.safety?.type
+                                      ? t(`catalogueContent.safetyType.${section.safety.type}`)
+                                      : section.title}
+                                  </span>
+                                  {section.safety?.tag && (
+                                    <Badge tone={SAFETY_TONES[section.safety.tag]}>
+                                      {t(`catalogueContent.safetyTag.${section.safety.tag}`)}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <Passage body={section.body} />
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          bundle.sections.map((section, index) => (
+                            <div key={section.title ?? index} className="mb-3 last:mb-0">
+                              {section.title && (
+                                <h4 className="mb-1 font-medium text-text">{section.title}</h4>
+                              )}
+                              <Passage body={section.body} />
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
 
               {showCommercial && (
                 <Section id="pricing" title={t('medicinePage.pricing')}>
@@ -804,6 +1266,44 @@ export function MedicineDetail() {
                       />
                     )}
                   </Resource>
+                </Section>
+              )}
+
+              {shelf.length > 0 && (
+                <Section id="alternatives" title={t('alternatives.title')}>
+                  <p className="mb-3 text-sm text-text-muted">{t('alternatives.subtitle')}</p>
+                  {shelf.map((group) => (
+                    <div key={group.kind} className="mb-5 last:mb-0">
+                      <h3 className="mb-2 text-sm font-semibold text-text">
+                        {t(`alternativeGroup.${group.kind}`)}
+                      </h3>
+                      <AlternativeItems
+                        items={group.items}
+                        showPrices={showPrices}
+                        onAdd={mayOrder ? addToOrder : undefined}
+                      />
+                    </div>
+                  ))}
+                </Section>
+              )}
+
+              {/*
+                The advert, headed as one. See the `shelf`/`promoted` split
+                above for why this is never rendered among the alternatives.
+              */}
+              {promoted.length > 0 && (
+                <Section id="promoted" title={t('catalogueContent.promoted')}>
+                  <p className="mb-3 text-sm text-text-muted">
+                    {t('catalogueContent.promotedNote')}
+                  </p>
+                  {promoted.map((group) => (
+                    <AlternativeItems
+                      key={group.kind}
+                      items={group.items}
+                      showPrices={showPrices}
+                      onAdd={mayOrder ? addToOrder : undefined}
+                    />
+                  ))}
                 </Section>
               )}
 

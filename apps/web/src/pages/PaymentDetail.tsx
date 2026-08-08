@@ -2,6 +2,7 @@ import { useRef, useState, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { PaymentStatus, UserRole } from '@medsupply/shared-types';
+import { translatedOr } from '@medsupply/i18n';
 import { apiClient, errorMessage } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
 import {
@@ -288,8 +289,17 @@ export function PaymentDetail({ ownerMode = false }: PaymentDetailProps) {
                   </div>
 
                   <dl className="m-0 mt-3">
+                    {/*
+                      "delivery collection" was the enum, tidied — which reads
+                      as a category name rather than as the fact it records:
+                      a rider took this money at the customer's door.
+                      `translatedOr` keeps a source the catalogue has not caught
+                      up with readable rather than blank.
+                    */}
                     <Detail label={t('finance.source')}>
-                      {payment.source?.replaceAll('_', ' ').toLowerCase() ?? t('finance.manual')}
+                      {payment.source
+                        ? translatedOr(t, `paymentSource.${payment.source}`, payment.source)
+                        : t('finance.manual')}
                     </Detail>
                     <Detail label={t('finance.created')}>
                       {formatFinanceDateTime(payment.createdAt)}

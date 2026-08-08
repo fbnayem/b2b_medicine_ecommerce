@@ -2,6 +2,130 @@
 
 Tests must pass before a phase is marked complete.
 
+## Phase 43 coverage — the endpoints nobody could reach
+
+Four tests appended to `catalogueContentIntegration.test.ts` for the search
+wiring, an assertion pair added to `financeIntegration.test.ts` for the deleted
+route, and a new web file `Repairs.test.tsx` (nine tests) for the screens.
+
+| Gate                              | What it holds                                                                                                | Planted to prove it                                                                                                                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search fallback fires             | A term naming no product falls back to the monograph, and the result says `matchedIn: 'productInformation'`. | Fallback disabled → red with "nothing is called 'typhoid', so the only honest answer comes from the monograph".                                                                                       |
+| Search fallback does **not** fire | A term that names a product never pays the 451–1,568 ms monograph search.                                    | Asserted on `matchedIn`, which is the only observable difference.                                                                                                                                     |
+| An empty search stays empty       | A term nothing knows about does not blame the monograph for an empty screen.                                 |                                                                                                                                                                                                       |
+| Browsing is not searching         | A list with no search term carries no `matchedIn` at all.                                                    |                                                                                                                                                                                                       |
+| The duplicate is gone             | `GET /payments/my-collections` 404s rather than answering.                                                   | It first returned a **500** — `Payment.findOne({_id: 'my-collections'})` throws an unhandled `CastError` — which is how the pre-existing defect was found. A second assertion covers any mistyped id. |
+| Money conversion                  | `250.50` posts **25,050** paisa.                                                                             | `Math.round(taka * 100)` → `Math.round(taka)` → red with "expected 251 to be 25050". A hundredfold error on the one screen that exists to correct a ledger.                                           |
+| Repair offered only when needed   | A clean account shows no "Correct it" button.                                                                | Pressing it would post nothing and read as though it had.                                                                                                                                             |
+| Role scoping, three ways          | A rep sees no ledger panel; a manager may check but never correct or adjust; a manager sees no test send.    | Each mirrors a `requireRole` on the router, so the button whose only outcome is a 403 never exists.                                                                                                   |
+| Test send recipient               | The request carries the signed-in user's id and no other.                                                    | The endpoint accepts any recipient; the screen must never offer that.                                                                                                                                 |
+| Suppression vs failure            | A preference holding a message back renders differently from a gateway refusing it.                          | Rendering both as "failed" sends somebody hunting a bug that is one person's switched-off email.                                                                                                      |
+
+### Three gates that caught this work before it passed
+
+Not written this phase — they were already there, and all three fired:
+
+- **`apiPaths.test.ts`** — `/shops/${id}/assign-${kind}` is not an address the
+  specification check can resolve. Both paths are now written out.
+- **`fieldHints.test.ts`** — four new fields had a label and no hint.
+- **`queryKeyDiscipline.test.ts`** — three of the new writes left every screen
+  showing what was true beforehand, including a credit reservation, where the
+  stale figure is the one somebody approves the next order against.
+
+## Phase 42 coverage — the whole supplier record
+
+Three new integration files — `catalogueContentIntegration.test.ts`,
+`relationShapeIntegration.test.ts` and `catalogueActivationIntegration.test.ts` —
+plus two unit gates added to `catalogueRules.test.ts`.
+
+| Gate                 | What it holds                                                                                                                          | Planted to prove it                                                                                                                                                                                                                                                                         |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stage order          | The stock `$lookup` runs **after** `$skip`/`$limit`, never before.                                                                     | Lookup moved back above the paging stages → red, with a message naming the cost ("runs once per matched medicine instead of once per row returned"). The first attempt passed misleadingly against stale compiled output, which is the reason a gate nobody has watched fail is not a gate. |
+| Paging arithmetic    | Page 3 of 20 skips 40, page 1 skips nothing.                                                                                           | Asserted directly; an off-by-one here silently drops a row between pages.                                                                                                                                                                                                                   |
+| Language fallback    | A product with no Bangla returns English rather than nothing.                                                                          | Fires for 2,342 real products — 26,896 carry English, only 24,554 Bangla — so this is a live path, not a courtesy.                                                                                                                                                                          |
+| Group ordering       | Sections come back BRIEF → OVERVIEW → QUICK_TIP → SAFETY → BODY → FEATURE, not in storage order.                                       |                                                                                                                                                                                                                                                                                             |
+| Safety fields        | `type` and `tag` survive as fields, not as prose.                                                                                      |                                                                                                                                                                                                                                                                                             |
+| Body length          | Bodies are **not** truncated.                                                                                                          | The 2,000-character cap that cut the middle out of monographs is what this exists to prevent returning.                                                                                                                                                                                     |
+| Relation shape       | Items come back already in rank order, all four kinds round-trip, `PROMOTED` stays its own group so it can be labelled as advertising. |                                                                                                                                                                                                                                                                                             |
+| Relation idempotency | Re-importing one product replaces its lists rather than doubling them.                                                                 | This is what the retired unique `(fromId, toId, kind)` index used to provide; delete-then-insert provides it now.                                                                                                                                                                           |
+| Activation           | A product the supplier lists as out of stock is still visible to a shop owner, while `listedElsewhere` records what the supplier said. | The 24,188-product defect; the test is its proof.                                                                                                                                                                                                                                           |
+| Zero price           | A product priced at ৳0 stays inactive.                                                                                                 | 219 of them; unpurchasable.                                                                                                                                                                                                                                                                 |
+
+### The gate that is not a test
+
+The importer's **row reconciliation** is the evidence for "no information was
+lost". It accounts for every row of every source table as imported, folded,
+archived or refused, asserts each total against the source count, and sets a
+non-zero exit code if any line fails to balance or if a record could not be
+parsed. It is run as part of every import rather than kept for release.
+
+Two of the four data-loss defects this phase fixed were found by that counter
+and by the importer's "reshaped to fit" report — not by anybody reading the
+data. The other two were found by adversarial review of the same work.
+
+## Phase 41 coverage — the real catalogue and its alternatives
+
+`alternativesIntegration.test.ts`, eleven tests. Every gate proved by planting
+the defect it claims to catch.
+
+| Gate                         | What it holds                                                           | Planted to prove it                                                                                                                                  |
+| ---------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Absent-ingredient guard      | A product with no active ingredient has **no** same-ingredient group.   | Guard removed → exactly one test red. Without it every non-drug becomes an alternative for every other non-drug, which renders as a working feature. |
+| Collation                    | `paracetamol` and `Paracetamol` are one drug.                           | `.collation()` dropped → two tests red, including the one that exists solely for a hand-typed lower-case ingredient.                                 |
+| Delisted products            | Nothing withdrawn is ever offered, in any group.                        | `isActive: true` removed from the relation join → the withdrawn-product test and the ranking test both red.                                          |
+| Supplier ranking             | Rank 1 shows before rank 2.                                             | Covered by the same plant; `$sort` removal alone also turns it red.                                                                                  |
+| Strength ordering            | 665 mg never outranks 500 mg when the subject is 500 mg.                | Asserted directly against a fixture carrying both.                                                                                                   |
+| Cost privacy                 | A shop owner is never shown `costPriceMinor`, on any card in any group. | Asserted across every item of every group rather than on one.                                                                                        |
+| Role                         | A rider gets 403 — they carry what is on the note and do not sell.      |                                                                                                                                                      |
+| `callers.test.ts`            | The mobile screen must keep calling the endpoint.                       | Path broken → failure names the capability: "find another brand of the same medicine when the one they asked for has no stock".                      |
+| `resetCatalogue.ts` coverage | Every collection in the database is in the clear list or the keep list. | A collection planted into MongoDB → the run refuses and names it. It then caught `medicinerelations` for real.                                       |
+
+### Verified against the live catalogue, not only fixtures
+
+After the import, `alternativesFor` was run against **Napa 125 Suppository** in
+the real 55,998-product catalogue: three other manufacturers' Paracetamol 125 mg
+suppositories first, then other strengths, then basket affinity — 21 ms across
+1.35 million relation rows. Fixtures prove the rules; this proves the indexes.
+
+### Two traps, both of them the machine rather than the code
+
+Both appeared immediately after the import copied 4.2 GB of photography and left
+MongoDB holding a 56,000-product catalogue, and both look exactly like a
+regression until you check.
+
+**The web suite failed 8 files** with `Cannot find package '@radix-ui/...'` and
+`UNKNOWN: unknown error, lstat`. The packages were on disk the whole time — it
+is Windows filesystem contention between vitest's parallel workers.
+`pnpm vitest run --no-file-parallelism` returns all 43 files and 334 tests.
+
+**`typescript-go` panics inside its own `checkerPool`**, which kills the
+Playwright `webServer` before any test runs — and the error it surfaces says
+_"The end-to-end suite needs MongoDB and Redis running"_, which is a lie: both
+were up. The compiler is Go, so its worker pool answers to `GOMAXPROCS`:
+
+    GOMAXPROCS=2 pnpm exec playwright test
+
+That is the difference between a suite that cannot start and one that runs
+clean. If the machine is also short of memory the symptom changes shape again —
+V8 reports `Committing semi space failed` at a 38 MB heap, which is not the
+process running out of memory but the host.
+
+Neither is worth changing a build script over; both are worth recognising in
+under a minute instead of bisecting a phase's worth of work.
+
+### Completing the catalogue — three more gates, each planted
+
+`catalogueShapeIntegration.test.ts` (7) and three more in
+`alternativesIntegration.test.ts`.
+
+| Gate              | What it holds                                                                                                  | Planted to prove it                                                                                            |
+| ----------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Gallery           | A product keeps every photograph, and `productImageUrl` equals the first of them rather than drifting from it. | Asserted directly against a three-image fixture.                                                               |
+| Branch counts     | A parent's figure is everything underneath it, not only what is filed directly at it.                          | Roll-up replaced with a leaf-only count → two tests red, including the shop-owner one.                         |
+| Delisted branches | A shop owner is never offered a branch whose only product is withdrawn; a manager still sees it.               | `isActive` filter dropped from the grouping → the shop-owner test red, the manager test correctly still green. |
+| Branch filter     | `?branch=` matches at any depth; `?category=` still means one leaf.                                            | Asserted at two levels of the same trail.                                                                      |
+| Shelf fallback    | Offered **only** when nothing better exists.                                                                   | Made unconditional → "the shelf is a last resort" red, the fallback test correctly still green.                |
+
 ## Phase 40 coverage — MedSupply Rider
 
 Every gate below was proved by planting the defect it claims to catch, and two

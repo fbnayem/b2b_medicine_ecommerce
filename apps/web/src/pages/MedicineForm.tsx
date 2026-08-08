@@ -584,10 +584,17 @@ export function MedicineForm({ mode = 'create', onCreated, onCancel }: MedicineF
           error={errors.classification?.message}
           hint={t('hints.classification')}
         >
+          {/*
+            The catalogue, not the enum. This printed `PRESCRIPTION` and `OTC`
+            lower-cased — database values, in English whatever the language was
+            set to — while the medicine page two clicks away has rendered
+            "On prescription" from `classification.*` since the phase that
+            added it. One of the two was wrong and it was this one.
+          */}
           <Select {...form.register('classification')}>
             {Object.values(MedicineClassification).map((value) => (
               <option key={value} value={value}>
-                {value.replaceAll('_', ' ').toLowerCase()}
+                {t(`classification.${value}`)}
               </option>
             ))}
           </Select>

@@ -7,6 +7,7 @@ import {
   type NotificationRecord,
 } from '@medsupply/shared-types';
 import { apiClient } from '../api/client';
+import { DeliveryLog, TestSend } from '../components/NotificationDelivery';
 import { useNotificationStore } from '../store/useNotifications';
 import { useRealtimeEvent } from '../realtime/useRealtime';
 import {
@@ -108,6 +109,8 @@ export function Notifications() {
         }
       />
 
+      <TestSend />
+
       <div className="mb-4 flex flex-col gap-3">
         <FilterTabs
           label={t('notifications.category')}
@@ -198,6 +201,13 @@ export function Notifications() {
                         {t('notifications.archive')}
                       </Button>
                     </div>
+                    {/*
+                      Administrators only, and closed until asked for. "Did it
+                      actually send?" is a question about one message, so the
+                      attempt log belongs on that message rather than on a
+                      separate screen somebody would have to match up by hand.
+                    */}
+                    <DeliveryLog notificationId={notification._id} />
                   </Card>
                 </li>
               ))}

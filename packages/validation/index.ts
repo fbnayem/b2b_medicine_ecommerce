@@ -4,6 +4,7 @@ import {
   DeliveryFailureReason,
   DeliveryPriority,
   DeliveryProofType,
+  DeliveryRestriction,
   LedgerTransactionType,
   MedicineClassification,
   NotificationCategory,
@@ -194,6 +195,39 @@ const moneyMinor = z.number().int().min(0);
 const positiveQuantity = z.number().int().positive();
 
 /**
+ * Where a picture is — an absolute URL, or a path to a file we hold.
+ *
+ * `z.string().url()` alone rejected the second, which meant a catalogue
+ * imported with its images had exactly one field no schema had checked, because
+ * the importer had to set it after parsing. A relative path is a legitimate
+ * answer: the file exists, it simply is not served yet.
+ *
+ * Lifted out of `productImageUrl` so the gallery entries are held to the same
+ * rule rather than a copy of it that drifts.
+ */
+const imagePath = z
+  .string()
+  .trim()
+  .max(500)
+  .refine(
+    (value) => /^https?:\/\//i.test(value) || /^[\w./-]+\.(webp|jpe?g|png|gif|avif)$/i.test(value),
+    'Must be an http(s) URL or a path to an image file',
+  );
+
+/**
+ * One cell of a supplier attribute. The same rule for the name and the value —
+ * both are free text in the source ("skin type": "Sensitive") and holding them
+ * to one bound is one decision instead of two that drift.
+ */
+const attributeText = z.string().trim().min(1).max(300);
+
+/**
+ * A supplier-reported count — orders, views, ratings. Zero is a real answer;
+ * a negative or fractional one is a corrupt export, not a small number.
+ */
+const supplierCount = z.number().int().min(0);
+
+/**
  * Exported so a form can reuse the field rules without the money ones.
  *
  * The API is sent integer minor units; a form holds what somebody typed, which
@@ -211,7 +245,15 @@ export const MedicineFieldsSchema = z.object({
     .transform((value) => value.toUpperCase()),
   barcode: z.string().trim().min(6).max(32).optional(),
   productType: z.nativeEnum(ProductType).default(ProductType.MEDICINE),
-  brandName: z.string().trim().min(2).max(120),
+  /*
+   * 200, not 120. Combo packs name their contents in the title — "Sparkbliss
+   * Home Hygiene Essentials Combo Pack (Blissful Dreams Pillow Spray 100ml +
+   * Bathroom Freshener Signature 200ml + …)" is 186 characters — and 235 of
+   * the supplier's 57,033 names ran past the old bound and were cut, which for
+   * a combo pack removes the list of what is in the box. The longest in the
+   * bundle is 186; 200 keeps every one whole and still bounds the field.
+   */
+  brandName: z.string().trim().min(2).max(200),
   /*
    * The clinical identity, optional here and conditionally required below.
    *
@@ -224,7 +266,14 @@ export const MedicineFieldsSchema = z.object({
    * `validateMedicine` requires all three on a `PRESCRIPTION` product, because
    * nobody can dispense one without knowing its active ingredient and strength.
    */
-  genericName: z.string().trim().min(2).max(160).optional(),
+  /*
+   * 250, because an ingredient list is never cut and three real ones ran past
+   * 160 — the longest is 215 characters of a ten-ingredient supplement. Under
+   * the old bound the importer dropped them rather than truncating, which is
+   * the right choice between those two and still lost the field; raising it
+   * means it does not have to choose.
+   */
+  genericName: z.string().trim().min(2).max(250).optional(),
   manufacturer: z.string().trim().min(2).max(120),
   strength: z.string().trim().min(1).max(60).optional(),
   dosageForm: z.string().trim().min(2).max(60).optional(),
@@ -232,24 +281,71 @@ export const MedicineFieldsSchema = z.object({
   unit: z.string().trim().min(1).max(30),
   category: z.string().trim().min(2).max(80),
   description: z.string().trim().max(2000).optional(),
+  /** The primary photograph. Mirrors `productImages[0]`; see the model. */
+  productImageUrl: imagePath.optional(),
   /**
-   * Where the picture is — an absolute URL, or a path to a file we hold.
+   * The gallery, primary first.
    *
-   * `z.string().url()` alone rejected the second, which meant a catalogue
-   * imported with its images had exactly one field that no schema had checked,
-   * because the importer had to set it after parsing. A relative path is a
-   * legitimate answer here: the file exists, it simply is not served yet.
+   * Same rule per entry as the primary, because the one field an importer used
+   * to set after parsing was the one nothing checked — and a gallery is sixteen
+   * more chances to make that mistake. Capped at 20: the bundle's busiest
+   * product carries 16, and a product page that scrolls through fifty
+   * photographs is a bug rather than a feature.
    */
-  productImageUrl: z
-    .string()
-    .trim()
-    .max(500)
-    .refine(
-      (value) =>
-        /^https?:\/\//i.test(value) || /^[\w./-]+\.(webp|jpe?g|png|gif|avif)$/i.test(value),
-      'Must be an http(s) URL or a path to an image file',
-    )
+  productImages: z.array(imagePath).max(20).optional(),
+  /**
+   * The shelf trail, outermost first. `category` remains the leaf.
+   *
+   * Bounded so a malformed source cannot write an unbounded array into every
+   * document; the deepest path in the supplier catalogue is five.
+   */
+  categoryPath: z.array(z.string().trim().min(1).max(80)).max(8).optional(),
+  /*
+   * The supplier-record fields, mirroring the optional block on `Medicine`.
+   * Every one is optional and none is defaulted: a hand-entered medicine has
+   * no supplier record, and a schema that invented one would put the
+   * importer's provenance on rows it never touched.
+   */
+  popularity: z
+    .object({ ordered: supplierCount, viewCount: supplierCount, ratingCount: supplierCount })
     .optional(),
+  attributes: z
+    .array(z.object({ name: attributeText, value: attributeText }))
+    .max(40)
+    .optional(),
+  /*
+   * 32 tags of up to 120 characters. Measured against the bundle: the most any
+   * product carries is 24 and the longest is 89 — a run-together hashtag string
+   * — so the previous 20/80 cut eight products' lists short and dropped seven
+   * whole tags.
+   */
+  tags: z.array(z.string().trim().min(1).max(120)).max(32).optional(),
+  /*
+   * 1,000 because that is exactly where the supplier's own field stops — the
+   * longest of the 7,013 summaries is 1,000 characters on the nose, which is a
+   * cap on their side, not a coincidence. This bound was 500 and truncated
+   * 2,810 of them, 40%, mid-sentence.
+   */
+  shortDescription: z.string().trim().max(1000).optional(),
+  fullName: z.string().trim().min(2).max(300).optional(),
+  sourceSlug: z.string().trim().min(1).max(200).optional(),
+  genericId: z.number().int().min(0).optional(),
+  /**
+   * Bounded like `categoryPath` and for the same reason: a malformed source
+   * must not write an unbounded array into every document. The busiest product
+   * in the bundle belongs to four categories.
+   */
+  categoryIds: z.array(z.number().int().min(0)).max(16).optional(),
+  deliveryRestriction: z.nativeEnum(DeliveryRestriction).optional(),
+  /**
+   * The supplier's own availability at the moment it was checked. The date is
+   * required alongside the fact because "they had it" is only meaningful with
+   * a "when".
+   */
+  listedElsewhere: z
+    .object({ availability: z.string().trim().min(1).max(40), checkedAt: z.coerce.date() })
+    .optional(),
+  hasSupplierPhoto: z.boolean().optional(),
   costPriceMinor: moneyMinor,
   defaultSellingPriceMinor: moneyMinor,
   /**

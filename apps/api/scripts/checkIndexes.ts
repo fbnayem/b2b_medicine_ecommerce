@@ -22,17 +22,38 @@ import mongoose from 'mongoose';
  * operator to serve an ad-hoc query.
  */
 
-// Importing the barrel registers every schema with Mongoose.
+/*
+ * Importing the barrel registers every schema with Mongoose.
+ *
+ * **This list must name every model, and it silently did not.** `main` iterates
+ * `Object.keys(mongoose.models)`, so a model nobody imports here is never
+ * visited and nothing warns — the report simply comes back clean for a database
+ * missing that collection's indexes entirely. `db.ts` sets
+ * `autoIndex: !isProduction` precisely because this script is meant to be the
+ * production index step, so an omission here means those indexes exist nowhere.
+ *
+ * Eleven were missing when Phase 42 checked: the three that phase added, and
+ * eight from earlier phases (GoodsReceipt, PriceList, PurchaseOrder, Scheme,
+ * Stocktake, Supplier, Trip, Warehouse). The worst of them is
+ * `MedicineContent`'s text index — without it `searchContent` does not run
+ * slowly, it fails outright with "text index required for $text query".
+ *
+ * `models/queryGuards.ts` is deliberately absent: it holds no schema.
+ */
 import '../src/models/ActivityEvent';
 import '../src/models/AuditLog';
+import '../src/models/CatalogueSourceRecord';
 import '../src/models/Counter';
 import '../src/models/CreditNote';
 import '../src/models/CreditReservation';
 import '../src/models/Delivery';
+import '../src/models/GoodsReceipt';
 import '../src/models/Invoice';
 import '../src/models/LedgerTransaction';
 import '../src/models/Medicine';
 import '../src/models/MedicineBatch';
+import '../src/models/MedicineContent';
+import '../src/models/MedicineRelation';
 import '../src/models/MigrationRun';
 import '../src/models/Notification';
 import '../src/models/NotificationDelivery';
@@ -43,14 +64,21 @@ import '../src/models/Package';
 import '../src/models/Payment';
 import '../src/models/PaymentAttachment';
 import '../src/models/PickingList';
+import '../src/models/PriceList';
 import '../src/models/ProofFile';
+import '../src/models/PurchaseOrder';
 import '../src/models/PushDevice';
 import '../src/models/Return';
+import '../src/models/Scheme';
 import '../src/models/Session';
 import '../src/models/Shop';
 import '../src/models/StockMovement';
+import '../src/models/Stocktake';
+import '../src/models/Supplier';
 import '../src/models/SystemSetting';
+import '../src/models/Trip';
 import '../src/models/User';
+import '../src/models/Warehouse';
 
 const apply = process.argv.includes('--apply');
 const prune = process.argv.includes('--prune');

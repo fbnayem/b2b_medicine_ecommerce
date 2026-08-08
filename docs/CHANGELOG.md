@@ -1,5 +1,468 @@
 # Changelog
 
+## Phase 44 — The product page, and the price the buyer could not see
+
+Asked for: redesign the single medicine page, and make name, price, offer price
+and stock visible on every similar and alternative product.
+
+### The buyer could not see the price
+
+`canSeeCommercial` does not include `SHOP_OWNER`, and the medicine page hid the
+price behind it. The catalogue card showed a pharmacy ৳95.00; they clicked the
+product and it vanished. The server has never hidden it — `hideCosts` strips
+`costPriceMinor` and nothing else — and the list has always rendered it, so this
+was a disclosure rule that existed on one screen and only against the person the
+screen is for. Prices now follow `canReadCatalogue`; **cost** stays where it was.
+
+### What "offer price" means when you are the distributor
+
+A consumer pharmacy strikes through ৳70 and shows ৳63.30 with "10% OFF". Here
+the two figures are the trade price a pharmacy pays and the MRP printed on the
+pack, and the gap is not a discount we are giving — it is what the pharmacy
+earns when they sell it. So the badge reads **"You make 20.8%"** rather than
+dressing a margin up as a saving.
+
+Three rules came out of that:
+
+- The MRP is struck through **only when it is genuinely higher**. On every
+  imported line it currently equals the trade price, and an identical
+  struck-through figure reads as a broken discount.
+- The figure carries the label `catalogue.listPrice`. `customerMoney.test.ts`
+  already failed the mobile build for a bare catalogue price — "a bare figure
+  under a medicine reads as the price this shop pays, and it is not" — and it
+  caught this work. The web hero now carries the same label for the same reason.
+- A line underneath says the customer's own price list and any running offer are
+  applied when they order, because only `POST /orders/quote` knows their price.
+
+### The cards
+
+The suggestion cards showed four facts. `alternativesFor` returns the whole
+medicine plus its free stock, so they were showing four of about a dozen they
+had been handed. Each card now carries the photograph, brand and strength, the
+molecule, the manufacturer, the pack with its unit, the trade price, the struck
+MRP, the margin badge, free stock, and an **Add to order** button for the
+customer.
+
+`marginPercent` moved into `@medsupply/utilities`: the web card, the web page
+and the mobile screen would otherwise each carry their own copy of an arithmetic
+that is easy to get subtly wrong three different ways.
+
+### Redundancy removed
+
+The hero does not repeat the product name — `PageHeader` a centimetre above
+already carries it as the page's `h1`, and the test suite said so by failing on
+two headings for one product. The stat row above the record used to restate
+availability, list price and margin; all three are now in the product block, and
+the record below already carried the MRP and the margin as rows. Only
+**stock on hand** survives there, because it is genuinely a second number.
+
+Two galleries a screen apart became one.
+
+### Mobile
+
+The same price block, the same margin arithmetic, and alternative rows that now
+carry the molecule, the pack and both prices. Its `classification` row printed
+`PRESCRIPTION` in capitals — the fifth raw enum, found while editing the file
+next to it.
+
+## Phase 43 — The endpoints nobody could reach, and a recommendation I withdrew
+
+Asked for: finish everything the Phase 42 audit left open.
+
+### The search change I recommended, and did not make
+
+I told the user the catalogue search was the slow path and that it should move
+to the collection's text index. Then I measured it, and both halves were wrong.
+
+|                                          | infix regex, as shipped | `$text` + prefix union |
+| ---------------------------------------- | ----------------------- | ---------------------- |
+| matches across 20 terms a pharmacy types | baseline                | **2,718 fewer**        |
+| warm cost of one page of twenty          | 30 ms                   | ~10 ms                 |
+
+`amox` stops finding `Co-amoxiclav`. `losar` stops finding `Repace Losar`.
+`omeprazole` loses 460 products. The 194,244 index keys the regex examines are
+real, but they are index keys — warm, the page costs 30 ms for items and
+**113 ms for the `countDocuments` that pages it**, so the query I proposed to
+replace is not the expensive half. The regex stays, with the measurement written
+above it so the next person does not re-propose this.
+
+### `typhoid` returns nothing, and 79,904 monographs say which drugs treat it
+
+`searchContent` was written, indexed, tested and called by **no route**. The
+text index existed; `checkIndexes` built it; the assertion
+`searchContent('typhoid')` passed — and every client still returned an empty
+catalogue for the word, because nothing ever called the function.
+
+Searching that prose costs **451–1,568 ms**, far too much for a keystroke, so it
+runs in exactly one place: when the catalogue itself matched nothing. The
+response carries `matchedIn`, and both clients say so — _"No product is called
+'typhoid'. These mention it in their product information."_ A list that quietly
+changed what it was searching would be lying about why those products are there.
+
+### Eleven endpoints reached by no client: now one
+
+The count was published as seventeen, then thirteen, then eleven, wrong twice,
+because it was kept by hand. Nine now have screens, one was deleted, and the
+one that remains is deliberate.
+
+| endpoint                                       | where it went                                                                           |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `POST /finance/adjustments`                    | Post an adjustment, on the customer ledger. Taka in, minor units out.                   |
+| `GET /finance/reconciliation/{shopId}`         | "Check this account adds up" — reads, changes nothing.                                  |
+| `POST /finance/reconciliation/{shopId}/repair` | A second button, offered only once a check has found something.                         |
+| `POST /finance/credit-reservations/backfill`   | On the order, for orders that hold credit nothing recorded.                             |
+| `POST /shops/{id}/assign-owner`                | Until now, giving a pharmacy an account that could sign in was a database write.        |
+| `POST /shops/{id}/assign-manager`              | Beside it, on the customer page.                                                        |
+| `GET /notifications/{id}/deliveries`           | "Was this sent?" — the attempt log, with the provider's error.                          |
+| `POST /notifications/test`                     | Send yourself a test.                                                                   |
+| `DELETE /shops/{id}/addresses/{addressId}`     | Staff could add an address and never remove one.                                        |
+| `GET /payments/my-collections`                 | **Deleted.** Byte-for-byte identical to `GET /finance/my/collections`.                  |
+| `POST /inventory/allocations/reserve`          | **Left unreached, deliberately.** No screen should set stock aside outside an approval. |
+
+**The test send goes to the signed-in person and to nobody else.** The endpoint
+accepts any recipient and any event, and those two together would send a real
+customer a real-looking "your order was approved" — indistinguishable from the
+true one, because it _is_ the true template. A channel is proved by your own
+address, handset and number.
+
+### Removing a route exposed a 500 that was always there
+
+With `/payments/my-collections` gone, the path falls through to
+`GET /payments/:id`, where `Payment.findOne({ _id: 'my-collections' })` throws a
+`CastError` — and nothing in the stack turns one of those into a status. It was
+a **500**. Any mistyped identifier reached the same place; deleting the
+duplicate is only what surfaced it. Now 404, for the same reason a real id the
+caller may not see answers 404.
+
+### Four enums still printed at people
+
+`classification` had a catalogue since the phase that added it and the medicine
+**form** did not use it, so the same product read "On prescription" on one screen
+and `prescription` on the next. A payment's source read "delivery collection" —
+the enum, tidied — rather than "Collected on delivery". A picking discrepancy
+read `open`. And the mobile statement looked its ledger types up in
+`movementType.*`, which names what happens to a carton, so **every row** fell
+through to the raw value: a shop owner reading their own statement in Bangla saw
+`invoice charge`.
+
+### The two single-product items
+
+The product typed `uncategorized` is the supplier declining to answer, and its
+own trail says `Medicine > Dermatological Preparations > Topical
+Anti-Infectives`. The two agree on 55,970 of 57,033 rows, which is what makes
+the trail usable as a second opinion rather than a guess.
+
+The logo residue on `91652 Himalaya Men Power Bright Licorice Face Wash` was
+**looked at**. It is the Himalaya wordmark and "SINCE 1930" — the manufacturer's
+trademark on their own packaging, which belongs on a photograph of that
+packaging; nothing of Arogga's survives. It is image 5 of 5, a marketing banner
+showing three products, so it is not the picture on the card. Kept, with the
+reason recorded in `LOGO_RESIDUE_REVIEWED` — and a rule that reports the entry as
+stale if the flag ever goes, so the list can only shrink.
+
+### Three gates I had not met
+
+The web suite refused the work three times before it passed, each for a reason
+worth keeping: a path assembled at run time (`/shops/${id}/assign-${kind}`) is
+not an address the specification check can find; four new fields had a label and
+no hint; and three of the new writes left every screen showing what was true
+beforehand — including a credit reservation, where the stale figure is the one
+somebody approves the next order against.
+
+The money conversion was planted and observed red: `250.50` became **251** paisa
+instead of 25,050, a hundredfold error on the one screen that exists to correct
+a ledger.
+
+### Still not done, and why
+
+**Stock, cost and barcodes are absent from the source**, so 0 warehouses, 0
+batches, cost equal to trade on all 55,999 rows, and no barcode anywhere. An
+opening goods receipt resolves the first two; the third needs a scanner run over
+real cartons. **No binary has been built.** **No pharmacist has reviewed the
+79,904 monographs**, which now state dose limits and contraindications in two
+languages on the product pages.
+
+## Phase 42 — The whole supplier record, and the five million characters that were missing
+
+Asked for: import everything from the export, lose no information.
+
+### Every source row, accounted for
+
+The claim this phase makes is checkable, so the importer ends by checking it —
+one line per source table, every row landing in exactly one fate, and a non-zero
+exit if any total fails to add up.
+
+| table                    |      rows | outcome                                                                              |
+| ------------------------ | --------: | ------------------------------------------------------------------------------------ |
+| `products`               |    57,033 | 55,998 imported · 1,035 refused, **archived whole**                                  |
+| `variants`               |    57,113 | 55,998 folded into the medicine · 1,115 archived                                     |
+| `images`                 |    90,764 | 81,128 copied · 8,471 placeholders became `hasSupplierPhoto: false` · 1,165 archived |
+| `faq`                    |   285,165 | **5 imported, 285,160 folded** — they are five questions repeated per product        |
+| `seo_sections`           |   398,881 | 263,022 became monograph sections · 46,472 became attributes · 89,387 archived       |
+| `relations`              | 3,627,168 | **3,546,026 imported** · 81,142 point at a refused product                           |
+| `product_categories`     |   152,804 | 149,913 imported · 2,891 archived                                                    |
+| `descriptions.csv`       | 1,397,897 | 340,891 folded into the summary · 1,057,006 archived unflattened                     |
+| `categories`             |     1,204 | archived beside every product that uses them                                         |
+| `computed_relations.csv` | 2,550,388 | archived — derivable from fields we store                                            |
+
+What that produced: **55,998 medicines**, **57,033 archived source records** (every
+product, including the 1,035 the catalogue refuses), **79,902 monograph documents**
+— 55,990 English and 23,912 Bangla, holding **1,354,411 sections** — **148,231
+relation lists** holding 3,546,026 ranked items, and 81,128 images.
+
+The archive is 4,059 MB of data in **821 MB** of storage, because the collection
+is created with zstd block compression. That was verified against the running
+server rather than trusted to the schema option: `collStats` reports
+`block_compressor=zstd`.
+
+### The catalogue list took 6.1 seconds to return twenty rows
+
+`listMedicines` ran its stock `$lookup` **before** `$skip` and `$limit`, so
+returning one page aggregated stock for every one of the 55,998 matched
+products. Moved below the `$limit`:
+
+|                                      |              |
+| ------------------------------------ | ------------ |
+| page 1, as shipped                   | **6,130 ms** |
+| page 1, lookup after the page is cut | **11 ms**    |
+| page 500, as shipped                 | 6,277 ms     |
+
+Both measured with `medicinebatches` empty — the most favourable case the old
+shape could ever have, since every batch received made it worse. The pipeline
+moved into `medicineListQuery.ts` so its stage order can be asserted, and the
+gate was proved by planting the defect back and watching it go red.
+
+### Five million characters of clinical text, deleted in silence
+
+`readable()` stripped markup, then removed a trailing unclosed tag with
+`/<[^>]*$/`. That pattern matches **any** remaining `<` through to the end of
+the passage — and a drug monograph is full of literal ones.
+
+| stored as                  | the source says                           |
+| -------------------------- | ----------------------------------------- |
+| `CrCl (ml/min)`            | `CrCl (ml/min) <20 Max: 200 mg daily.`    |
+| `Child: PO 8 mg/kg/day if` | `Child: PO 8 mg/kg/day if <50 kg q12–24h` |
+
+**21,796 passages across 13,983 products**, 5,380,934 characters, with no
+adjustment counted — while the summary printed "never cut to fit". The Bengali
+copy of the same drug survived intact, because Bengali escapes the character,
+so the two languages stated different renal doses for the same medicine.
+
+A tag name can only start with a letter, `/` or `!`; a dose threshold is
+followed by a digit. That one character now separates them, and the cut is
+counted when it happens.
+
+### Four more silent losses, all found by counters rather than by reading
+
+- **`SafetyAdviceTag` held four values where the source has seven**, discarding
+  57,377 of 215,391 verdicts — including `CONSULT YOUR DOCTOR`, which at 56,447
+  rows is the most common verdict in the catalogue. It now stores 55,939 of them.
+- **HTML entities were never decoded.** The first fix hand-listed 21 names; the
+  bundle uses **62**, so `&le;4.2µm` and `&ge;65 yr` still reached the screen as
+  their own source text. Replaced with a generated table of 205 names, checked
+  against every entity in the bundle — nothing unresolved.
+- **`shortDescription` was capped at 500 characters**, truncating 2,810 of the
+  7,013 summaries. The supplier's own field stops at exactly 1,000.
+- **Newlines were flattened**, turning the dose tables in 77,795 passages into
+  run-on sentences.
+- **Four field bounds were set through the data instead of above it** — product
+  name (cut 235, longest 186), active ingredient (dropped 3 whole, longest 215),
+  tags (7 dropped, 8 lists cut) and attribute value. All raised past the
+  measured maximum, so a bound now stops a malformed export rather than trimming
+  a well-formed one.
+
+Every one of these was found by reading the importer's own report _after_ a full
+run and then querying the database — never from the summary, which reported
+success each time. It took four full imports to reach a clean one.
+
+### 43% of the catalogue was switched off by a competitor's warehouse
+
+`isActive` was set from the supplier's stock on the day they were scraped, which
+hid **24,188 products** from every shop owner. That snapshot moved to
+`listedElsewhere`, dated; `isActive` is now derived from whether the line has a
+price at all. 55,779 products are active, and the 219 priced at ৳0 are not.
+
+### The web catalogue could reach 100 of 55,998 products
+
+`limit=100`, no pagination, no category filter — and it ignored the `?branch=`
+parameter its own breadcrumbs linked to. Now paginated, with a category sidebar
+carrying counts rolled up at every level, and a sort control.
+
+### Fixed in passing
+
+- `checkIndexes` named 28 of 40 models, so eleven collections' indexes were
+  created by nothing in production — including the text index without which
+  monograph search does not run slowly, it fails outright.
+- `resetCatalogue` refused to start once an import had run, because its own
+  coverage guard did not know the two new collections.
+- `categoryService.ts` contained a raw NUL byte, so git classified it as binary
+  and its diffs could not be reviewed or merged.
+- The `MedicineContent` contract type named four fields the stored document does
+  not have, which is why both clients hand-rolled their own.
+
+## Phase 41 — The catalogue is real, and it knows what else to send
+
+Asked for: empty the product database, load everything from the Arogga export,
+and keep the source ids so the similar/alternative data can be used. Then a
+plan for the best way to use it.
+
+### 57,033 rows in, 55,998 products out
+
+The whole catalogue, measured rather than estimated — every row put through the
+real `CreateMedicineSchema`, so anything imported is something a person could
+have typed into the form and anything refused is something the form would
+refuse too.
+
+|                                                              |            |
+| ------------------------------------------------------------ | ---------- |
+| imported                                                     | **55,998** |
+| active (the rest arrived out of stock, so `isActive: false`) | 31,810     |
+| with a photograph                                            | 45,557     |
+| with English long-form copy                                  | 51,231     |
+| naming an active ingredient                                  | 26,244     |
+| refused by the schema                                        | 632        |
+| no base variant, so no price and no pack                     | 403        |
+
+The 632 refusals are almost all real defects in the source: 558 prescription
+rows that do not state a strength, 30 that do not name an active ingredient. A
+prescription medicine missing either is one nobody can dispense, and it belongs
+outside the catalogue rather than inside it with a blank.
+
+### Two spellings of one folder, and twelve gigabytes
+
+`.gitignore` said `arogga export/`. The bundle on disk is `arogga_export`. So
+the export was untracked and **not ignored** — one `git add -A` from entering the
+history. `findExport()` in the importer carried the identical typo, which is why
+discovery had always failed and `--source=` had always been mandatory without
+the error ever saying why. Both spellings are now listed.
+
+### Suggestions that cannot be derived, and the three million that can
+
+The export ships **6.2 million** relation rows across seven types. Four of them
+are questions the catalogue already answers:
+
+| the export's answer                              | the catalogue's answer                    |
+| ------------------------------------------------ | ----------------------------------------- |
+| `same_generic`, 436,348 rows                     | `genericName`, matched case-insensitively |
+| `same_brand` + `more_from_brand`, 1,843,672 rows | `manufacturer`                            |
+| `same_category`, 1,104,604 rows                  | `category`                                |
+
+Storing those would have been two and a half million rows describing one
+afternoon's catalogue — every one of them wrong the moment a line is delisted,
+and nothing in this system would ever have rebuilt them. Cefixime alone has 363
+brands here; expressing that as data costs 131,000 rows to say what one indexed
+field says for nothing.
+
+So **`SAME_INGREDIENT` is a query, not a table.** It cannot go stale because
+there is nothing to go stale, and it works for a medicine somebody types in by
+hand tomorrow — which a row imported from a supplier never would.
+
+What is left is genuinely external knowledge, and that is stored:
+**1,347,473 rows** — 616,896 comparable products and 730,577 basket
+affinities, capped at the supplier's own rank 24 because no screen shows more
+than a dozen and their fifth suggestion beats their sixtieth. The 1,201,594
+dropped past that cap are reported by the importer rather than left to be
+inferred from a total that looks complete.
+
+`you_may_also_like` is never read at all. The handoff is explicit that for
+prescription medicines it degrades to a bestseller carousel — it offers condoms
+and cough drops against an asthma tablet — and a wrong suggestion in a pharmacy
+is worse than no suggestion.
+
+### What a shop is told when the answer is no
+
+`GET /inventory/medicines/{id}/alternatives`, and a section on both the web and
+mobile product screens. Against the real catalogue, asking about **Napa 125
+Suppository**: three other manufacturers' Paracetamol 125 mg suppositories
+first, then the other strengths, then what is usually ordered alongside — in
+**21 ms** across 56,000 products and 1.35 million relations.
+
+Same strength ranks above same drug, because 500 mg and 665 mg of one molecule
+are not interchangeable and offering the wrong one is worse than offering
+nothing. In stock ranks above out of stock, because an alternative nobody can be
+sent is not an alternative. Free stock is on every card for the same reason.
+
+**The guard worth naming**: most of this catalogue is not a drug, and a shampoo
+has no active ingredient. Matching on `genericName` without checking it is
+present makes every non-drug an alternative for every other non-drug — a
+null-equals-null bug that renders as a working recommendation engine. Planting
+it turns exactly one test red.
+
+### 2,141 products were on the wrong shelf
+
+`healthcare`, `sexual_wellness` and `ayurvedic` were in no shelf mapping, and an
+unrecognised type fell silently to `MEDICINE`. A glucometer, a nebuliser mask, a
+walking stick and a box of condoms, all filed as drugs. They are now devices,
+personal care and herbal respectively, and an unmapped type is **reported**
+rather than defaulted quietly — the silence was the actual defect.
+
+### Deleting a product is not deleting a row
+
+Thirteen models hold an `ObjectId` pointing at a medicine, and Mongoose enforces
+nothing, so `Medicine.deleteMany({})` succeeds instantly and leaves orders whose
+lines have no product and a stock ledger naming nothing. `resetCatalogue.ts`
+takes the catalogue and everything downstream of it together, dry-run by
+default, and **refuses to run at all if a collection exists that is in neither
+its clear list nor its keep list** — which caught `medicinerelations`, added in
+this same phase, before the first real run.
+
+Users, shops, suppliers, warehouses, sessions and settings survive. So do audit
+records, and the reset adds one: `CATALOGUE_RESET`, with the counts.
+
+### An import that writes 55,998 rows is not the one that wrote 15
+
+The upsert was `findOne` then `create` per product, plus one atomic `$inc` per
+reference — around 167,000 round trips at this scale. Now: one indexed read to
+learn what already exists, `reserveReferences` claiming a whole block in a single
+`$inc`, ids minted client-side so the relation pass needs nothing read back, and
+`bulkWrite` in batches of a thousand. A rejected document is counted and
+reported rather than throwing away the other fifty-five thousand.
+
+### Completing it: the gallery, the shelf, and the products with nothing to say
+
+Three gaps were named when the catalogue landed, and left open. All three are
+closed.
+
+**36,000 photographs had nowhere to go.** `Medicine` held `productImageUrl`,
+singular, so the importer took `position === 1` and dropped the rest — a
+pharmacy deciding between two similar packs saw one angle of each.
+`productImages` now holds the whole gallery in the supplier's own display order,
+up to 16 a product, and `productImageUrl` is documented as a _mirror_ of its
+first entry rather than a second source of truth. **81,421 images**
+are now served, 5.8G across 45,557 products, 11,274 of them with more than one shot.
+
+The web product page gets a chooser under the main shot — rendered only when
+there is more than one, because a lone thumbnail beneath its own full-size copy
+is a control that does nothing. Mobile gets a horizontal strip, and in the
+process gets **product photography at all**: it had never rendered a single
+catalogue image, because `/media` sits above the versioned API and joining
+`baseURL` to a media path naively yields `…/api/v1/media/…`, which is a 404 that
+renders as a silent blank. `mediaUrl` does that join in one place.
+
+**The shelf hierarchy was thrown away.** The importer kept only the last segment
+of `Medicine > Antimicrobial > Anti-Bacterial`, so the catalogue knew a product
+was an "Anti-Bacterial" and had no idea that sat under "Medicine" — and nothing
+could ask for everything on a branch. `categoryPath` stores the trail as a
+multi-key index; `?branch=Antimicrobial` now matches at any depth.
+
+`GET /inventory/categories` returns the tree, **derived from the products
+themselves**. The supplier ships a 1,204-row category table and none of it is
+imported, for the same reason the alternatives are not stored: a stored tree is
+a second place the hierarchy lives, it drifts the moment a product moves, and it
+lists branches holding nothing — a buyer clicking "Nebulisers" to find an empty
+page because the tree remembers a line delisted last year. A branch exists
+exactly when something is filed under it, the count beside it is true by
+construction, and a shop owner is never shown a branch whose every product is
+delisted. 12 roots over 997 distinct paths.
+
+**225 products showed a blank space.** They have neither a stored suggestion nor
+an active ingredient — a walking stick, a one-off device — so all three
+alternative groups came back empty. `SAME_CATEGORY` is the floor, and it is
+deliberately **not** offered when anything better exists: "others in this
+category" beside a real list of same-ingredient alternatives is noise, and noise
+on a suggestion list teaches people to stop reading it. **Zero**
+products now show nothing.
+
 ## Phase 40 — MedSupply Rider, and four things a prebuild found
 
 Asked for: plan the third application, then complete it. Offline completion in

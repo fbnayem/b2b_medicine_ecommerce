@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { UserRole } from '@medsupply/shared-types';
+import { translatedOr } from '@medsupply/i18n';
 import { apiClient, errorMessage } from '../api/client';
 import { useAuthStore } from '../store/useAuth';
 import {
@@ -506,10 +507,17 @@ export function FulfilmentWork() {
                         <p className="text-sm text-text-muted">{item.notes}</p>
                       </div>
                       <div className="text-end">
-                        {/* The status of a discrepancy is a server string with
-                            no shared enum, so it is shown as it comes rather
-                            than mapped to words this client made up. */}
-                        <Badge>{item.status.replaceAll('_', ' ').toLowerCase()}</Badge>
+                        {/*
+                          The model constrains this to OPEN or RESOLVED, so
+                          there are two words to write and they are now written
+                          in both catalogues. It printed the database value
+                          before — in English, on a page a storekeeper reads in
+                          Bangla — and "open" said nothing about the fact that
+                          somebody is waiting on a decision.
+                        */}
+                        <Badge>
+                          {translatedOr(t, `discrepancyStatus.${item.status}`, item.status)}
+                        </Badge>
                         {item.resolutionNotes && (
                           <p className="mt-1 text-sm text-text-muted">{item.resolutionNotes}</p>
                         )}

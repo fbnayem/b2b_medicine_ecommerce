@@ -14,6 +14,10 @@
 
 Human-readable reference; unique SKU and optional barcode; complete catalogue data; integer-minor-unit cost/selling prices; order limits; classification; cold-chain and active flags; creator and timestamps. Indexed for catalogue search.
 
+Phase 42 added the supplier record: `popularity` (ordered / viewCount / ratingCount), `attributes`, `tags`, `shortDescription`, `fullName`, `sourceSlug`, `genericId`, `categoryIds`, `deliveryRestriction`, `listedElsewhere` and `hasSupplierPhoto`. All optional and absent on hand-entered rows. Only `popularity.ordered` and `tags` are indexed — the collection already carries 64 MB of index, so each field had to argue for one separately.
+
+`listedElsewhere` holds the supplier's own stock snapshot, dated. It exists to take that job away from `isActive`, which previously meant "the supplier had stock on the day we scraped" and hid 24,188 products — 43% of the catalogue — from every shop owner. `isActive` now means whether _we_ sell the line.
+
 ### MedicineBatch
 
 Medicine reference; per-medicine unique batch number; manufacturing/expiry dates; prices; received quantity; embedded stock-state quantities; warehouse location; block/quarantine flags; optimistic version; creator and timestamps. Indexed for FEFO.
@@ -131,6 +135,16 @@ A group is the unit an administrator edits, the unit that is audited and the uni
 `stockmovements` gains five types — `RETURN_RECEIPT`, `RETURN_RESTOCK`, `RETURN_DAMAGED`, `RETURN_EXPIRED` and `RETURN_QUARANTINED` — each keyed on the return and batch, so a replayed receipt is a no-op rather than a second booking.
 
 No migration is required. The two new collections start empty, `quantities.returned` was already present and zero on every existing batch, and no existing document is rewritten.
+
+## Phase 42 collections
+
+- `cataloguesourcerecords`: one document per source product — the supplier's complete nested record (`raw`, or `rawText` when the bytes are not valid JSON), a `digest` over those bytes, and `aux` carrying the sibling rows the record does not contain (image metadata, SEO prose, FAQ, computed relations, category rows). Unique on `(source, sourceId)`. Created with **zstd block compression**; without it the 3.1 GB of raw JSON is not worth keeping, with it the archive costs a few hundred megabytes. Nothing in the application reads it: it exists so any mapping decision is reversible by migration instead of a re-scrape, and so "no information was lost" is checkable rather than asserted.
+- `medicinecontents`: the supplier's long-form copy, **one document per (medicine, language)** rather than one per section. Row-per-section would be 1.38 M documents; the read is always "the whole monograph for one product in one language, in display order", which is one document. Sections carry `group`, `title`, `body` (uncapped), `position` and, on safety rows, `safety.type` and `safety.tag`. Unique on `(medicineId, lang)`, plus a text index over `sections.body` and `sections.title` so a pharmacist can search by what a drug treats rather than only by its name.
+- `medicinerelations`: **restructured** from one row per relation to one document per `(fromId, kind)` holding an ordered `items` array. The row shape cost 457 MB of index to describe 188 MB of data, and the full 3.6 M supplier relations would have reached roughly 1.2 GB; as arrays it is ~224,000 documents under a single `{fromId, kind}` index. The old unique `(fromId, toId, kind)` index is retired — it existed only for import idempotency, which delete-then-insert per product now provides.
+
+`MedicineRelationKind` gained `SAME_BRAND` and `PROMOTED`. `PROMOTED` is the supplier's bestseller carousel and must be labelled as advertising wherever it is shown; for prescription lines it returns unrelated products.
+
+**A migration is required, and it is a reset.** The relation restructure changes document shape, so `pnpm --filter @medsupply/api reset:catalogue --apply` followed by a full import is the supported path — the unique `{fromId, kind}` index cannot build while old-shape rows are present.
 
 ## Phase 12 index and session changes
 

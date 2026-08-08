@@ -134,6 +134,146 @@ export const ProductType = {
 } as const;
 export type ProductType = (typeof ProductType)[keyof typeof ProductType];
 
+/**
+ * Which part of the supplier's product copy a passage belongs to.
+ *
+ * The first four are the structured monograph every drug line carries — the
+ * brief facts (indication, dose, contraindication), the prose overview, the
+ * quick tips and the safety panel. `BODY` is the long-form description that
+ * products without a monograph carry instead, and `FEATURE` is the "Key
+ * Features" merchandising copy on non-drug lines. One vocabulary for all six
+ * because a detail screen renders them the same way — a heading and passages —
+ * and only the heading differs.
+ */
+export const MedicineContentGroup = {
+  BRIEF: 'BRIEF',
+  OVERVIEW: 'OVERVIEW',
+  QUICK_TIP: 'QUICK_TIP',
+  SAFETY: 'SAFETY',
+  BODY: 'BODY',
+  FEATURE: 'FEATURE',
+} as const;
+export type MedicineContentGroup = (typeof MedicineContentGroup)[keyof typeof MedicineContentGroup];
+
+/**
+ * The questions the supplier's safety panel answers, one row each.
+ *
+ * Six of these cover essentially the whole bundle — Alcohol, Pregnancy,
+ * Breastfeeding, Kidney and Liver appear on 38,806 rows each and Driving on
+ * 38,784. The last three appear **seven times each**, and they are here for one
+ * reason: this catalogue's promise is that nothing in the supplier's record is
+ * lost, and twenty-one rows are still twenty-one rows. Listing them costs three
+ * lines; leaving them out costs a silent drop that nobody would ever notice.
+ */
+export const SafetyAdviceType = {
+  ALCOHOL: 'ALCOHOL',
+  PREGNANCY: 'PREGNANCY',
+  BREASTFEEDING: 'BREASTFEEDING',
+  DRIVING: 'DRIVING',
+  KIDNEY: 'KIDNEY',
+  LIVER: 'LIVER',
+  SIDE_EFFECTS: 'SIDE_EFFECTS',
+  PREGNANCY_AND_LACTATION: 'PREGNANCY_AND_LACTATION',
+  PRECAUTIONS_AND_WARNINGS: 'PRECAUTIONS_AND_WARNINGS',
+} as const;
+export type SafetyAdviceType = (typeof SafetyAdviceType)[keyof typeof SafetyAdviceType];
+
+/**
+ * The supplier's verdict on a safety row. Their export writes it with spaces
+ * ("SAFE IF PRESCRIBED"); the importer maps it to these, so a screen never
+ * has to guess whether a space or an underscore arrived.
+ *
+ * **This list was four values and that was a defect**, caught by the importer's
+ * own drop counter rather than by anyone reading the data. Measured across all
+ * 26,896 monographs, the seven real verdicts occur:
+ *
+ * | verdict | rows |
+ * | --- | --- |
+ * | `CONSULT YOUR DOCTOR` | 56,447 |
+ * | `SAFE IF PRESCRIBED` | 51,986 |
+ * | `CAUTION` | 49,797 |
+ * | `UNSAFE` | 40,324 |
+ * | `SAFE` | 15,907 |
+ * | `NOT RELEVANT` | 465 |
+ * | `প্রাসঙ্গিক না` | 465 |
+ *
+ * The **most common verdict of all** was outside the enum and therefore thrown
+ * away — 57,377 of 215,391 rows, 26.6%, gone. The Bengali spelling is the
+ * Bengali-language rendering of "not relevant" and normalises to the same
+ * value, which the identical 465 on both confirms: it is one verdict written
+ * twice, not two verdicts.
+ *
+ * `CONSULT_YOUR_DOCTOR` is also the verdict that most needs showing. A screen
+ * may style it however it likes, but it may not omit it: telling a pharmacist
+ * nothing where the manufacturer said "ask a doctor" is worse than silence.
+ */
+export const SafetyAdviceTag = {
+  SAFE: 'SAFE',
+  SAFE_IF_PRESCRIBED: 'SAFE_IF_PRESCRIBED',
+  CONSULT_YOUR_DOCTOR: 'CONSULT_YOUR_DOCTOR',
+  CAUTION: 'CAUTION',
+  UNSAFE: 'UNSAFE',
+  NOT_RELEVANT: 'NOT_RELEVANT',
+} as const;
+export type SafetyAdviceTag = (typeof SafetyAdviceTag)[keyof typeof SafetyAdviceTag];
+
+/**
+ * Where a line may be delivered, when that is narrower than everywhere.
+ *
+ * The source flags this as a `dhaka_only` boolean. An enum of one instead,
+ * because a boolean hard-codes today's only restriction into a field name —
+ * the next restriction would become a second boolean beside it, and every
+ * screen would need to know about both.
+ */
+export const DeliveryRestriction = { DHAKA_ONLY: 'DHAKA_ONLY' } as const;
+export type DeliveryRestriction = (typeof DeliveryRestriction)[keyof typeof DeliveryRestriction];
+
+/**
+ * The language a piece of catalogue content is written in.
+ *
+ * The canonical language union lives in `@medsupply/i18n` (`LANGUAGES`) — and
+ * that package depends on this one, so importing it back would be a cycle.
+ * The values here are the same strings, which keeps a `ContentLanguage`
+ * assignable wherever a `Language` is wanted. Deliberately still a separate
+ * type: the UI language and the content language are two decisions, because a
+ * Bangla screen showing a medicine whose copy only exists in English must say
+ * so rather than show nothing.
+ */
+export const ContentLanguage = { EN: 'en', BN: 'bn' } as const;
+export type ContentLanguage = (typeof ContentLanguage)[keyof typeof ContentLanguage];
+
+/**
+ * Why one catalogue line is being shown next to another.
+ *
+ * This used to store only the two kinds that cannot be worked out from the
+ * products themselves, on the argument that "another brand of the same drug"
+ * is `genericName` matching — a query stays right as the catalogue changes,
+ * where a stored row ages into suggestions for products delisted a year ago.
+ * That reasoning is still sound for *answering* the question, and
+ * `AlternativeGroupKind` still derives `SAME_INGREDIENT` live. The **storage**
+ * half was reversed by the product owner: the complete supplier record is
+ * being kept, every relation included, so the derivable kinds are now stored
+ * too rather than reconstructed.
+ *
+ * - `SIMILAR` — comparable enough to offer as a substitute, where the
+ *   substitution is not a matter of sharing an active ingredient.
+ * - `BOUGHT_TOGETHER` — basket affinity. Nothing about either product predicts
+ *   it; it is a fact about how people actually order.
+ * - `SAME_BRAND` — the supplier's "more from this brand" list. Derivable from
+ *   `manufacturer`; stored because their ranking of it is not.
+ * - `PROMOTED` — the supplier's bestseller carousel. **Advertising, not a
+ *   clinical relationship**: on prescription lines it returns products with no
+ *   connection to the medicine at all, so every screen showing it must label
+ *   it as a promotion and never present it as a clinical match.
+ */
+export const MedicineRelationKind = {
+  SIMILAR: 'SIMILAR',
+  BOUGHT_TOGETHER: 'BOUGHT_TOGETHER',
+  SAME_BRAND: 'SAME_BRAND',
+  PROMOTED: 'PROMOTED',
+} as const;
+export type MedicineRelationKind = (typeof MedicineRelationKind)[keyof typeof MedicineRelationKind];
+
 export const StockMovementType = {
   RECEIPT: 'RECEIPT',
   ADDITION: 'ADDITION',
@@ -211,8 +351,13 @@ export interface Medicine {
   packSize: string;
   unit: string;
   category: string;
+  /** The whole shelf trail, outermost first. `category` is its last element. */
+  categoryPath?: string[];
   description?: string;
+  /** The primary photograph — mirrors `productImages[0]`. */
   productImageUrl?: string;
+  /** Every photograph, in display order. Up to 16 in the imported catalogue. */
+  productImages?: string[];
   costPriceMinor: number;
   defaultSellingPriceMinor: number;
   /**
@@ -226,8 +371,145 @@ export interface Medicine {
   coldChain: boolean;
   isActive: boolean;
   totalAvailable?: number;
+  /*
+   * Everything below to `hasSupplierPhoto` is the supplier record: absent on
+   * every hand-entered medicine, filled by the importer, and never required.
+   */
+  /**
+   * The supplier's own demand signals — how often their customers ordered,
+   * viewed and rated the line. Kept because "best sellers" on a freshly
+   * imported catalogue has no local sales to draw on; our own figures take
+   * over the moment there are any.
+   */
+  popularity?: { ordered: number; viewCount: number; ratingCount: number };
+  /** Name–value pairs as the supplier lists them: "skin type", "country of origin". */
+  attributes?: { name: string; value: string }[];
+  /** The supplier's merchandising tags, verbatim, for filtering. */
+  tags?: string[];
+  /** One-line summary for cards and search results; `description` is the long form. */
+  shortDescription?: string;
+  /** The supplier's display name with strength and form spelled out. */
+  fullName?: string;
+  /**
+   * Provenance of an imported line: the supplier's URL slug and their generic
+   * id. What lets a re-import find its own rows instead of duplicating them.
+   */
+  sourceSlug?: string;
+  genericId?: number;
+  /** The supplier's category ids, joining against the imported category tree. */
+  categoryIds?: number[];
+  deliveryRestriction?: DeliveryRestriction;
+  /**
+   * Whether the supplier could sell it when last checked — their stock, never
+   * ours. Dated, because an availability with no date reads as a fact about
+   * now.
+   */
+  listedElsewhere?: { availability: string; checkedAt: string };
+  /**
+   * False when the only picture on file is the supplier's placeholder, so a
+   * screen can say "no photograph" instead of showing a stock graphic as if
+   * it were the product.
+   */
+  hasSupplierPhoto?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Why one product is being offered beside another.
+ *
+ * `SAME_INGREDIENT` is derived at the moment it is asked, from `genericName`;
+ * the stored kinds arrive through the spread, so a kind added to
+ * `MedicineRelationKind` appears here without a second list to keep in step —
+ * which now includes `PROMOTED`, and the caution on it travels with it: shown
+ * as a promotion, never as a suggestion of equivalence.
+ */
+export const AlternativeGroupKind = {
+  SAME_INGREDIENT: 'SAME_INGREDIENT',
+  ...MedicineRelationKind,
+  /** Others on the same shelf. Offered only when nothing better exists. */
+  SAME_CATEGORY: 'SAME_CATEGORY',
+} as const;
+export type AlternativeGroupKind = (typeof AlternativeGroupKind)[keyof typeof AlternativeGroupKind];
+
+export interface AlternativeGroup {
+  kind: AlternativeGroupKind;
+  /** Always carries `totalAvailable`: a suggestion with no stock is not one. */
+  items: Array<Medicine & { totalAvailable: number }>;
+}
+
+/**
+ * One titled passage of supplier copy — "Indication", "Adult Dose", one row of
+ * the safety panel. Sections stay in the order the supplier publishes them,
+ * which is the order a pharmacist expects a monograph to read in.
+ */
+export interface MedicineContentSection {
+  group: MedicineContentGroup;
+  /** The supplier's own heading. Absent where a group is a single passage. */
+  title?: string;
+  body: string;
+  /**
+   * The supplier's publication order across the whole document, so a screen
+   * that filters to one group still knows where each passage sat.
+   */
+  position: number;
+  /** `SAFETY` rows only: which question this answers, and the supplier's verdict. */
+  safety?: { type?: SafetyAdviceType; tag?: SafetyAdviceTag };
+}
+
+/**
+ * The supplier's product copy for one medicine in one language.
+ *
+ * A document of its own rather than fields on `Medicine`, because a monograph
+ * is kilobytes the catalogue list never reads. Per language rather than a
+ * translation map, because the supplier ships some products in one language
+ * only — the English and Bangla records are siblings, and a missing sibling is
+ * a fact the screen states, not a fallback it hides.
+ */
+export interface MedicineContent {
+  _id: string;
+  medicineId: string;
+  lang: ContentLanguage;
+  /** In display order; a screen groups by `group` when rendering. */
+  sections: MedicineContentSection[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/*
+ * The served shape, which is what a client actually receives.
+ *
+ * `MedicineContent` above is the stored document. The endpoint returns this
+ * instead — grouped, ordered, and carrying which language came back — and both
+ * clients hand-rolled their own copy of it because the shared package described
+ * a document whose every field name was wrong (`language` for `lang`, `content`
+ * for `body`, flat `safetyTag` for nested `safety.tag`, and no `position` at
+ * all). Nothing imported it, so nothing caught it; the compiler would have
+ * agreed with a consumer reading `undefined` off every field.
+ */
+export interface MonographSection {
+  title?: string;
+  body: string;
+  safety?: { type?: SafetyAdviceType; tag?: SafetyAdviceTag };
+}
+
+export interface MonographGroup {
+  group: MedicineContentGroup;
+  /** In the supplier's publication order within the group. */
+  sections: MonographSection[];
+}
+
+export interface Monograph {
+  /** The language actually returned — not necessarily the one asked for. */
+  lang: ContentLanguage;
+  /**
+   * What the caller asked for. Carried so a Bangla screen that received English
+   * can say so, rather than presenting the fallback as if nothing happened.
+   */
+  requested: ContentLanguage;
+  groups: MonographGroup[];
+  /** Which export this copy came from, and when it was scraped. */
+  source?: { name?: string; scrapedAt?: string };
 }
 
 export interface MedicineBatch {

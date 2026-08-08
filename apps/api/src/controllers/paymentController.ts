@@ -11,7 +11,7 @@ import { AuthRequest } from '../middlewares/auth';
 import { Payment } from '../models/Payment';
 import { PaymentAttachment } from '../models/PaymentAttachment';
 import { Shop } from '../models/Shop';
-import { getCollectorSummary } from '../services/financeService';
+import { objectIdParam } from '../services/requestSanitiser';
 import {
   failPayment,
   getReceiptData,
@@ -62,6 +62,20 @@ async function paymentFilter(req: AuthRequest) {
 }
 
 async function permittedPayment(req: AuthRequest, id: string) {
+  /*
+   * A word that is not an id is "no such payment", not a crash.
+   *
+   * `Payment.findOne({ _id: 'my-collections' })` throws a `CastError`, and
+   * nothing in the stack turns one of those into a status, so it left as a 500.
+   * Removing the duplicate `/payments/my-collections` route is what surfaced
+   * it — the path fell through to `/:id` — but any mistyped identifier reached
+   * the same place. 404 rather than 400 for the same reason a real id the
+   * caller may not see answers 404: which strings are ids is not something this
+   * endpoint should confirm.
+   */
+  if (!objectIdParam(id))
+    throw Object.assign(new Error('Payment not found'), { statusCode: 404, code: 'NOT_FOUND' });
+
   const scope = await paymentFilter(req);
   const payment = await Payment.findOne({ _id: id, ...scope })
     .populate('shopId', 'reference name primaryPhone status')
@@ -197,20 +211,6 @@ export async function handover(req: AuthRequest, res: Response, next: NextFuncti
     res.json({
       data: paymentDto(result.payment),
       meta: { idempotentReplay: result.idempotentReplay },
-    });
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function myCollections(req: AuthRequest, res: Response, next: NextFunction) {
-  try {
-    res.json({
-      data: await getCollectorSummary(
-        String(req.user!._id),
-        Math.max(1, Number(req.query.page) || 1),
-        Math.min(100, Math.max(1, Number(req.query.limit) || 30)),
-      ),
     });
   } catch (error) {
     next(error);

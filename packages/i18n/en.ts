@@ -6,13 +6,18 @@ import {
   DeliveryPriority,
   DeliveryStatus,
   LedgerTransactionType,
+  MedicineContentGroup,
   NotificationCategory,
   NotificationChannel,
+  NotificationDeliveryStatus,
   PaymentMethod,
+  PaymentSource,
   PaymentStatus,
   PurchaseOrderStatus,
   ReturnReason,
   ReturnStatus,
+  SafetyAdviceTag,
+  SafetyAdviceType,
   ShopStatus,
   TripStatus,
   StocktakeStatus,
@@ -694,6 +699,21 @@ export const en = {
     supplierPaymentTerms: 'How many days you have to pay them after an invoice.',
     dateFrom: 'The first day to include.',
     dateTo: 'The last day to include.',
+    adjustmentAmount:
+      'In taka, as you would write it on a receipt. Always a positive figure — the kind above decides which way it goes.',
+    adjustmentReason:
+      'This is what appears in the ledger and on the customer’s statement, so write it for them to read.',
+    testNote: 'Anything that tells you which test this was when it arrives.',
+    backfillReason:
+      'Kept on the record for good, so write what made this necessary rather than "backfill".',
+    adjustmentType:
+      'A credit reduces what they owe; a charge increases it. An opening balance is for a customer brought over from the old books.',
+    testChannel:
+      'The one you want to prove works. Your own address, handset or number receives it.',
+    addOwner:
+      'Anybody with a shop owner account. A shop can have several, and adding one does not remove the others.',
+    setManager:
+      'Our side of the relationship. There is one, and choosing replaces whoever is there.',
     asOf: 'The figures are worked out as they stood at the end of this day.',
     statusFilter: 'Show only records at this stage. Leave it on All to see everything.',
     searchReference: 'Part of a reference is enough — you need not type all of it.',
@@ -914,12 +934,37 @@ export const en = {
     loading: 'Loading medicines',
     loadingMore: 'Loading more',
     thatIsEverything: 'That is all {{count}} of them.',
+    // Browsing by shelf, and saying which shelf you are on. A catalogue of
+    // 55,998 lines is unusable without both.
+    categories: 'Categories',
+    categoriesLoading: 'Loading categories',
+    allCategories: 'Everything',
+    branchShowing: 'Showing {{branch}}',
+    showEverything: 'Show everything',
+    sortLabel: 'Sort by',
+    sortName: 'Name',
+    sortPopular: 'Most ordered',
+    // Said when the search had to change what it was looking at. Plain, and
+    // specific about the term, because "no exact match" alone leaves the reader
+    // wondering what these products are.
+    matchedInContent:
+      'No product is called "{{term}}". These mention it in their product information.',
     couldNotLoad: 'The catalogue could not be loaded.',
     none: 'No medicines matched',
     noneBody: 'Try a shorter search — a brand name on its own usually finds it.',
     available: 'In stock',
     outOfStock: 'Out of stock',
     addToOrder: 'Add to order',
+    /*
+     * The gap between the trade price and the price printed on the pack.
+     *
+     * A consumer shop would call this a discount. It is not one: it is what the
+     * pharmacy earns when they sell the pack, which is the figure this trade
+     * decides on — so it is labelled as margin rather than dressed up as a
+     * saving we are handing out.
+     */
+    marginBadge: 'You make {{percent}}%',
+    dhakaOnly: 'Dhaka only',
     listedActive: 'Available to order',
     listedInactive: 'Not available',
     back: 'Back to the catalogue',
@@ -927,8 +972,14 @@ export const en = {
     productType: 'Product type',
     manufacturer: 'Manufacturer',
     category: 'Category',
+    /** Announced by a screen reader, so it says which photo, not "button". */
+    showPhoto: 'Show photo {{number}}',
+    photos: '{{count}} photos of this product',
     classification: 'Classification',
     coldChain: 'Needs refrigeration',
+    // The badge form. The row in the record reads 'Needs refrigeration: Yes';
+    // a badge has no room for a label and no need of one.
+    coldChainShort: 'Cold chain',
     yes: 'Yes',
     no: 'No',
     orderLimits: 'How many you may order',
@@ -965,6 +1016,98 @@ export const en = {
    * catalogue" rather than "delete", because nothing is deleted and every past
    * order still names it.
    */
+  /**
+   * What else a shop could be sent.
+   *
+   * Written as what the reader wants to know rather than as what the system
+   * did: "Other brands of the same medicine" says the useful thing, where
+   * "Same generic" says a database column. Plain language is the rule.
+   */
+  alternatives: {
+    title: 'What else could be sent',
+    subtitle: 'Other products a shop could be offered if this one is not available.',
+    inStock: '{{count}} in stock',
+    noStock: 'None in stock',
+    couldNotLoad: 'Could not load alternatives.',
+  },
+  alternativeGroup: {
+    SAME_INGREDIENT: 'Other brands of the same medicine',
+    SIMILAR: 'Comparable products',
+    BOUGHT_TOGETHER: 'Often ordered together',
+    SAME_BRAND: 'More from this manufacturer',
+    /*
+     * Advertising, and the heading says so. The supplier's "promoted" list is
+     * their bestseller carousel; on a prescription medicine it returns
+     * unrelated products, so any wording that groups it with the clinical
+     * headings above would claim a relationship that does not exist.
+     */
+    PROMOTED: 'Promoted products',
+    SAME_CATEGORY: 'Others on the same shelf',
+  },
+
+  /**
+   * The supplier's product copy on the medicine detail screen.
+   *
+   * The headings are the reader's words, not the exporter's: "About this
+   * product" rather than "body", "Features" rather than a section id. Two keys
+   * carry the weight here: `provenance` says whose words the copy is, and
+   * `notAdvice` sits wherever the copy could be mistaken for a clinical
+   * recommendation — what the supplier ships is marketing plus a reprinted
+   * monograph, and neither is a pharmacist.
+   *
+   * `satisfies` rather than the `as Record<…>` cast the status maps use. The
+   * cast quietly admits a map with a member missing — planted and observed
+   * before choosing this — where `satisfies` refuses it here and, because the
+   * exact keys survive into `Catalogue`, refuses the same gap in `bn.ts` too.
+   */
+  catalogueContent: {
+    group: {
+      [MedicineContentGroup.BRIEF]: 'Brief',
+      [MedicineContentGroup.OVERVIEW]: 'Overview',
+      [MedicineContentGroup.QUICK_TIP]: 'Quick tips',
+      [MedicineContentGroup.SAFETY]: 'Safety advice',
+      [MedicineContentGroup.BODY]: 'About this product',
+      [MedicineContentGroup.FEATURE]: 'Features',
+    } satisfies Record<MedicineContentGroup, string>,
+    safetyType: {
+      [SafetyAdviceType.ALCOHOL]: 'Alcohol',
+      [SafetyAdviceType.PREGNANCY]: 'Pregnancy',
+      [SafetyAdviceType.BREASTFEEDING]: 'Breastfeeding',
+      [SafetyAdviceType.DRIVING]: 'Driving',
+      [SafetyAdviceType.KIDNEY]: 'Kidney',
+      [SafetyAdviceType.LIVER]: 'Liver',
+      [SafetyAdviceType.SIDE_EFFECTS]: 'Side effects',
+      [SafetyAdviceType.PREGNANCY_AND_LACTATION]: 'Pregnancy and breastfeeding',
+      [SafetyAdviceType.PRECAUTIONS_AND_WARNINGS]: 'Precautions and warnings',
+    } satisfies Record<SafetyAdviceType, string>,
+    safetyTag: {
+      [SafetyAdviceTag.SAFE]: 'Safe',
+      [SafetyAdviceTag.SAFE_IF_PRESCRIBED]: 'Safe if prescribed',
+      // The commonest verdict in the whole catalogue, and the one that was
+      // being dropped. "Ask your doctor" rather than "consult your physician":
+      // the reader is a shop owner, not a clinician.
+      [SafetyAdviceTag.CONSULT_YOUR_DOCTOR]: 'Ask your doctor',
+      [SafetyAdviceTag.CAUTION]: 'Use with caution',
+      [SafetyAdviceTag.UNSAFE]: 'Unsafe',
+      // The manufacturer was asked and said the question does not apply here —
+      // which is different from having no answer, and worth showing as such.
+      [SafetyAdviceTag.NOT_RELEVANT]: 'Does not apply',
+    } satisfies Record<SafetyAdviceTag, string>,
+    provenance: 'Product information supplied by the manufacturer',
+    notAdvice: 'This is not clinical advice. Ask a pharmacist before acting on any of it.',
+    showMore: 'Show more',
+    showLess: 'Show less',
+    /**
+     * Shown to a Bangla reader when the supplier only wrote this product up in
+     * English. 24,554 of the 26,896 monographs have Bangla, so this fires on
+     * the 2,342 that do not — often enough to need saying, rarely enough that
+     * silently serving English would look like a bug rather than a gap.
+     */
+    onlyInEnglish: 'This product has only been written up in English.',
+    /** The same caution as `alternativeGroup.PROMOTED`, for the section itself. */
+    promoted: 'Promoted products',
+    promotedNote: 'The supplier advertises these. They are not alternatives to this product.',
+  },
   medicinePage: {
     edit: 'Edit',
     delist: 'Take off the catalogue',
@@ -982,6 +1125,13 @@ export const en = {
     noMrp: 'No printed price recorded',
     noMrpSet: 'Not recorded',
     perUnit: 'For one {{unit}}',
+    mrpIs: 'printed price {{amount}}',
+    /*
+     * Said on the buyer's own screen, because the figure above it is the list
+     * price and their invoice may be lower. A page that implied the list price
+     * was theirs would be quoting a number the invoice then contradicts.
+     */
+    priceCaveat: 'Your price list and any offer running on this line are applied when you order.',
     priceOrder:
       'An order uses this price unless the shop has its own discount or a price list, and both of those come first.',
     newPrice: 'New price for a shop',
@@ -1119,6 +1269,21 @@ export const en = {
     estimatedTotal: 'Estimated total',
     timeline: 'What has happened so far',
     activity: 'Order activity',
+    // Only administrators see this. Orders placed before credit was reserved
+    // hold credit that nothing records, so the customer looks like they have
+    // more available than they do.
+    backfillTitle: 'Record the credit this order holds',
+    backfillBody:
+      'For orders placed before credit was set aside automatically. If this order already has its credit recorded, nothing changes and you are told so.',
+    backfillReason: 'Why this is being recorded now',
+    backfill: 'Record it',
+    backfilling: 'Recording',
+    backfilled: 'The credit this order holds is now recorded.',
+    backfillAlreadyDone: 'This order already had its credit recorded. Nothing changed.',
+    backfillFailed: 'The credit could not be recorded.',
+    backfillConfirmTitle: 'Record this order’s credit?',
+    backfillConfirmBody:
+      'The customer’s available credit will drop by this order’s value, because it was always holding that credit — it simply was not written down.',
     cancelTitle: 'Ask to cancel this order',
     cancelBody:
       'A manager decides cancellations. You will be told whether yours was granted, and the order carries on in the meantime.',
@@ -1570,6 +1735,25 @@ export const en = {
     statusChanged: 'Changed to {{status}}.',
     statusFailed: 'That could not be changed.',
     defaultAddress: 'Default',
+    // Who the customer belongs to. A shop can have several owners — the people
+    // who sign in and order — and one manager, who is our side of it.
+    people: 'Who looks after them',
+    manager: 'Our manager',
+    noManager: 'Nobody here is looking after them.',
+    addOwner: 'Add a shop owner',
+    setManager: 'Set our manager',
+    choosePerson: 'Choose somebody',
+    assign: 'Assign',
+    ownerAssigned: 'They can now sign in and order for this shop.',
+    ownerAssignFailed: 'That owner could not be added.',
+    managerAssigned: 'They now look after this shop.',
+    managerAssignFailed: 'That manager could not be set.',
+    removeAddress: 'Remove',
+    removeAddressTitle: 'Remove this address?',
+    removeAddressBody:
+      'Deliveries already on the road keep the address they were given. "{{label}}" stops being offered for new orders.',
+    addressRemoved: 'The address has been removed.',
+    addressRemoveFailed: 'That address could not be removed.',
   },
 
   approvals: {
@@ -1951,6 +2135,43 @@ export const en = {
     couldNotLoadLedger: 'This account could not be loaded.',
     noEntries: 'Nothing happened in this period',
     noEntriesBody: 'Try a wider date range.',
+    // Checking a customer's ledger against what the system has cached, and
+    // correcting it. Written for somebody who is looking at a figure they do
+    // not believe, so every label says what the number is rather than naming
+    // the mechanism that produced it.
+    reconcileTitle: 'Check this account adds up',
+    reconcileBody:
+      'Compares every invoice, payment and collection against the ledger. Nothing is changed by looking.',
+    reconcileCheck: 'Check the account',
+    reconcileChecking: 'Checking',
+    reconcileClean: 'Everything matches. Nothing needs correcting.',
+    reconcileFailed: 'The account could not be checked.',
+    ledgerBalance: 'The ledger says',
+    cachedBalance: 'The customer record says',
+    difference: 'Difference',
+    missingCharges: 'Invoices never charged',
+    paymentsNotPosted: 'Payments never entered',
+    collectionsNotRecorded: 'Money collected but not recorded',
+    repair: 'Correct it',
+    repairTitle: 'Correct this account?',
+    repairBody:
+      'Missing invoice charges will be posted and the customer record set to the ledger figure. Entries are added, never removed, so this shows in the ledger.',
+    repaired: 'Corrected. {{charges}} invoice charges were posted.',
+    repairFailed: 'The account could not be corrected.',
+    adjustmentTitle: 'Post an adjustment',
+    adjustmentBody:
+      'An opening balance, or a correction with a reason. It appears in the ledger like any other entry.',
+    adjustmentType: 'What kind',
+    adjustmentAmount: 'Amount in taka',
+    adjustmentAmountInvalid: 'Enter an amount above zero.',
+    adjustmentReason: 'Why',
+    postAdjustment: 'Post it',
+    adjustmentPosting: 'Posting',
+    adjustmentPosted: 'The adjustment is in the ledger.',
+    adjustmentFailed: 'The adjustment could not be posted.',
+    adjustmentConfirmTitle: 'Post this adjustment?',
+    adjustmentConfirmBody:
+      '{{amount}} as {{type}}. A ledger entry cannot be deleted — a mistake is corrected by posting the opposite.',
     posted: 'Posted',
     type: 'What it was',
     description: 'Description',
@@ -3555,6 +3776,23 @@ export const en = {
     markedRead: 'Marked as read.',
     archived: 'Archived.',
     updateFailed: 'Those notifications could not be updated.',
+    // The attempt log behind one message, and a way to prove a channel works.
+    // Written for the conversation that starts "I never got the email".
+    deliveries: 'Was this sent?',
+    deliveriesLoading: 'Checking',
+    deliveriesFailed: 'The sending record could not be read.',
+    noDeliveries: 'Nothing was sent for this one.',
+    attempts: 'after {{count}} tries',
+    providerReference: 'Reference: {{reference}}',
+    testTitle: 'Send yourself a test',
+    testBody:
+      'Goes to you and to nobody else, so a real customer never receives a test. Use it to find out whether a way of sending actually works.',
+    testChannel: 'How to send it',
+    testNote: 'What it should say',
+    testSend: 'Send it to me',
+    testSending: 'Sending',
+    testSent: 'Sent. Open "Was this sent?" on the new message to see what happened to it.',
+    testFailed: 'The test could not be sent.',
     allCaughtUp: 'You have read everything here',
     noneInCategory: 'Nothing in this category yet',
     pushOnThisDevice: 'Phone alerts on this device',
@@ -3579,6 +3817,18 @@ export const en = {
     discard: 'Undo my changes',
     unavailable: 'These settings are not available.',
   },
+
+  /**
+   * What happened to one attempt. `SUPPRESSED` is deliberately not worded as a
+   * failure: it means a preference refused the channel, which is the system
+   * doing what somebody asked of it.
+   */
+  notificationDeliveryStatus: {
+    [NotificationDeliveryStatus.PENDING]: 'Still going out',
+    [NotificationDeliveryStatus.SENT]: 'Sent',
+    [NotificationDeliveryStatus.FAILED]: 'Did not send',
+    [NotificationDeliveryStatus.SUPPRESSED]: 'Held back by a preference',
+  } as Record<NotificationDeliveryStatus, string>,
 
   /** The five ways a message can reach somebody. */
   notificationChannel: {
@@ -3819,6 +4069,26 @@ export const en = {
     PRESCRIPTION: 'On prescription',
     OTC: 'Over the counter',
   },
+
+  /**
+   * How a payment reached us. Printed on the payment page, where "delivery
+   * collection" read as a description of the enum rather than as the fact that
+   * a rider took the money at the door.
+   */
+  paymentSource: {
+    [PaymentSource.MANUAL]: 'Entered at the office',
+    [PaymentSource.DELIVERY_COLLECTION]: 'Collected on delivery',
+  } as Record<PaymentSource, string>,
+
+  /**
+   * Whether a picking discrepancy has been decided. Two values, and the screen
+   * that shows them printed both straight from the database — so a storekeeper
+   * read "open" and "resolved" in English on an otherwise Bangla page.
+   */
+  discrepancyStatus: {
+    OPEN: 'Waiting for a decision',
+    RESOLVED: 'Decided',
+  } as Record<string, string>,
 
   productType: {
     MEDICINE: 'Medicine',

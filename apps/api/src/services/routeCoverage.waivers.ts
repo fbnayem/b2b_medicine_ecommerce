@@ -17,8 +17,12 @@
  * The counts below are stated as figures rather than as prose because they are
  * the burn-down, and a burn-down nobody can read the number off is a mood.
  *
- * **187 routes. 187 documented. 183 reached by an integration test, and the
+ * **186 routes. 186 documented. 182 reached by an integration test, and the
  * four that are not are the four the recorder cannot see.**
+ *
+ * It was 187 until `GET /payments/my-collections` was removed — a byte-for-byte
+ * duplicate of `GET /finance/my/collections` that no client called. A burn-down
+ * can also go down by deleting the thing being counted.
  *
  * Both lists are therefore finished. What they leave behind is a gate rather
  * than a number: a new route that is undocumented, or that no test calls, now
@@ -31,7 +35,7 @@
 /**
  * Served, but absent from the OpenAPI document.
  *
- * **Empty. 187 of 187 documented.**
+ * **Empty. 186 of 186 documented.**
  *
  * It began at 91, and the last 77 went in one pass because the roles assertion
  * had made the exercise worth doing: every `roles` list written here is checked
@@ -53,7 +57,7 @@ export const UNDOCUMENTED_ROUTES: readonly string[] = [];
 /**
  * Served, but no integration test reaches them.
  *
- * **4 of 187**, from 81 — and all four are the health probes and `/metrics`,
+ * **4 of 186**, from 81 — and all four are the health probes and `/metrics`,
  * which the recorder structurally cannot see. Their reason is written beside
  * them below and it is not "nobody got to them".
  *

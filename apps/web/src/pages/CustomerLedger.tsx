@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { FinanceSummaryCards } from '../components/FinanceSummaryCards';
+import { LedgerCorrections } from '../components/LedgerCorrections';
 import {
   Button,
   DataTable,
@@ -152,6 +153,14 @@ export function CustomerLedger() {
           )}
         </Resource>
       </div>
+
+      {/*
+        Below the ledger on purpose. Checking a balance and correcting one are
+        the same job in the wrong order — nobody posts an adjustment before
+        reading what is there — and putting the write above the record would
+        offer the correction first.
+      */}
+      <LedgerCorrections shopId={shopId!} />
     </>
   );
 }

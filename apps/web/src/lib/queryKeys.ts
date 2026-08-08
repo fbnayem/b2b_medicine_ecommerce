@@ -41,12 +41,29 @@ export const keys = {
   medicines: {
     all: family('medicines'),
     list: (filters: Filters) => ['medicines', 'list', filters] as const,
+    /**
+     * The shelf hierarchy beside the list. In this family, not its own,
+     * because the server derives it from the same records — adding or
+     * delisting a medicine moves its counts, so one invalidation must reach
+     * both.
+     */
+    categories: () => ['medicines', 'categories'] as const,
     /** The type-ahead in order entry. Same records, different question. */
     search: (term: string) => ['medicines', 'search', term] as const,
     /** The whole-catalogue feed behind a picker. */
     picker: () => ['medicines', 'picker'] as const,
     one: (id: string) => ['medicines', 'one', id] as const,
     batches: (id: string) => ['medicines', 'one', id, 'batches'] as const,
+    /** What else could be supplied instead. Nested so refreshing one clears it. */
+    alternatives: (id: string) => ['medicines', 'one', id, 'alternatives'] as const,
+    /**
+     * The manufacturer's copy, per language. The English and Bangla monographs
+     * are sibling responses to the same URL pattern, so a key without the
+     * language would show whichever answer happened to load first after a
+     * language switch. Nested under `one(id)` like the alternatives, so
+     * refreshing the medicine clears its copy too.
+     */
+    content: (id: string, lang: string) => ['medicines', 'one', id, 'content', lang] as const,
   },
 
   /** Batches, movements and where things are kept. */
